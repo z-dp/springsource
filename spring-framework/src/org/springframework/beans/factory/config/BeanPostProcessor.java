@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory.config;
 
@@ -32,6 +32,8 @@ import org.springframework.beans.BeansException;
  *
  * @author Juergen Hoeller
  * @since 10.10.2003
+ * @see InstantiationAwareBeanPostProcessor
+ * @see DestructionAwareBeanPostProcessor
  * @see ConfigurableBeanFactory#addBeanPostProcessor
  * @see BeanFactoryPostProcessor
  */
@@ -43,11 +45,12 @@ public interface BeanPostProcessor {
 	 * init-method). The bean will already be populated with property values.
 	 * The returned bean instance may be a wrapper around the original.
 	 * @param bean the new bean instance
-	 * @param name the name of the bean
+	 * @param beanName the name of the bean
 	 * @return the bean instance to use, either the original or a wrapped one
 	 * @throws org.springframework.beans.BeansException in case of errors
+	 * @see org.springframework.beans.factory.InitializingBean#afterPropertiesSet
 	 */
-	Object postProcessBeforeInitialization(Object bean, String name) throws BeansException;
+	Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException;
 
 	/**
 	 * Apply this BeanPostProcessor to the given new bean instance <i>after</i> any bean
@@ -55,10 +58,11 @@ public interface BeanPostProcessor {
 	 * init-method). The bean will already be populated with property values.
 	 * The returned bean instance may be a wrapper around the original.
 	 * @param bean the new bean instance
-	 * @param name the name of the bean
+	 * @param beanName the name of the bean
 	 * @return the bean instance to use, either the original or a wrapped one
 	 * @throws org.springframework.beans.BeansException in case of errors
+	 * @see org.springframework.beans.factory.InitializingBean#afterPropertiesSet
 	 */
-	Object postProcessAfterInitialization(Object bean, String name) throws BeansException;
+	Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException;
 
 }

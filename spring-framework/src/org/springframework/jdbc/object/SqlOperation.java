@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,15 +12,14 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.object;
-
-import java.sql.ResultSet;
 
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.core.PreparedStatementCreatorFactory;
+import org.springframework.jdbc.core.PreparedStatementSetter;
 import org.springframework.jdbc.support.JdbcUtils;
 
 /**
@@ -32,13 +31,9 @@ import org.springframework.jdbc.support.JdbcUtils;
  *
  * @author Rod Johnson
  * @author Juergen Hoeller
- * @version $Id: SqlOperation.java,v 1.10 2004/03/18 02:46:13 trisberg Exp $
+ * @see PreparedStatementCreatorFactory
  */
 public abstract class SqlOperation extends RdbmsOperation {
-
-	private int resultSetType = ResultSet.TYPE_FORWARD_ONLY;
-
-	private boolean updatableResults = false;
 
 	/**
 	 * Object enabling us to create PreparedStatementCreators
@@ -48,81 +43,60 @@ public abstract class SqlOperation extends RdbmsOperation {
 
 
 	/**
-	 * Set whether to use prepared statements that return a
-	 * specific type of ResultSet.
-	 * @param resultSetType the ResultSet type
-	 * @see java.sql.ResultSet#TYPE_FORWARD_ONLY
-	 * @see java.sql.ResultSet#TYPE_SCROLL_INSENSITIVE
-	 * @see java.sql.ResultSet#TYPE_SCROLL_SENSITIVE
-	 */
-	protected void setResultSetType(int resultSetType) {
-		this.resultSetType = resultSetType;
-	}
-
-	/**
-	 * Return whether prepared statements will return a specific
-	 * type of ResultSet.
-	 */
-	protected int getResultSetType() {
-		return resultSetType;
-	}
-
-	/**
-	 * Set whether to use prepared statements capable of returning
-	 * updatable ResultSets.
-	 */
-	protected void setUpdatableResults(boolean updatableResults) {
-		this.updatableResults = updatableResults;
-	}
-
-	/**
-	 * Return whether prepared statements will return updatable ResultSets.
-	 */
-	protected boolean isUpdatableResults() {
-		return updatableResults;
-	}
-	
-
-	/**
 	 * Overridden method to configure the PreparedStatementCreatorFactory
 	 * based on our declared parameters.
-	 * @see RdbmsOperation#compileInternal()
 	 */
 	protected final void compileInternal() {
 		// validate parameter count
-		int bindVarCount = 0;
 		try {
-			bindVarCount = JdbcUtils.countParameterPlaceholders(getSql(), '?', '\'');
+			int bindVarCount = JdbcUtils.countParameterPlaceholders(getSql(), '?', "'\"");
+			if (bindVarCount != getDeclaredParameters().size()) {
+				throw new InvalidDataAccessApiUsageException(
+						"SQL '" + getSql() + "' requires " + bindVarCount + " bind variables, but " +
+						getDeclaredParameters().size() + " variables were declared for this object");
+			}
 		}
 		catch (IllegalArgumentException ex) {
 			// transform JDBC-agnostic error to data access error
 			throw new InvalidDataAccessApiUsageException(ex.getMessage());
 		}
-		if (bindVarCount != getDeclaredParameters().size())
-			throw new InvalidDataAccessApiUsageException("SQL '" + getSql() + "' requires " + bindVarCount +
-			                                             " bind variables, but " + getDeclaredParameters().size() +
-																									 " variables were declared for this object");
 
 		this.preparedStatementFactory = new PreparedStatementCreatorFactory(getSql(), getDeclaredParameters());
-		this.preparedStatementFactory.setResultSetType(this.resultSetType);
-		this.preparedStatementFactory.setUpdatableResults(this.updatableResults);
+		this.preparedStatementFactory.setResultSetType(getResultSetType());
+		this.preparedStatementFactory.setUpdatableResults(isUpdatableResults());
+		this.preparedStatementFactory.setReturnGeneratedKeys(isReturnGeneratedKeys());
+		if (getGeneratedKeysColumnNames() != null) {
+			this.preparedStatementFactory.setGeneratedKeysColumnNames(getGeneratedKeysColumnNames());
+		}
+		this.preparedStatementFactory.setNativeJdbcExtractor(getJdbcTemplate().getNativeJdbcExtractor());
+
 		onCompileInternal();
 	}
 
 	/**
-	 * Hook method that subclasses may override to react to compilation.
+	 * Hook method that subclasses may override to post-process compilation.
 	 * This implementation does nothing.
+	 * @see #compileInternal
 	 */
 	protected void onCompileInternal() {
 	}
 
 	/**
 	 * Return a PreparedStatementCreator to perform an operation
-	 * with this parameters.
-	 * @param params parameters. May be null.
+	 * with the given parameters.
+	 * @param params parameter array. May be <code>null</code>.
 	 */
-	protected PreparedStatementCreator newPreparedStatementCreator(Object[] params) {
+	protected final PreparedStatementCreator newPreparedStatementCreator(Object[] params) {
 		return this.preparedStatementFactory.newPreparedStatementCreator(params);
+	}
+
+	/**
+	 * Return a PreparedStatementSetter to perform an operation
+	 * with the given parameters.
+	 * @param params parameter array. May be <code>null</code>.
+	 */
+	protected final PreparedStatementSetter newPreparedStatementSetter(Object[] params) {
+		return this.preparedStatementFactory.newPreparedStatementSetter(params);
 	}
 
 }

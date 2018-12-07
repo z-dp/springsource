@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.dao;
 
@@ -39,7 +39,7 @@ public abstract class DataAccessException extends NestedRuntimeException {
 
 	/**
 	 * Constructor for DataAccessException.
-	 * @param msg message
+	 * @param msg the detail message
 	 */
 	public DataAccessException(String msg) {
 		super(msg);
@@ -47,7 +47,7 @@ public abstract class DataAccessException extends NestedRuntimeException {
 
 	/**
 	 * Constructor for DataAccessException.
-	 * @param msg message
+	 * @param msg the detail message
 	 * @param ex root cause (usually from using a underlying
 	 * data access API such as JDBC)
 	 */

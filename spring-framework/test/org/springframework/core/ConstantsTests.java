@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.core;
 
@@ -22,14 +22,15 @@ import junit.framework.TestCase;
 
 /**
  * @author Rod Johnson
- * @since 28-Apr-2003
- * @version $Revision: 1.2 $
+ * @author Juergen Hoeller
+ * @since 28.04.2003
  */
 public class ConstantsTests extends TestCase {
 
 	public void testConstants() {
 		Constants c = new Constants(A.class);
-		assertTrue(c.getSize() == 5);
+		assertEquals(A.class.getName(), c.getClassName());
+		assertEquals(5, c.getSize());
 		
 		assertEquals(c.asNumber("DOG").intValue(), A.DOG);
 		assertEquals(c.asNumber("dog").intValue(), A.DOG);

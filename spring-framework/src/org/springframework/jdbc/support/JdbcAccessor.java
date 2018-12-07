@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,15 +12,20 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.support;
 
 import javax.sql.DataSource;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import org.springframework.beans.factory.InitializingBean;
+
 /**
  * Base class for JdbcTemplate and other JDBC-accessing DAO helpers,
- * defining common properties like exception translator.
+ * defining common properties like DataSource and exception translator.
  *
  * <p>Not intended to be used directly. See JdbcTemplate.
  *
@@ -28,16 +33,18 @@ import javax.sql.DataSource;
  * @since 28.11.2003
  * @see org.springframework.jdbc.core.JdbcTemplate
  */
-public class JdbcAccessor {
+public abstract class JdbcAccessor implements InitializingBean {
 
-	/**
-	 * Used to obtain connections throughout the lifecycle of this object.
-	 * This enables this class to close connections if necessary.
-	 **/
+	protected final Log logger = LogFactory.getLog(getClass());
+
+	/** Used to obtain connections throughout the lifecycle of this object */
 	private DataSource dataSource;
 
 	/** Helper to translate SQL exceptions to DataAccessExceptions */
 	private SQLExceptionTranslator exceptionTranslator;
+
+	private boolean lazyInit = true;
+
 
 	/**
 	 * Set the JDBC DataSource to obtain connections from.
@@ -54,9 +61,21 @@ public class JdbcAccessor {
 	}
 
 	/**
+	 * Specify the database product name for the DataSource that this accessor uses.
+	 * This allows to initialize a SQLErrorCodeSQLExceptionTranslator without
+	 * obtaining a Connection from the DataSource to get the metadata.
+	 * @param dbName the database product name that identifies the error codes entry
+	 * @see SQLErrorCodeSQLExceptionTranslator#setDatabaseProductName
+	 * @see java.sql.DatabaseMetaData#getDatabaseProductName()
+	 */
+	public void setDatabaseProductName(String dbName) {
+		this.exceptionTranslator = new SQLErrorCodeSQLExceptionTranslator(dbName);
+	}
+
+	/**
 	 * Set the exception translator for this instance.
-	 * If no custom translator is provided, a default is used
-	 * which examines the SQLException's vendor-specific error code.
+	 * <p>If no custom translator is provided, a default SQLErrorCodeSQLExceptionTranslator
+	 * is used which examines the SQLException's vendor-specific error code.
 	 * @param exceptionTranslator exception translator
 	 * @see org.springframework.jdbc.support.SQLErrorCodeSQLExceptionTranslator
 	 * @see org.springframework.jdbc.support.SQLStateSQLExceptionTranslator
@@ -67,13 +86,39 @@ public class JdbcAccessor {
 
 	/**
 	 * Return the exception translator for this instance.
-	 * Creates a default one for the specified DataSource if none set.
+	 * <p>Creates a default SQLErrorCodeSQLExceptionTranslator for the specified
+	 * DataSource if none set.
 	 */
-	public synchronized SQLExceptionTranslator getExceptionTranslator() {
+	public SQLExceptionTranslator getExceptionTranslator() {
 		if (this.exceptionTranslator == null) {
-			this.exceptionTranslator = new SQLErrorCodeSQLExceptionTranslator(this.dataSource);
+			DataSource dataSource = getDataSource();
+			if (dataSource != null) {
+				this.exceptionTranslator = new SQLErrorCodeSQLExceptionTranslator(dataSource);
+			}
+			else {
+				this.exceptionTranslator = new SQLStateSQLExceptionTranslator();
+			}
 		}
 		return this.exceptionTranslator;
+	}
+
+	/**
+	 * Set whether to lazily initialize the SQLExceptionTranslator for this accessor,
+	 * on first encounter of a SQLException. Default is "true"; can be switched to
+	 * "false" for initialization on startup.
+	 * <p>Early initialization only applies if <code>afterPropertiesSet</code> is called.
+	 * @see #getExceptionTranslator
+	 * @see #afterPropertiesSet
+	 */
+	public void setLazyInit(boolean lazyInit) {
+		this.lazyInit = lazyInit;
+	}
+
+	/**
+	 * Return whether to lazily initialize the SQLExceptionTranslator for this accessor.
+	 */
+	public boolean isLazyInit() {
+		return lazyInit;
 	}
 
 	/**
@@ -81,10 +126,12 @@ public class JdbcAccessor {
 	 * creating a default one for the specified DataSource if none set.
 	 */
 	public void afterPropertiesSet() {
-		if (this.dataSource == null) {
+		if (getDataSource() == null) {
 			throw new IllegalArgumentException("dataSource is required");
 		}
-		getExceptionTranslator();
+		if (!isLazyInit()) {
+			getExceptionTranslator();
+		}
 	}
 	
 }

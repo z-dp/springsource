@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,44 +12,45 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans;
 
 /**
- * Object containing 0 or more PropertyValues comprising one update.
+ * Object containing 0 or more PropertyValue objects comprising one update.
+ *
  * @author Rod Johnson
  * @since 13 May 2001
- * @version $Id: PropertyValues.java,v 1.3 2004/03/18 02:46:12 trisberg Exp $
+ * @see PropertyValue
  */
 public interface PropertyValues {
    
 	/** 
 	 * Return an array of the PropertyValue objects held in this object.
-	 * @return an array of the PropertyValue objects held in this object.
 	 */
 	PropertyValue[] getPropertyValues();	
 	
 	/**
-	 * Return the property value with the given name.
-	 * @param propertyName name to search for
-	 * @return pv or null
+	 * Return the property value with the given name, if any.
+	 * @param propertyName the name to search for
+	 * @return the property value, or <code>null</code>
 	 */
 	PropertyValue getPropertyValue(String propertyName);
 
 	/**
 	 * Is there a property value for this property?
-	 * @param propertyName name of the property we're interested in
+	 * @param propertyName the name of the property we're interested in
 	 * @return whether there is a property value for this property
 	 */
 	boolean contains(String propertyName);
 	
 	/**
 	 * Return the changes since the previous PropertyValues.
-	 * Subclasses should also override equals.
+	 * Subclasses should also override <code>equals</code>.
 	 * @param old old property values
 	 * @return PropertyValues updated or new properties.
-	 * Return the empty PropertyValues if there are no changes.
+	 * Return empty PropertyValues if there are no changes.
+	 * @see java.lang.Object#equals
 	 */
 	PropertyValues changesSince(PropertyValues old);
 

@@ -7,10 +7,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.support.PagedListHolder;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.samples.jpetstore.domain.Account;
 import org.springframework.samples.jpetstore.domain.logic.PetStoreFacade;
 import org.springframework.validation.BindException;
-import org.springframework.validation.Errors;
+import org.springframework.validation.ValidationUtils;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.SimpleFormController;
 import org.springframework.web.util.WebUtils;
@@ -48,6 +49,7 @@ public class AccountFormController extends SimpleFormController {
 
 	protected void onBindAndValidate(HttpServletRequest request, Object command, BindException errors)
 			throws Exception {
+
 		AccountForm accountForm = (AccountForm) command;
 		Account account = accountForm.getAccount();
 
@@ -64,25 +66,20 @@ public class AccountFormController extends SimpleFormController {
 
 		if (accountForm.isNewAccount()) {
 			account.setStatus("OK");
-			rejectIfEmpty(errors, "account.username", "USER_ID_REQUIRED", "User ID is required.");
+			ValidationUtils.rejectIfEmpty(errors, "account.username", "USER_ID_REQUIRED", "User ID is required.");
 			if (account.getPassword() == null || account.getPassword().length() < 1 ||
 					!account.getPassword().equals(accountForm.getRepeatedPassword())) {
-			 errors.reject("PASSWORD_MISMATCH", "Passwords did not match or were not provided.  Matching passwords are required.");
+			 errors.reject("PASSWORD_MISMATCH",
+					 "Passwords did not match or were not provided. Matching passwords are required.");
 			}
 		}
 		else if (account.getPassword() != null && account.getPassword().length() > 0) {
 		  if (!account.getPassword().equals(accountForm.getRepeatedPassword())) {
-				errors.reject("PASSWORD_MISMATCH", "Passwords did not match.  Matching passwords are required.");
+				errors.reject("PASSWORD_MISMATCH",
+						"Passwords did not match. Matching passwords are required.");
 		  }
 	  }
  	}
-
-	protected void rejectIfEmpty(Errors errors, String field, String errorCode, String defaultMessage) {
-		Object fieldValue = errors.getFieldValue(field);
-		if (fieldValue == null || fieldValue.toString().length() == 0) {
-			errors.rejectValue(field, errorCode, defaultMessage);
-		}
-	}
 
 	protected Map referenceData(HttpServletRequest request) throws Exception {
 		Map model = new HashMap();
@@ -91,17 +88,28 @@ public class AccountFormController extends SimpleFormController {
 		return model;
 	}
 
-	protected ModelAndView onSubmit(HttpServletRequest request, HttpServletResponse response,
-																	Object command, BindException errors) throws Exception {
+	protected ModelAndView onSubmit(
+			HttpServletRequest request, HttpServletResponse response, Object command, BindException errors)
+			throws Exception {
+
 		AccountForm accountForm = (AccountForm) command;
-		if (accountForm.isNewAccount()) {
-			this.petStore.insertAccount(accountForm.getAccount());
+		try {
+			if (accountForm.isNewAccount()) {
+				this.petStore.insertAccount(accountForm.getAccount());
+			}
+			else {
+				this.petStore.updateAccount(accountForm.getAccount());
+			}
 		}
-		else {
-			this.petStore.updateAccount(accountForm.getAccount());
+		catch (DataIntegrityViolationException ex) {
+			errors.rejectValue("account.username", "USER_ID_ALREADY_EXISTS",
+					"User ID already exists: choose a different ID.");
+			return showForm(request, response, errors);
 		}
+		
 		UserSession userSession = new UserSession(this.petStore.getAccount(accountForm.getAccount().getUsername()));
-		PagedListHolder myList = new PagedListHolder(this.petStore.getProductListByCategory(accountForm.getAccount().getFavouriteCategoryId()));
+		PagedListHolder myList = new PagedListHolder(
+				this.petStore.getProductListByCategory(accountForm.getAccount().getFavouriteCategoryId()));
 		myList.setPageSize(4);
 		userSession.setMyList(myList);
 		request.getSession().setAttribute("userSession", userSession);

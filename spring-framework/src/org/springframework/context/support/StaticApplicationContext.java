@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.context.support;
 
@@ -20,8 +20,6 @@ import java.util.Locale;
 
 import org.springframework.beans.BeansException;
 import org.springframework.beans.MutablePropertyValues;
-import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.context.ApplicationContext;
 
@@ -29,65 +27,87 @@ import org.springframework.context.ApplicationContext;
  * ApplicationContext that allows concrete registration of beans and
  * messages in code, rather than from external configuration sources.
  * Mainly useful for testing.
+ *
  * @author Rod Johnson
+ * @author Juergen Hoeller
+ * @see #registerSingleton
+ * @see #registerPrototype
+ * @see #registerBeanDefinition
+ * @see #refresh
  */
-public class StaticApplicationContext extends AbstractApplicationContext {
+public class StaticApplicationContext extends GenericApplicationContext {
 
-	private DefaultListableBeanFactory beanFactory;
+	private final StaticMessageSource messageSource;
 
 	/**
-	 * Create new StaticApplicationContext.
+	 * Create a new StaticApplicationContext.
+	 * @see #registerSingleton
+	 * @see #registerPrototype
+	 * @see #registerBeanDefinition
+	 * @see #refresh
 	 */
 	public StaticApplicationContext() throws BeansException {
 		this(null);
 	}
 
 	/**
-	 * Create new StaticApplicationContext with the given parent.
-	 * @param parent the parent application context
+	 * Create a new StaticApplicationContext with the given parent.
+	 * @see #registerSingleton
+	 * @see #registerPrototype
+	 * @see #registerBeanDefinition
+	 * @see #refresh
 	 */
 	public StaticApplicationContext(ApplicationContext parent) throws BeansException {
 		super(parent);
 
-		// create bean factory with parent
-		this.beanFactory = new DefaultListableBeanFactory(parent);
-
-		// Register the message source bean
-		registerSingleton(MESSAGE_SOURCE_BEAN_NAME, StaticMessageSource.class, null);
+		// initialize and register StaticMessageSource
+		this.messageSource = new StaticMessageSource();
+		getBeanFactory().registerSingleton(MESSAGE_SOURCE_BEAN_NAME, this.messageSource);
 	}
 
 	/**
-	 * Return the underlying bean factory of this context.
+	 * Return the internal StaticMessageSource used by this context.
+	 * Can be used to register messages on it.
+	 * @see #addMessage
 	 */
-	public DefaultListableBeanFactory getDefaultListableBeanFactory() {
-		return beanFactory;
+	public StaticMessageSource getStaticMessageSource() {
+		return messageSource;
 	}
 
 	/**
-	 * Return underlying bean factory for super class.
+	 * Register a singleton bean with the underlying bean factory.
+	 * <p>For more advanced needs, register with the underlying BeanFactory directly.
+	 * @see #getDefaultListableBeanFactory
 	 */
-	public ConfigurableListableBeanFactory getBeanFactory() {
-		return beanFactory;
+	public void registerSingleton(String name, Class clazz) throws BeansException {
+		getDefaultListableBeanFactory().registerBeanDefinition(name, new RootBeanDefinition(clazz));
 	}
 
 	/**
-	 * Do nothing: We rely on callers to update our public methods.
-	 */
-	protected void refreshBeanFactory() {
-	}
-
-	/**
-	 * Register a singleton bean with the default bean factory.
+	 * Register a singleton bean with the underlying bean factory.
+	 * <p>For more advanced needs, register with the underlying BeanFactory directly.
+	 * @see #getDefaultListableBeanFactory
 	 */
 	public void registerSingleton(String name, Class clazz, MutablePropertyValues pvs) throws BeansException {
-		this.beanFactory.registerBeanDefinition(name, new RootBeanDefinition(clazz, pvs));
+		getDefaultListableBeanFactory().registerBeanDefinition(name, new RootBeanDefinition(clazz, pvs));
 	}
 
 	/**
-	 * Register a prototype bean with the default bean factory.
+	 * Register a prototype bean with the underlying bean factory.
+	 * <p>For more advanced needs, register with the underlying BeanFactory directly.
+	 * @see #getDefaultListableBeanFactory
+	 */
+	public void registerPrototype(String name, Class clazz) throws BeansException {
+		getDefaultListableBeanFactory().registerBeanDefinition(name, new RootBeanDefinition(clazz, false));
+	}
+
+	/**
+	 * Register a prototype bean with the underlying bean factory.
+	 * <p>For more advanced needs, register with the underlying BeanFactory directly.
+	 * @see #getDefaultListableBeanFactory
 	 */
 	public void registerPrototype(String name, Class clazz, MutablePropertyValues pvs) throws BeansException {
-		this.beanFactory.registerBeanDefinition(name, new RootBeanDefinition(clazz, pvs, false));
+		getDefaultListableBeanFactory().registerBeanDefinition(name, new RootBeanDefinition(clazz, pvs, false));
 	}
 
 	/**
@@ -95,10 +115,10 @@ public class StaticApplicationContext extends AbstractApplicationContext {
 	 * @param code lookup code
 	 * @param locale locale message should be found within
 	 * @param defaultMessage message associated with this lookup code
+	 * @see #getStaticMessageSource
 	 */
 	public void addMessage(String code, Locale locale, String defaultMessage) {
-		StaticMessageSource messageSource = (StaticMessageSource) getBean(MESSAGE_SOURCE_BEAN_NAME);
-		messageSource.addMessage(code, locale, defaultMessage);
+		getStaticMessageSource().addMessage(code, locale, defaultMessage);
 	}
 
 }

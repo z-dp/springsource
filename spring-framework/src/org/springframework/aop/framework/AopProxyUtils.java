@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,83 +12,121 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.Arrays;
 
-import org.aopalliance.aop.AspectException;
+import org.springframework.aop.support.AopUtils;
+import org.springframework.util.Assert;
 
 /**
- * Miscellaneous utilities for AOP proxies
+ * Miscellaneous utilities for AOP proxy users and AOP proxy implementations.
+ * Mainly for internal use within the framework.
+ *
+ * <p>See AopUtils for a collection of generic AOP utility methods
+ * which do not depend on the AOP framework itself.
+ *
  * @author Rod Johnson
- * @version $Id: AopProxyUtils.java,v 1.6 2004/03/19 21:35:54 johnsonr Exp $
+ * @author Juergen Hoeller
+ * @see org.springframework.aop.support.AopUtils
  */
 public abstract class AopProxyUtils {
-	
+
 	/**
-	 * Get complete set of interfaces to proxy. This will always add the ProxyConfig interface.
+	 * Return the target class of the given bean instance.
+	 * <p>Returns the target class for an AOP proxy and the plain bean class else.
+	 * @param proxy the instance to check (might be an AOP proxy)
+	 * @return the target class
+	 * @see org.springframework.aop.framework.Advised#getTargetSource
+	 * @see org.springframework.aop.TargetSource#getTargetClass
+	 */
+	public static Class getTargetClass(Object proxy) {
+		if (AopUtils.isCglibProxy(proxy)) {
+			return proxy.getClass().getSuperclass();
+		}
+		if (proxy instanceof Advised) {
+			return ((Advised) proxy).getTargetSource().getTargetClass();
+		}
+		return proxy.getClass();
+	}
+
+	/**
+	 * Get complete set of interfaces to proxy. This will always add the Advised interface
+	 * unless the AdvisedSupport's "opaque" flag is true.
 	 * @return the complete set of interfaces to proxy
 	 */
 	public static Class[] completeProxiedInterfaces(AdvisedSupport advised) {
-		Class[] proxiedInterfaces = advised.getProxiedInterfaces();
-		if (proxiedInterfaces == null ||proxiedInterfaces.length == 0) {
-			proxiedInterfaces = new Class[1];
+		// Won't include Advised, which may be necessary.
+		Class[] specifiedInterfaces = advised.getProxiedInterfaces();
+		Class[] proxiedInterfaces = specifiedInterfaces;
+		if (!advised.isOpaque() && !advised.isInterfaceProxied(Advised.class)) {
+			// We need to add the Advised interface.
+			proxiedInterfaces = new Class[specifiedInterfaces.length + 1];
 			proxiedInterfaces[0] = Advised.class;
-		}
-		else {
-			// Don't add the interface twice if it's already there
-			if (!advised.isInterfaceProxied(Advised.class)) {
-				proxiedInterfaces = new Class[advised.getProxiedInterfaces().length + 1];
-				proxiedInterfaces[0] = Advised.class;
-				System.arraycopy(advised.getProxiedInterfaces(), 0, proxiedInterfaces, 1, advised.getProxiedInterfaces().length);
-			}
+			System.arraycopy(specifiedInterfaces, 0, proxiedInterfaces, 1, specifiedInterfaces.length);
 		}
 		return proxiedInterfaces;
 	}
 
 	/**
-	 * Invoke the target directly via reflection.
+	 * Extract the user-specified interfaces that the given proxy implements,
+	 * i.e. all non-Advised interfaces that the proxy implements.
+	 * @param proxy the proxy to analyze (usually a JDK dynamic proxy)
+	 * @return all user-specified interfaces that the proxy implements,
+	 * in the original order (never <code>null</code> or empty)
+	 * @see Advised
 	 */
-	public static Object invokeJoinpointUsingReflection(Object target, Method m, Object[] args) throws Throwable {
-		//	Use reflection to invoke the method
-		 try {
-			 Object rval = m.invoke(target, args);
-			 return rval;
-		 }
-		 catch (InvocationTargetException ex) {
-			 // Invoked method threw a checked exception. 
-			 // We must rethrow it. The client won't see the interceptor.
-			 throw ex.getTargetException();
-		 }
-		 catch (IllegalArgumentException ex) {
-			throw new AspectException("AOP configuration seems to be invalid: tried calling " + m + " on [" + target + "]: " +  ex);
-		 }
-		 catch (IllegalAccessException ex) {
-			 throw new AspectException("Couldn't access method " + m, ex);
-		 }
+	public static Class[] proxiedUserInterfaces(Object proxy) {
+		Class[] proxyInterfaces = proxy.getClass().getInterfaces();
+		if (proxy instanceof Advised) {
+			Assert.isTrue((proxyInterfaces.length > 1),
+					"JDK proxy must implement at least 1 interface aside from Advised");
+			Class[] beanInterfaces = new Class[proxyInterfaces.length - 1];
+			System.arraycopy(proxyInterfaces, 1, beanInterfaces, 0, beanInterfaces.length);
+			return beanInterfaces;
+		}
+		else {
+			Assert.notEmpty(proxyInterfaces,
+					"JDK proxy must implement at least 1 interface aside from Advised");
+			return proxyInterfaces;
+		}
+	}
+
+	/**
+	 * Check equality of the proxies behind the given AdvisedSupport objects.
+	 * Not the same as equality of the AdvisedSupport objects:
+	 * rather, equality of interfaces, advisors and target sources.
+	 */
+	public static boolean equalsInProxy(AdvisedSupport a, AdvisedSupport b) {
+		if (a == b) {
+			return true;
+		}
+		if (!equalsProxiedInterfaces(a, b)) {
+			return false;
+		}
+		if (!equalsAdvisors(a, b)) {
+			return false;
+		}
+		if (a.getTargetSource() == null) {
+			return (b.getTargetSource() == null);
+		}
+		return a.getTargetSource().equals(b.getTargetSource());
+	}
+
+	/**
+	 * Check equality of the proxied interfaces behind the given AdvisedSupport objects.
+	 */
+	public static boolean equalsProxiedInterfaces(AdvisedSupport a, AdvisedSupport b) {
+		return Arrays.equals(a.getProxiedInterfaces(), b.getProxiedInterfaces());
 	}
 	
 	/**
-	 * Note the same as equality of the AdvisedSupport objects.
+	 * Check equality of the advisors behind the given AdvisedSupport objects.
 	 */
-	public static boolean equalsInProxy(AdvisedSupport a, AdvisedSupport b) {
-		if (a == b)
-			return true;
-	
-		if (!Arrays.equals(a.getProxiedInterfaces(), b.getProxiedInterfaces()))
-			return false;
-
-		if (!Arrays.equals(a.getAdvisors(), b.getAdvisors()))
-			return false;
-	
-		if (a.getTargetSource() == null)
-			return b.getTargetSource() == null;
-	
-		return a.getTargetSource().equals(b.getTargetSource());
+	public static boolean equalsAdvisors(AdvisedSupport a, AdvisedSupport b) {
+		return Arrays.equals(a.getAdvisors(), b.getAdvisors());
 	}
 
 }

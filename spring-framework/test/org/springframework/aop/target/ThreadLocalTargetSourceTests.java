@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.target;
 
@@ -25,7 +25,6 @@ import org.springframework.core.io.ClassPathResource;
 
 /**
  * @author Rod Johnson
- * @version $Id: ThreadLocalTargetSourceTests.java,v 1.5 2004/03/18 03:01:18 trisberg Exp $
  */
 public class ThreadLocalTargetSourceTests extends TestCase {
 
@@ -51,7 +50,7 @@ public class ThreadLocalTargetSourceTests extends TestCase {
 	 * with one another.
 	 */
 	public void testUseDifferentManagedInstancesInSameThread() {
-			SideEffectBean apartment = (SideEffectBean) beanFactory.getBean("apartment");
+		SideEffectBean apartment = (SideEffectBean) beanFactory.getBean("apartment");
 		assertEquals(INITIAL_COUNT, apartment.getCount() );
 		apartment.doWork();
 		assertEquals(INITIAL_COUNT + 1, apartment.getCount() );
@@ -72,27 +71,25 @@ public class ThreadLocalTargetSourceTests extends TestCase {
 	}
 	
 	/**
-	 * Relies on introduction
-	 *
+	 * Relies on introduction.
 	 */
 	public void testCanGetStatsViaMixin() {
 		ThreadLocalTargetSourceStats stats = (ThreadLocalTargetSourceStats) beanFactory.getBean("apartment");
 		// +1 because creating target for stats call counts
-		assertEquals(1, stats.getInvocations());
+		assertEquals(1, stats.getInvocationCount());
 		SideEffectBean apartment = (SideEffectBean) beanFactory.getBean("apartment");
 		apartment.doWork();
 		// +1 again
-		assertEquals(3, stats.getInvocations());
+		assertEquals(3, stats.getInvocationCount());
 		// + 1 for states call!
-		assertEquals(3, stats.getHits());
+		assertEquals(3, stats.getHitCount());
 		apartment.doWork();
-		assertEquals(6, stats.getInvocations());
-		assertEquals(6, stats.getHits());
+		assertEquals(6, stats.getInvocationCount());
+		assertEquals(6, stats.getHitCount());
 		// Only one thread so only one object can have been bound
-		assertEquals(1, stats.getObjects());
+		assertEquals(1, stats.getObjectCount());
 	}
 	
-
 	public void testNewThreadHasOwnInstance() throws InterruptedException {
 		SideEffectBean apartment = (SideEffectBean) beanFactory.getBean("apartment");
 		assertEquals(INITIAL_COUNT, apartment.getCount() );
@@ -125,7 +122,25 @@ public class ThreadLocalTargetSourceTests extends TestCase {
 		assertEquals(INITIAL_COUNT + 3, r.mine.getCount() );
 		
 		// Bound to two threads
-		assertEquals(2, ((ThreadLocalTargetSourceStats) apartment).getObjects());
+		assertEquals(2, ((ThreadLocalTargetSourceStats) apartment).getObjectCount());
+	}
+
+	/**
+	 * Test for SPR-1442. Destroyed target should re-associated with thread and not throw NPE
+	 */
+	public void testReuseDestroyedTarget() {
+		ThreadLocalTargetSource source = (ThreadLocalTargetSource)this.beanFactory.getBean("threadLocalTs");
+
+		// try first time
+		Object o = source.getTarget();
+		source.destroy();
+
+		// try second time
+		try {
+			source.getTarget();
+		} catch(NullPointerException ex) {
+			fail("Should not throw NPE");
+		}
 	}
 
 }

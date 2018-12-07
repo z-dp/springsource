@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.remoting.jaxrpc;
 
@@ -26,6 +26,7 @@ import javax.xml.rpc.server.ServletEndpointContext;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.MessageSourceAccessor;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
@@ -43,14 +44,21 @@ import org.springframework.web.util.WebUtils;
  *
  * <p>This class does not extend WebApplicationContextSupport to not expose
  * any public setters. For some reason, Axis tries to resolve public setters
- * with WSDL means... with private and protected means, everything works.
+ * in a special way...
+ *
+ * <p>JAX-RPC service endpoints are usually required to implement an
+ * RMI port interface. However, many JAX-RPC implementations accept plain
+ * service endpoint classes too, avoiding the need to maintain an RMI port
+ * interface in addition to an existing non-RMI business interface.
+ * Therefore, implementing the business interface will usually be sufficient.
  *
  * @author Juergen Hoeller
  * @since 16.12.2003
  * @see #init
  * @see #getWebApplicationContext
+ * @see org.springframework.web.context.support.WebApplicationObjectSupport
  */
-public class ServletEndpointSupport implements ServiceLifecycle {
+public abstract class ServletEndpointSupport implements ServiceLifecycle {
 
 	protected final Log logger = LogFactory.getLog(getClass());
 	
@@ -59,6 +67,7 @@ public class ServletEndpointSupport implements ServiceLifecycle {
 	private WebApplicationContext webApplicationContext;
 
 	private MessageSourceAccessor messageSourceAccessor;
+
 
 	/**
 	 * Initialize this JAX-RPC servlet endpoint.
@@ -83,6 +92,13 @@ public class ServletEndpointSupport implements ServiceLifecycle {
 	 */
 	protected final ServletEndpointContext getServletEndpointContext() {
 		return servletEndpointContext;
+	}
+
+	/**
+	 * Return the current Spring ApplicationContext.
+	 */
+	protected final ApplicationContext getApplicationContext() {
+		return this.webApplicationContext;
 	}
 
 	/**
@@ -112,15 +128,17 @@ public class ServletEndpointSupport implements ServiceLifecycle {
 	 * as provided by the servlet container.
 	 * @return the File representing the temporary directory
 	 */
-	protected File getTempDir() {
+	protected final File getTempDir() {
 		return WebUtils.getTempDir(getServletContext());
 	}
 
 	/**
 	 * Callback for custom initialization after the context has been set up.
+	 * @throws ServiceException if initialization failed
 	 */
-	protected void onInit() {
+	protected void onInit() throws ServiceException {
 	}
+
 
 	/**
 	 * This implementation of destroy is empty.

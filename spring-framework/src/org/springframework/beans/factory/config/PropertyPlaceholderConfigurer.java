@@ -1,68 +1,60 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2007 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory.config;
 
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
 import org.springframework.beans.BeansException;
-import org.springframework.beans.MutablePropertyValues;
-import org.springframework.beans.PropertyValue;
 import org.springframework.beans.factory.BeanDefinitionStoreException;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.BeanFactoryAware;
+import org.springframework.beans.factory.BeanNameAware;
 import org.springframework.core.Constants;
-import org.springframework.util.ObjectUtils;
 
 /**
  * A property resource configurer that resolves placeholders in bean property values of
  * context definitions. It <i>pulls</i> values from a properties file into bean definitions.
  *
- * <p>The default placeholder syntax follows the Ant / Log4J / JSP EL style:<br><br>
- * <code>
- * &nbsp;&nbsp;${...}
- * </code>
+ * <p>The default placeholder syntax follows the Ant / Log4J / JSP EL style:
  *
- * <p>Example XML context definition:<br><br>
- * <code>
- * &nbsp;&nbsp;&lt;bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource"&gt;<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&lt;property name="driverClassName"&gt;&lt;value&gt;${driver}&lt;/value&gt;&lt;/property&gt;<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&lt;property name="url"&gt;&lt;value&gt;jdbc:${dbname}&lt;/value&gt;&lt;/property&gt;<br>
- * &nbsp;&nbsp;&lt;/bean&gt;
- * </code>
+ * <pre class="code">${...}</pre>
  *
- * <p>Example properties file:<br><br>
- * <code>
- * &nbsp;&nbsp;driver=com.mysql.jdbc.Driver<br>
- * &nbsp;&nbsp;dbname=mysql:mydb
- * </code>
+ * Example XML context definition:
  *
- * <p>PropertyPlaceholderConfigurer checks simple property values, lists, maps,
+ * <pre class="code">&lt;bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource"&gt;
+ *   &lt;property name="driverClassName"&gt;&lt;value&gt;${driver}&lt;/value&gt;&lt;/property&gt;
+ *   &lt;property name="url"&gt;&lt;value&gt;jdbc:${dbname}&lt;/value&gt;&lt;/property&gt;
+ * &lt;/bean&gt;</pre>
+ *
+ * Example properties file:
+ *
+ * <pre class="code">driver=com.mysql.jdbc.Driver
+ * dbname=mysql:mydb</pre>
+ *
+ * PropertyPlaceholderConfigurer checks simple property values, lists, maps,
  * props, and bean names in bean references. Furthermore, placeholder values can
- * also cross-reference other placeholders, like:<br><br>
- * <code>
- * &nbsp;&nbsp;rootPath=myrootdir
- * &nbsp;&nbsp;subPath=${rootPath}/subdir
- * </code>
+ * also cross-reference other placeholders, like:
  *
- * <p>In contrast to PropertyOverrideConfigurer, this configurer allows to fill in
+ * <pre class="code">rootPath=myrootdir
+ * subPath=${rootPath}/subdir</pre>
+ *
+ * In contrast to PropertyOverrideConfigurer, this configurer allows to fill in
  * explicit placeholders in context definitions. Therefore, the original definition
  * cannot specify any default values for such bean properties, and the placeholder
  * properties file is supposed to contain an entry for each defined placeholder.
@@ -78,23 +70,32 @@ import org.springframework.util.ObjectUtils;
  * of the specified properties. This can be customized via "systemPropertiesMode".
  *
  * <p>Note that the context definition <i>is</i> aware of being incomplete;
- * this is immediately obvious when looking at the XML definition file.
+ * this is immediately obvious to users when looking at the XML definition file.
+ * Hence, placeholders have to be resolved; any desired defaults have to be
+ * defined as placeholder values as well (for example in a default properties file).
+ *
+ * <p>Property values can be converted after reading them in, through overriding
+ * the {@link #convertPropertyValue} method. For example, encrypted values can
+ * be detected and decrypted accordingly before processing them.
  *
  * @author Juergen Hoeller
  * @since 02.10.2003
- * @see PropertyOverrideConfigurer
  * @see #setLocations
  * @see #setProperties
  * @see #setPlaceholderPrefix
  * @see #setPlaceholderSuffix
- * @see #setSystemPropertiesMode
+ * @see #setSystemPropertiesModeName
  * @see System#getProperty(String)
- * @version $Id: PropertyPlaceholderConfigurer.java,v 1.10 2004/03/19 17:52:29 jhoeller Exp $
+ * @see #convertPropertyValue
+ * @see PropertyOverrideConfigurer
  */
-public class PropertyPlaceholderConfigurer extends PropertyResourceConfigurer {
+public class PropertyPlaceholderConfigurer extends PropertyResourceConfigurer
+    implements BeanNameAware, BeanFactoryAware {
 
+	/** Default placeholder prefix: "${" */
 	public static final String DEFAULT_PLACEHOLDER_PREFIX = "${";
 
+	/** Default placeholder suffix: "}" */
 	public static final String DEFAULT_PLACEHOLDER_SUFFIX = "}";
 
 
@@ -122,7 +123,13 @@ public class PropertyPlaceholderConfigurer extends PropertyResourceConfigurer {
 
 	private int systemPropertiesMode = SYSTEM_PROPERTIES_MODE_FALLBACK;
 
+	private boolean searchSystemEnvironment = false;
+
 	private boolean ignoreUnresolvablePlaceholders = false;
+
+	private String beanName;
+
+	private BeanFactory beanFactory;
 
 
 	/**
@@ -144,21 +151,6 @@ public class PropertyPlaceholderConfigurer extends PropertyResourceConfigurer {
 	}
 
 	/**
-	 * Set how to check system properties: as fallback, as override, or never.
-	 * For example, will resolve ${user.dir} to the "user.dir" system property.
-	 * <p>The default is "fallback": If not being able to resolve a placeholder
-	 * with the specified properties, a system property will be tried.
-	 * "override" will check for a system property first, before trying the
-	 * specified properties. "never" will not check system properties at all.
-	 * @see #SYSTEM_PROPERTIES_MODE_NEVER
-	 * @see #SYSTEM_PROPERTIES_MODE_FALLBACK
-	 * @see #SYSTEM_PROPERTIES_MODE_OVERRIDE
-	 */
-	public void setSystemPropertiesMode(int systemPropertiesMode) {
-		this.systemPropertiesMode = systemPropertiesMode;
-	}
-
-	/**
 	 * Set the system property mode by the name of the corresponding constant,
 	 * e.g. "SYSTEM_PROPERTIES_MODE_OVERRIDE".
 	 * @param constantName name of the constant
@@ -170,184 +162,183 @@ public class PropertyPlaceholderConfigurer extends PropertyResourceConfigurer {
 	}
 
 	/**
-	 * Set whether to ignore unresolvable placeholders. Default is false:
-	 * An exception will be thrown if a placeholder cannot not be resolved.
+	 * Set how to check system properties: as fallback, as override, or never.
+	 * For example, will resolve ${user.dir} to the "user.dir" system property.
+	 * <p>The default is "fallback": If not being able to resolve a placeholder
+	 * with the specified properties, a system property will be tried.
+	 * "override" will check for a system property first, before trying the
+	 * specified properties. "never" will not check system properties at all.
+	 * @see #SYSTEM_PROPERTIES_MODE_NEVER
+	 * @see #SYSTEM_PROPERTIES_MODE_FALLBACK
+	 * @see #SYSTEM_PROPERTIES_MODE_OVERRIDE
+	 * @see #setSystemPropertiesModeName
+	 */
+	public void setSystemPropertiesMode(int systemPropertiesMode) {
+		this.systemPropertiesMode = systemPropertiesMode;
+	}
+
+	/**
+	 * Set whether to search for a matching system environment variable
+	 * if no matching system property has been found. Only applied when
+	 * "systemPropertyMode" is active (i.e. "fallback" or "override"), right
+	 * after checking JVM system properties.
+	 * <p>Default is "false". Switch this setting on to resolve placeholders
+	 * as system environment variables as well. However, it is recommended to
+	 * pass external values in as JVM system properties: This can easily be
+	 * achieved in a startup script, even for existing environment variables.
+	 * <p><b>NOTE:</b> Access to environment variables does not work on the
+	 * Sun VM 1.4, where the corresponding {@link System#getenv} support was
+	 * disabled - before it eventually got re-enabled for the Sun VM 1.5.
+	 * Please upgrade to 1.5 (or higher) if you intend to rely on the
+	 * environment variable support.
+	 * @see #setSystemPropertiesMode
+	 * @see java.lang.System#getProperty(String)
+	 * @see java.lang.System#getenv(String)
+	 */
+	public void setSearchSystemEnvironment(boolean searchSystemEnvironment) {
+		this.searchSystemEnvironment = searchSystemEnvironment;
+	}
+
+	/**
+	 * Set whether to ignore unresolvable placeholders. Default is "false":
+	 * An exception will be thrown if a placeholder cannot be resolved.
 	 */
 	public void setIgnoreUnresolvablePlaceholders(boolean ignoreUnresolvablePlaceholders) {
 		this.ignoreUnresolvablePlaceholders = ignoreUnresolvablePlaceholders;
 	}
 
+	/**
+	 * Only necessary to check that we're not parsing our own bean definition,
+	 * to avoid failing on unresolvable placeholders in properties file locations.
+	 * The latter case can happen with placeholders for system properties in
+	 * resource locations.
+	 * @see #setLocations
+	 * @see org.springframework.core.io.ResourceEditor
+	 */
+	public void setBeanName(String beanName) {
+		this.beanName = beanName;
+	}
 
-	protected void processProperties(ConfigurableListableBeanFactory beanFactory, Properties props)
+	/**
+	 * Only necessary to check that we're not parsing our own bean definition,
+	 * to avoid failing on unresolvable placeholders in properties file locations.
+	 * The latter case can happen with placeholders for system properties in
+	 * resource locations.
+	 * @see #setLocations
+	 * @see org.springframework.core.io.ResourceEditor
+	 */
+	public void setBeanFactory(BeanFactory beanFactory) {
+		this.beanFactory = beanFactory;
+	}
+
+
+	protected void processProperties(ConfigurableListableBeanFactory beanFactoryToProcess, Properties props)
 			throws BeansException {
-		String[] beanNames = beanFactory.getBeanDefinitionNames();
+
+		BeanDefinitionVisitor visitor = new PlaceholderResolvingBeanDefinitionVisitor(props);
+		String[] beanNames = beanFactoryToProcess.getBeanDefinitionNames();
 		for (int i = 0; i < beanNames.length; i++) {
-			BeanDefinition bd = beanFactory.getBeanDefinition(beanNames[i]);
-			try {
-				parseBeanDefinition(props, bd);
-			}
-			catch (BeanDefinitionStoreException ex) {
-				throw new BeanDefinitionStoreException(bd.getResourceDescription(), beanNames[i], ex.getMessage());
-			}
-		}
-	}
-
-	protected void parseBeanDefinition(Properties props, BeanDefinition beanDefinition) {
-		MutablePropertyValues pvs = beanDefinition.getPropertyValues();
-		if (pvs != null) {
-			parsePropertyValues(props, pvs);
-		}
-		ConstructorArgumentValues cas = beanDefinition.getConstructorArgumentValues();
-		if (cas != null) {
-			parseIndexedArgumentValues(props, cas.getIndexedArgumentValues());
-			parseGenericArgumentValues(props, cas.getGenericArgumentValues());
-		}
-	}
-
-	protected void parsePropertyValues(Properties props, MutablePropertyValues pvs) {
-		for (int j = 0; j < pvs.getPropertyValues().length; j++) {
-			PropertyValue pv = pvs.getPropertyValues()[j];
-			Object newVal = parseValue(props, pv.getValue());
-			if (!ObjectUtils.nullSafeEquals(newVal, pv.getValue())) {
-				pvs.addPropertyValue(pv.getName(), newVal);
-			}
-		}
-	}
-
-	protected void parseIndexedArgumentValues(Properties props, Map ias) {
-		for (Iterator it = ias.keySet().iterator(); it.hasNext();) {
-			Integer index = (Integer) it.next();
-			ConstructorArgumentValues.ValueHolder valueHolder = (ConstructorArgumentValues.ValueHolder) ias.get(index);
-			Object newVal = parseValue(props, valueHolder.getValue());
-			if (!ObjectUtils.nullSafeEquals(newVal, valueHolder.getValue())) {
-				valueHolder.setValue(newVal);
-			}
-		}
-	}
-
-	protected void parseGenericArgumentValues(Properties props, Set gas) {
-		for (Iterator it = gas.iterator(); it.hasNext();) {
-			ConstructorArgumentValues.ValueHolder valueHolder = (ConstructorArgumentValues.ValueHolder) it.next();
-			Object newVal = parseValue(props, valueHolder.getValue());
-			if (!ObjectUtils.nullSafeEquals(newVal, valueHolder.getValue())) {
-				valueHolder.setValue(newVal);
-			}
-		}
-	}
-
-	protected Object parseValue(Properties props, Object value) {
-		if (value instanceof String) {
-			return parseString(props, (String) value, null);
-		}
-		else if (value instanceof RuntimeBeanReference) {
-      RuntimeBeanReference ref = (RuntimeBeanReference) value;
-      String newBeanName = parseString(props, ref.getBeanName(), null);
-			if (!newBeanName.equals(ref.getBeanName())) {
-				return new RuntimeBeanReference(newBeanName);
-			}
-		}
-		else if (value instanceof List) {
-			parseList(props, (List) value);
-		}
-		else if (value instanceof Set) {
-			parseSet(props, (Set) value);
-		}
-		else if (value instanceof Map) {
-			parseMap(props, (Map) value);
-		}
-		else if (value instanceof BeanDefinition) {
-			parseBeanDefinition(props, (BeanDefinition) value);
-		}
-		return value;
-	}
-
-	/**
-	 * Parse the given List, exchanging its values if necessary.
-	 */
-	protected void parseList(Properties props, List listVal) {
-		for (int i = 0; i < listVal.size(); i++) {
-			Object elem = listVal.get(i);
-			Object newVal = parseValue(props, elem);
-			if (!ObjectUtils.nullSafeEquals(newVal, elem)) {
-				listVal.set(i, newVal);
+			// Check that we're not parsing our own bean definition,
+			// to avoid failing on unresolvable placeholders in properties file locations.
+			if (!(beanNames[i].equals(this.beanName) && beanFactoryToProcess.equals(this.beanFactory))) {
+				BeanDefinition bd = beanFactoryToProcess.getBeanDefinition(beanNames[i]);
+				try {
+					visitor.visitBeanDefinition(bd);
+				}
+				catch (BeanDefinitionStoreException ex) {
+					throw new BeanDefinitionStoreException(bd.getResourceDescription(), beanNames[i], ex.getMessage());
+				}
 			}
 		}
 	}
 
 	/**
-	 * Parse the given Set, exchanging its values if necessary.
+	 * Parse the given String value recursively, to be able to resolve
+	 * nested placeholders (when resolved property values in turn contain
+	 * placeholders again).
+	 * @param strVal the String value to parse
+	 * @param props the Properties to resolve placeholders against
+	 * @param visitedPlaceholders the placeholders that have already been visited
+	 * during the current resolution attempt (used to detect circular references
+	 * between placeholders). Only non-null if we're parsing a nested placeholder.
+	 * @throws BeanDefinitionStoreException if invalid values are encountered
+	 * @see #resolvePlaceholder(String, java.util.Properties, int)
 	 */
-	protected void parseSet(Properties props, Set setVal) {
-		for (Iterator it = new HashSet(setVal).iterator(); it.hasNext();) {
-			Object elem = it.next();
-			Object newVal = parseValue(props, elem);
-			if (!ObjectUtils.nullSafeEquals(newVal, elem)) {
-				setVal.remove(elem);
-				setVal.add(newVal);
-			}
-		}
-	}
+	protected String parseStringValue(String strVal, Properties props, Set visitedPlaceholders)
+	    throws BeanDefinitionStoreException {
 
-	/**
-	 * Parse the given Map, exchanging its values if necessary.
-	 */
-	protected void parseMap(Properties props, Map mapVal) {
-		for (Iterator it = new HashMap(mapVal).keySet().iterator(); it.hasNext();) {
-			Object key = it.next();
-			Object elem = mapVal.get(key);
-			Object newVal = parseValue(props, elem);
-			if (!ObjectUtils.nullSafeEquals(newVal, elem)) {
-				mapVal.put(key, newVal);
-			}
-		}
-	}
+		StringBuffer buf = new StringBuffer(strVal);
 
-	/**
-	 * Parse values recursively to be able to resolve cross-references between placeholder values.
-	 */
-	protected String parseString(Properties props, String strVal, String originalPlaceholder)
-	    throws BeansException {
+		// The following code does not use JDK 1.4's StringBuffer.indexOf(String)
+		// method to retain JDK 1.3 compatibility. The slight loss in performance
+		// is not really relevant, as this code will typically just run on startup.
+
 		int startIndex = strVal.indexOf(this.placeholderPrefix);
 		while (startIndex != -1) {
-			int endIndex = strVal.indexOf(this.placeholderSuffix, startIndex + this.placeholderPrefix.length());
+			int endIndex = buf.toString().indexOf(
+			    this.placeholderSuffix, startIndex + this.placeholderPrefix.length());
 			if (endIndex != -1) {
-				String placeholder = strVal.substring(startIndex + this.placeholderPrefix.length(), endIndex);
-				if (originalPlaceholder == null) {
-					originalPlaceholder = placeholder;
+				String placeholder = buf.substring(startIndex + this.placeholderPrefix.length(), endIndex);
+				if (!visitedPlaceholders.add(placeholder)) {
+					throw new BeanDefinitionStoreException(
+							"Circular placeholder reference '" + placeholder + "' in property definitions");
 				}
-				else if (placeholder.equals(originalPlaceholder)) {
-					throw new BeanDefinitionStoreException("Circular placeholder reference '" + placeholder +
-																								 "' in property definitions [" + props + "]");
-				}
-				String propVal = null;
-				if (this.systemPropertiesMode == SYSTEM_PROPERTIES_MODE_OVERRIDE) {
-					propVal = System.getProperty(placeholder);
-				}
-				if (propVal == null) {
-					propVal = resolvePlaceholder(placeholder, props);
-				}
-				if (propVal == null && this.systemPropertiesMode == SYSTEM_PROPERTIES_MODE_FALLBACK) {
-					propVal = System.getProperty(placeholder);
-				}
+				String propVal = resolvePlaceholder(placeholder, props, this.systemPropertiesMode);
 				if (propVal != null) {
-					propVal = parseString(props, propVal, originalPlaceholder);
-					logger.debug("Resolving placeholder '" + placeholder + "' to [" + propVal + "]");
-					strVal = strVal.substring(0, startIndex) + propVal + strVal.substring(endIndex+1);
-					startIndex = strVal.indexOf(this.placeholderPrefix, startIndex + propVal.length());
+					// Recursive invocation, parsing placeholders contained in the
+					// previously resolved placeholder value.
+					propVal = parseStringValue(propVal, props, visitedPlaceholders);
+					buf.replace(startIndex, endIndex + this.placeholderSuffix.length(), propVal);
+					if (logger.isDebugEnabled()) {
+						logger.debug("Resolved placeholder '" + placeholder + "' to value [" + propVal + "]");
+					}
+					startIndex = buf.toString().indexOf(this.placeholderPrefix, startIndex + propVal.length());
 				}
 				else if (this.ignoreUnresolvablePlaceholders) {
-					// return unprocessed value
-					return strVal;
+					// Proceed with unprocessed value.
+					startIndex = buf.toString().indexOf(this.placeholderPrefix, endIndex + this.placeholderSuffix.length());
 				}
 				else {
 					throw new BeanDefinitionStoreException("Could not resolve placeholder '" + placeholder + "'");
 				}
+				visitedPlaceholders.remove(placeholder);
 			}
 			else {
 				startIndex = -1;
 			}
 		}
-		return strVal;
+
+		return buf.toString();
+	}
+
+	/**
+	 * Resolve the given placeholder using the given properties, performing
+	 * a system properties check according to the given mode.
+	 * <p>Default implementation delegates to <code>resolvePlaceholder
+	 * (placeholder, props)</code> before/after the system properties check.
+	 * <p>Subclasses can override this for custom resolution strategies,
+	 * including customized points for the system properties check.
+	 * @param placeholder the placeholder to resolve
+	 * @param props the merged properties of this configurer
+	 * @param systemPropertiesMode the system properties mode,
+	 * according to the constants in this class
+	 * @return the resolved value, of null if none
+	 * @see #setSystemPropertiesMode
+	 * @see System#getProperty
+	 * @see #resolvePlaceholder(String, java.util.Properties)
+	 */
+	protected String resolvePlaceholder(String placeholder, Properties props, int systemPropertiesMode) {
+		String propVal = null;
+		if (systemPropertiesMode == SYSTEM_PROPERTIES_MODE_OVERRIDE) {
+			propVal = resolveSystemProperty(placeholder);
+		}
+		if (propVal == null) {
+			propVal = resolvePlaceholder(placeholder, props);
+		}
+		if (propVal == null && systemPropertiesMode == SYSTEM_PROPERTIES_MODE_FALLBACK) {
+			propVal = resolveSystemProperty(placeholder);
+		}
+		return propVal;
 	}
 
 	/**
@@ -360,11 +351,47 @@ public class PropertyPlaceholderConfigurer extends PropertyResourceConfigurer {
 	 * after this method is invoked, according to the system properties mode.
 	 * @param placeholder the placeholder to resolve
 	 * @param props the merged properties of this configurer
-	 * @return the resolved value
+	 * @return the resolved value, of <code>null</code> if none
 	 * @see #setSystemPropertiesMode
 	 */
 	protected String resolvePlaceholder(String placeholder, Properties props) {
 		return props.getProperty(placeholder);
+	}
+
+	/**
+	 * Resolve the given key as JVM system property, and optionally also as
+	 * system environment variable if no matching system property has been found.
+	 * @param key the placeholder to resolve as system property key
+	 * @return the system property value, or <code>null</code> if not found
+	 * @see #setSearchSystemEnvironment
+	 * @see java.lang.System#getProperty(String)
+	 * @see java.lang.System#getenv(String)
+	 */
+	protected String resolveSystemProperty(String key) {
+		String value = System.getProperty(key);
+		if (value == null && this.searchSystemEnvironment) {
+			value = System.getenv(key);
+		}
+		return value;
+	}
+
+
+	/**
+	 * BeanDefinitionVisitor that resolves placeholders in String values,
+	 * delegating to the <code>parseStringValue</code> method of the
+	 * containing class.
+	 */
+	private class PlaceholderResolvingBeanDefinitionVisitor extends BeanDefinitionVisitor {
+
+		private final Properties props;
+
+		public PlaceholderResolvingBeanDefinitionVisitor(Properties props) {
+			this.props = props;
+		}
+
+		protected String resolveStringValue(String strVal) throws BeansException {
+			return parseStringValue(strVal, this.props, new HashSet());
+		}
 	}
 
 }

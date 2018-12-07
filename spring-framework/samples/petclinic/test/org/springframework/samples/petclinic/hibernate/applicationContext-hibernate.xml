@@ -3,18 +3,6 @@
 
 <beans>
 
-	<!-- ========================= GENERAL DEFINITIONS ========================= -->
-
-	<!-- Message source for this context, loaded from localized "messages_xx" files -->
-	<bean id="messageSource" class="org.springframework.context.support.ResourceBundleMessageSource">
-		<property name="basename"><value>messages</value></property>										
-	</bean>
-
-	<!-- ========================= Start of PERSISTENCE DEFINITIONS ========================= -->
-  
-	<!-- NOTE: Choose exactly 1 "dataSource" bean and 1 "clinicTarget" bean -->
-
-	<!-- Local HSQL DataSource that works in any environment -->
 	<bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
 		<property name="driverClassName"><value>org.hsqldb.jdbcDriver</value></property>
 		<property name="url"><value>jdbc:hsqldb:hsql://localhost:9001</value></property>
@@ -22,28 +10,42 @@
 		<property name="password"><value></value></property>
 	</bean>
 
-	<!-- Hibernate SessionFactory for HSQL -->
-	<bean id="sessionFactory" class="org.springframework.orm.hibernate.LocalSessionFactoryBean">
+	<bean id="sessionFactory" class="org.springframework.orm.hibernate3.LocalSessionFactoryBean">
 		<property name="dataSource"><ref local="dataSource"/></property>
 		<property name="mappingResources">
-			<value>org/springframework/samples/petclinic/hibernate/petclinic.hbm.xml</value>
+			<value>petclinic.hbm.xml</value>
 		</property>
 		<property name="hibernateProperties">
 			<props>
-				<prop key="hibernate.dialect">net.sf.hibernate.dialect.HSQLDialect</prop>
+				<prop key="hibernate.dialect">org.hibernate.dialect.HSQLDialect</prop>
+				<prop key="hibernate.show_sql">true</prop>
 			</props>
+		</property>
+		<property name="eventListeners">
+			<map>
+				<entry key="merge">
+					<bean class="org.springframework.orm.hibernate3.support.IdTransferringMergeEventListener"/>
+				</entry>
+			</map>
 		</property>
 	</bean>
 
-	<!-- Transaction manager for a single Hibernate SessionFactory (alternative to JTA) -->
-	<bean id="transactionManager" class="org.springframework.orm.hibernate.HibernateTransactionManager">
+	<bean id="transactionManager" class="org.springframework.orm.hibernate3.HibernateTransactionManager">
 		<property name="sessionFactory"><ref local="sessionFactory"/></property>
 	</bean>
 
-	<!-- Transactional proxy for the Petclinic primary business object -->
+	<!--
+		Note the use of an inner bean for the "target" property.
+		This ensures that there is only one instance of this bean in the
+		factory, allowing us to use autowire by type if necessary.
+	-->
 	<bean id="clinic" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean">
 		<property name="transactionManager"><ref local="transactionManager"/></property>
-		<property name="target"><ref local="clinicTarget"/></property>
+		<property name="target">
+			<bean class="org.springframework.samples.petclinic.hibernate.HibernateClinic">
+				<property name="sessionFactory"><ref local="sessionFactory"/></property>
+			</bean>
+		</property>
 		<property name="transactionAttributes">
 			<props>
 				<prop key="*">PROPAGATION_REQUIRED</prop>
@@ -51,11 +53,4 @@
 		</property>
 	</bean>
 
-	<!-- Petclinic primary business object: Hibernate implementation -->
-	<bean id="clinicTarget" class="org.springframework.samples.petclinic.hibernate.HibernateClinic">
-		<property name="sessionFactory"><ref local="sessionFactory"/></property>
-	</bean>
-
-	<!-- ========================= End of PERSISTENCE DEFINITIONS ========================= -->
-	
 </beans>

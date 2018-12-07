@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,9 +12,15 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.mvc.multiaction;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.web.util.WebUtils;
 
 /**
  * Simple implementation of MethodNameResolver that maps URL to method
@@ -25,27 +31,94 @@ package org.springframework.web.servlet.mvc.multiaction;
  *
  * <p>Maps the resource name after the last slash, ignoring an extension.
  * E.g. "/foo/bar/baz.html" to "baz", assuming a "/foo/bar/baz.html"
- * controller mapping to the respective MultiActionController.
- * Doesn't support wildcards.
+ * controller mapping to the corresponding MultiActionController handler.
+ * method. Doesn't support wildcards.
  *
  * @author Rod Johnson
  * @author Juergen Hoeller
 */
 public class InternalPathMethodNameResolver extends AbstractUrlMethodNameResolver {
 
+	private String prefix = "";
+
+	private String suffix = "";
+
+	/** Request URL path String --> method name String */
+	private final Map methodNameCache = Collections.synchronizedMap(new HashMap());
+
+
+	/**
+	 * Specify a common prefix for handler method names.
+	 * Will be prepended to the internal path found in the URL:
+	 * e.g. internal path "baz", prefix "my" -> method name "mybaz".
+	 */
+	public void setPrefix(String prefix) {
+		this.prefix = (prefix != null ? prefix : "");
+	}
+
+	/**
+	 * Return the common prefix for handler method names.
+	 */
+	protected String getPrefix() {
+		return prefix;
+	}
+
+	/**
+	 * Specify a common suffix for handler method names.
+	 * Will be appended to the internal path found in the URL:
+	 * e.g. internal path "baz", suffix "Handler" -> method name "bazHandler".
+	 */
+	public void setSuffix(String suffix) {
+		this.suffix = (suffix != null ? suffix : "");
+	}
+
+	/**
+	 * Return the common suffix for handler method names.
+	 */
+	protected String getSuffix() {
+		return suffix;
+	}
+
+
+	/**
+	 * Extracts the method name indicated by the URL path.
+	 * @see #extractHandlerMethodNameFromUrlPath
+	 * @see #postProcessHandlerMethodName
+	 */
 	protected String getHandlerMethodNameForUrlPath(String urlPath) {
-		String name = urlPath;
-		// look at resource name after last slash
-		int slashIndex = name.lastIndexOf('/');
-		if (slashIndex != -1) {
-			name = name.substring(slashIndex+1);
+		String methodName = (String) this.methodNameCache.get(urlPath);
+		if (methodName == null) {
+			methodName = extractHandlerMethodNameFromUrlPath(urlPath);
+			methodName = postProcessHandlerMethodName(methodName);
+			this.methodNameCache.put(urlPath, methodName);
 		}
-		// ignore extension
-		int dotIndex = name.lastIndexOf('.');
-		if (dotIndex != -1) {
-			name = name.substring(0, dotIndex);
-		}
-		return name;
+		return methodName;
+	}
+
+	/**
+	 * Extract the handler method name from the given request URI.
+	 * Delegates to <code>WebUtils.extractViewNameFromUrlPath(String)</code>.
+	 * @param uri the request URI (e.g. "/index.html")
+	 * @return the extracted URI filename (e.g. "index")
+	 * @see org.springframework.web.util.WebUtils#extractFilenameFromUrlPath
+	 */
+	protected String extractHandlerMethodNameFromUrlPath(String uri) {
+		return WebUtils.extractFilenameFromUrlPath(uri);
+	}
+
+	/**
+	 * Build the full handler method name based on the given method name
+	 * as indicated by the URL path.
+	 * <p>The default implementation simply applies prefix and suffix.
+	 * This can be overridden, for example, to manipulate upper case
+	 * / lower case, etc.
+	 * @param methodName the original method name, as indicated by the URL path
+	 * @return the full method name to use
+	 * @see #getPrefix()
+	 * @see #getSuffix()
+	 */
+	protected String postProcessHandlerMethodName(String methodName) {
+		return getPrefix() + methodName + getSuffix();
 	}
 
 }

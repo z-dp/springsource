@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.filter;
 
@@ -27,13 +27,12 @@ import javax.servlet.http.HttpServletResponse;
 
 /**
  * Filter base class that guarantees to be just executed once per request,
- * on any servlet container. It provides a doFilterInternal method with
- * HttpServletRequest and HttpServletResponse arguments.
+ * on any servlet container. It provides a <code>doFilterInternal</code>
+ * method with HttpServletRequest and HttpServletResponse arguments.
  *
- * <p>How to identify that a request is already filtered is determined
- * by the getAlreadyFilteredAttributeName method. The default implementation
- * is based on the class name of the concrete filter, but this can be made
- * more specific by overriding that method in subclasses.
+ * <p>The <code>getAlreadyFilteredAttributeName</code> method determines how
+ * to identify that a request is already filtered. The default implementation
+ * is based on the configured name of the concrete filter instance.
  *
  * @author Juergen Hoeller
  * @since 06.12.2003
@@ -43,14 +42,15 @@ import javax.servlet.http.HttpServletResponse;
 public abstract class OncePerRequestFilter extends GenericFilterBean {
 
 	/**
-	 * Suffix that gets appended to the actual class name for the
+	 * Suffix that gets appended to the filter name for the
 	 * "already filtered" request attribute.
 	 * @see #getAlreadyFilteredAttributeName
 	 */
 	public static final String ALREADY_FILTERED_SUFFIX = ".FILTERED";
 
+
 	/**
-	 * This doFilter implementation stores a request attribute for
+	 * This <code>doFilter</code> implementation stores a request attribute for
 	 * "already filtered", proceeding without filtering again if the
 	 * attribute is already there.
 	 * @see #getAlreadyFilteredAttributeName
@@ -60,15 +60,19 @@ public abstract class OncePerRequestFilter extends GenericFilterBean {
 	public final void doFilter(ServletRequest request, ServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
 
+		if (!(request instanceof HttpServletRequest) || !(response instanceof HttpServletResponse)) {
+			throw new ServletException("OncePerRequestFilter just supports HTTP requests");
+		}
 		HttpServletRequest httpRequest = (HttpServletRequest) request;
 		HttpServletResponse httpResponse = (HttpServletResponse) response;
 
 		String alreadyFilteredAttributeName = getAlreadyFilteredAttributeName();
 		if (request.getAttribute(alreadyFilteredAttributeName) != null || shouldNotFilter(httpRequest)) {
+			// Proceed without invoking this filter...
 			filterChain.doFilter(request, response);
-			return;
 		}
 		else {
+			// Do invoke this filter...
 			request.setAttribute(alreadyFilteredAttributeName, Boolean.TRUE);
 			doFilterInternal(httpRequest, httpResponse, filterChain);
 		}
@@ -76,22 +80,25 @@ public abstract class OncePerRequestFilter extends GenericFilterBean {
 
 	/**
 	 * Return the name of the request attribute that identifies that a request
-	 * is already filtered. Default implementation takes the actual class name
-	 * and appends ".FILTERED".
-	 * <p>Subclasses can override this to get more specific identification.
-	 * For example, a certain filter class could be applied multiple times
-	 * but with different configuration: The attribute name should identify
-	 * the particular configuration then.
+	 * is already filtered.
+	 * <p>Default implementation takes the configured name of the concrete filter
+	 * instance and appends ".FILTERED". If the filter is not fully initialized,
+	 * it falls back to its class name.
+	 * @see #getFilterName
 	 * @see #ALREADY_FILTERED_SUFFIX
 	 */
 	protected String getAlreadyFilteredAttributeName() {
-		return getClass().getName() + ALREADY_FILTERED_SUFFIX;
+		String name = getFilterName();
+		if (name == null) {
+			name = getClass().getName();
+		}
+		return name + ALREADY_FILTERED_SUFFIX;
 	}
 
 	/**
-	 * Can return true to avoid filtering of the given request.
-	 * The default implementation always returns false.
-	 * Can be overridden in subclasses for custom filtering control.
+	 * Can be overridden in subclasses for custom filtering control,
+	 * returning <code>true</code> to avoid filtering of the given request.
+	 * <p>The default implementation always returns <code>false</code>.
 	 * @param request current HTTP request
 	 * @return whether the given request should <i>not</i> be filtered
 	 * @throws ServletException in case of errors
@@ -100,12 +107,14 @@ public abstract class OncePerRequestFilter extends GenericFilterBean {
 		return false;
 	}
 
+
 	/**
 	 * Same contract as for doFilter, but guaranteed to be just invoked once per
 	 * request. Provides HttpServletRequest and HttpServletResponse arguments
 	 * instead of the default ServletRequest and ServletResponse ones.
 	 */
-	protected abstract void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-																					 FilterChain filterChain) throws ServletException, IOException;
+	protected abstract void doFilterInternal(
+			HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+			throws ServletException, IOException;
 
 }

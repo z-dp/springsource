@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,14 +12,14 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory.access;
 
 import org.springframework.beans.BeansException;
 
 /**
- * <p>An interface for a class used to lookup/use, and optionally allow the
+ * An interface for a class used to lookup/use, and optionally allow the
  * release of a BeanFactory, or BeanFactory subclass such as ApplicationContext.
  *
  * <p>Where this interface is implemented as a singleton class such as
@@ -41,7 +41,6 @@ import org.springframework.beans.BeansException;
  * SingletonBeanFactoryLocator may be used to demand load these contexts.
  * 
  * @author Colin Sampaleanu
- * @version $Revision: 1.4 $
  * @see org.springframework.beans.factory.BeanFactory
  * @see org.springframework.context.access.DefaultLocatorFactory
  * @see org.springframework.context.ApplicationContext

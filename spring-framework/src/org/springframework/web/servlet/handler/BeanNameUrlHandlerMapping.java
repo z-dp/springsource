@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.handler;
 
@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.context.ApplicationContextException;
+import org.springframework.util.StringUtils;
 
 /**
  * Implementation of the HandlerMapping interface to map from URLs to beans with names
@@ -47,20 +48,24 @@ public class BeanNameUrlHandlerMapping extends AbstractUrlHandlerMapping {
 		if (logger.isDebugEnabled()) {
 			logger.debug("Looking for URL mappings in application context: " + getApplicationContext());
 		}
-		String[] urlMaps = getApplicationContext().getBeanDefinitionNames();
+		String[] beanNames = getApplicationContext().getBeanDefinitionNames();
 
-		// take anything beginning with a slash in the bean name
-		for (int i = 0; i < urlMaps.length; i++) {
-			String[] urls = checkForUrl(urlMaps[i]);
+		// Take any bean name or alias that begins with a slash.
+		for (int i = 0; i < beanNames.length; i++) {
+			String[] urls = checkForUrl(beanNames[i]);
 			if (urls.length > 0) {
-				logger.debug("Found URL mapping [" + urlMaps[i] + "]");
-				// create a mapping to each part of the path
+				if (logger.isDebugEnabled()) {
+					logger.debug("Found URL mapping [" + beanNames[i] + "]");
+				}
+				// Create a mapping to each part of the path.
 				for (int j = 0; j < urls.length; j++) {
-					registerHandler(urls[j], urlMaps[i]);
+					registerHandler(urls[j], beanNames[i]);
 				}
 			}
 			else {
-				logger.debug("Rejected bean name '" + urlMaps[i] + "'");
+				if (logger.isDebugEnabled()) {
+					logger.debug("Rejected bean name '" + beanNames[i] + "'");
+				}
 			}
 		}
 	}
@@ -80,7 +85,7 @@ public class BeanNameUrlHandlerMapping extends AbstractUrlHandlerMapping {
 				urls.add(aliases[j]);
 			}
 		}
-		return (String[]) urls.toArray(new String[urls.size()]);
+		return StringUtils.toStringArray(urls);
 	}
 
 }

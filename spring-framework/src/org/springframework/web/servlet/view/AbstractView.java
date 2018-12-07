@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2007 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.view;
 
@@ -32,32 +32,34 @@ import org.springframework.web.servlet.View;
 import org.springframework.web.servlet.support.RequestContext;
 
 /**
- * Abstract view superclass. Standard framework view implementations
- * and application-specific custom views can extend this class
- * to simplify their implementation. Subclasses should be JavaBeans.
+ * Abstract base class for {@link org.springframework.web.servlet.View}
+ * implementations. Subclasses should be JavaBeans, to allow for
+ * convenient configuration as Spring-managed bean instances.
  *
- * <p>Extends ApplicationObjectSupport, which will be helpful to some views.
- * Handles static attributes, and merging static with dynamic attributes.
- * Subclasses just need to implement the actual rendering.
+ * <p>Provides support for static attributes, to be made available to the view,
+ * with a variety of ways to specify them. Static attributes will be merged
+ * with the given dynamic attributes (the model that the controller returned)
+ * for each render operation.
  *
- * <p>It's recommended that subclasses <b>don't</b> cache anything, in the
- * quest for efficiency. This class offers caching. However, it's possible
- * to disable this class's caching, which is useful during development.
+ * <p>Extends {@link WebApplicationObjectSupport}, which will be helpful to
+ * some views. Subclasses just need to implement the actual rendering.
  *
  * @author Rod Johnson
  * @author Juergen Hoeller
- * @version $Id: AbstractView.java,v 1.9 2004/03/18 02:46:11 trisberg Exp $
+ * @see #setAttributes
+ * @see #setAttributesMap
  * @see #renderMergedOutputModel
  */
 public abstract class AbstractView extends WebApplicationObjectSupport implements View, BeanNameAware {
 
-	/** The name by which this View is known */
+	/** Default content type. Overridable as bean property. */
+	public static final String DEFAULT_CONTENT_TYPE = "text/html; charset=ISO-8859-1";
+
+
 	private String beanName;
 
-	/** Default content type. Overridable as bean property. */
-	private String contentType = "text/html; charset=ISO-8859-1";
+	private String contentType = DEFAULT_CONTENT_TYPE;
 
-	/** Name of request context attribute, or null if not needed */
 	private String requestContextAttribute;
 
 	/** Map of static attributes, keyed by attribute name (String) */
@@ -67,7 +69,7 @@ public abstract class AbstractView extends WebApplicationObjectSupport implement
 	/**
 	 * Set the view's name. Helpful for traceability.
 	 * Framework code must call this when constructing views.
-	 * @param beanName the view's name. May not be null.
+	 * @param beanName the view's name. May not be <code>null</code>.
 	 * Views should use this for log messages.
 	 */
 	public void setBeanName(String beanName) {
@@ -75,9 +77,8 @@ public abstract class AbstractView extends WebApplicationObjectSupport implement
 	}
 
 	/**
-	 * Return the view's name. Should never be null,
+	 * Return the view's name. Should never be <code>null</code>,
 	 * if the view was correctly configured.
-	 * @return the view's name
 	 */
 	public String getBeanName() {
 		return beanName;
@@ -85,9 +86,11 @@ public abstract class AbstractView extends WebApplicationObjectSupport implement
 
 	/**
 	 * Set the content type for this view.
-	 * May be ignored by subclasses if the view itself is assumed
+	 * Default is "text/html; charset=ISO-8859-1".
+	 * <p>May be ignored by subclasses if the view itself is assumed
 	 * to set the content type, e.g. in case of JSPs.
 	 * @param contentType content type for this view
+	 * @see #DEFAULT_CONTENT_TYPE
 	 */
 	public void setContentType(String contentType) {
 		this.contentType = contentType;
@@ -95,99 +98,120 @@ public abstract class AbstractView extends WebApplicationObjectSupport implement
 
 	/**
 	 * Return the content type for this view.
-	 * @return content type for this view
 	 */
-	protected String getContentType() {
+	public String getContentType() {
 		return this.contentType;
 	}
 
 	/**
-	 * Set the name of the RequestContext attribute for this view,
-	 * or null if not needed.
-	 * @param requestContextAttribute name of the RequestContext attribute
+	 * Set the name of the RequestContext attribute for this view.
+	 * Default is none.
 	 */
 	public void setRequestContextAttribute(String requestContextAttribute) {
 		this.requestContextAttribute = requestContextAttribute;
 	}
 
 	/**
-	 * Set static attributes from a java.util.Properties object. This is
-	 * the most convenient way to set static attributes. Note that static
-	 * attributes can be overridden by dynamic attributes, if a value
-	 * with the same name is included in the model.
-	 * <p>Can be populated with a String "value" (parsed via PropertiesEditor)
-	 * or a "props" element in XML bean definitions.
-	 * @see org.springframework.beans.propertyeditors.PropertiesEditor
+	 * Return the name of the RequestContext attribute, if any.
 	 */
-	public void setAttributes(Properties props) {
-		setAttributesMap(props);
+	public String getRequestContextAttribute() {
+		return this.requestContextAttribute;
 	}
 
 	/**
-	 * Set static attributes from a Map. This allows to set any kind
-	 * of attribute values, for example bean references.
-	 * <p>Can be populated with a "map" or "props" element in XML bean
-	 * definitions.
-	 * @param attributes Map with name Strings as keys and attribute
-	 * objects as values
+	 * Set static attributes as a CSV string.
+	 * Format is: attname0={value1},attname1={value1}
 	 */
-	public void setAttributesMap(Map attributes) {
-		if (attributes != null) {
-			Iterator itr = attributes.keySet().iterator();
-			while (itr.hasNext()) {
-				String name = (String) itr.next();
-				Object value = attributes.get(name);
+	public void setAttributesCSV(String propString) throws IllegalArgumentException {
+		if (propString != null) {
+			StringTokenizer st = new StringTokenizer(propString, ",");
+			while (st.hasMoreTokens()) {
+				String tok = st.nextToken();
+				int eqIdx = tok.indexOf("=");
+				if (eqIdx == -1) {
+					throw new IllegalArgumentException("Expected = in attributes CSV string '" + propString + "'");
+				}
+				if (eqIdx >= tok.length() - 2) {
+					throw new IllegalArgumentException(
+							"At least 2 characters ([]) required in attributes CSV string '" + propString + "'");
+				}
+				String name = tok.substring(0, eqIdx);
+				String value = tok.substring(eqIdx + 1);
+
+				// Delete first and last characters of value: { and }
+				value = value.substring(1);
+				value = value.substring(0, value.length() - 1);
+
 				addStaticAttribute(name, value);
 			}
 		}
 	}
 
 	/**
-	 * Set static attributes as a CSV string.
-	 * Format is attname0={value1},attname1={value1}
+	 * Set static attributes for this view from a
+	 * <code>java.util.Properties</code> object.
+	 * <p>This is the most convenient way to set static attributes. Note that
+	 * static attributes can be overridden by dynamic attributes, if a value
+	 * with the same name is included in the model.
+	 * <p>Can be populated with a String "value" (parsed via PropertiesEditor)
+	 * or a "props" element in XML bean definitions.
+	 * @see org.springframework.beans.propertyeditors.PropertiesEditor
 	 */
-	public void setAttributesCSV(String propString) throws IllegalArgumentException {
-		if (propString == null)
-			// Leave static attributes unchanged
-			return;
+	public void setAttributes(Properties attributes) {
+		setAttributesMap(attributes);
+	}
 
-		StringTokenizer st = new StringTokenizer(propString, ",");
-		while (st.hasMoreTokens()) {
-			String tok = st.nextToken();
-			int eqindx = tok.indexOf("=");
-			if (eqindx == -1)
-				throw new IllegalArgumentException("Expected = in View string '" + propString + "'");
-
-			if (eqindx >= tok.length() - 2)
-				throw new IllegalArgumentException("At least 2 characters ([]) required in View string '" + propString + "'");
-
-			String name = tok.substring(0, eqindx);
-			String val = tok.substring(eqindx + 1);
-
-			// Delete first and last characters of value: { and }
-			val = val.substring(1);
-			val = val.substring(0, val.length() - 1);
-
-			if (logger.isDebugEnabled()) {
-				logger.info("Set static attribute with name '" + name + "' and value [" + val + "] on view");
+	/**
+	 * Set static attributes for this view from a Map. This allows to set
+	 * any kind of attribute values, for example bean references.
+	 * <p>Can be populated with a "map" or "props" element in XML bean definitions.
+	 * @param attributes Map with name Strings as keys and attribute objects as values
+	 */
+	public void setAttributesMap(Map attributes) {
+		if (attributes != null) {
+			Iterator it = attributes.entrySet().iterator();
+			while (it.hasNext()) {
+				Map.Entry entry = (Map.Entry) it.next();
+				Object key = entry.getKey();
+				if (!(key instanceof String)) {
+					throw new IllegalArgumentException(
+							"Invalid attribute key [" + key + "]: only Strings allowed");
+				}
+				addStaticAttribute((String) key, entry.getValue());
 			}
-			addStaticAttribute(name, val);
 		}
 	}
 
 	/**
-	 * Add static data to this view, exposed in each view.
-	 * <p>Must be invoked before any calls to render().
-	 * @param name name of attribute to expose
-	 * @param value object to expose
+	 * Allow Map access to the static attributes of this view,
+	 * with the option to add or override specific entries.
+	 * <p>Useful for specifying entries directly, for example via
+	 * "attributesMap[myKey]". This is particularly useful for
+	 * adding or overriding entries in child view definitions.
 	 */
-	public void addStaticAttribute(String name, Object value) {
-		logger.debug("Set static attribute with name '" + name + "' and value [" + value + "] on view");
-		this.staticAttributes.put(name, value);
+	public Map getAttributesMap() {
+		return this.staticAttributes;
 	}
 
 	/**
-	 * Handy for testing. Return the static attributes held in this view.
+	 * Add static data to this view, exposed in each view.
+	 * <p>Must be invoked before any calls to <code>render</code>.
+	 * @param name the name of the attribute to expose
+	 * @param value the attribute value to expose
+	 * @see #render
+	 */
+	public void addStaticAttribute(String name, Object value) {
+		this.staticAttributes.put(name, value);
+		if (logger.isDebugEnabled()) {
+			logger.debug("Set static attribute with name '" + name + "' and value [" + value +
+					"] on view with name '" + getBeanName() + "'");
+		}
+	}
+
+	/**
+	 * Return the static attributes for this view. Handy for testing.
+	 * <p>Returns an unmodifiable Map, as this is not intended for
+	 * manipulating the Map but rather just for checking the contents.
 	 * @return the static attributes in this view
 	 */
 	public Map getStaticAttributes() {
@@ -203,33 +227,65 @@ public abstract class AbstractView extends WebApplicationObjectSupport implement
 	 */
 	public void render(Map model, HttpServletRequest request, HttpServletResponse response) throws Exception {
 		if (logger.isDebugEnabled()) {
-			logger.debug("Rendering view with name '" + this.beanName + "' with model=[" + model +
-				"] and static attributes=[" + this.staticAttributes + "]");
+			logger.debug("Rendering view with name '" + this.beanName + "' with model " + model +
+				" and static attributes " + this.staticAttributes);
 		}
 
-		// Consolidate static and dynamic model attributes
-		Map mergedModel = new HashMap(this.staticAttributes);
-		mergedModel.putAll(model);
+		// Consolidate static and dynamic model attributes.
+		Map mergedModel = new HashMap(this.staticAttributes.size() + (model != null ? model.size() : 0));
+		mergedModel.putAll(this.staticAttributes);
+		if (model != null) {
+			mergedModel.putAll(model);
+		}
 
-		// expose RequestContext?
+		// Expose RequestContext?
 		if (this.requestContextAttribute != null) {
-			mergedModel.put(this.requestContextAttribute, new RequestContext(request, mergedModel));
+			mergedModel.put(this.requestContextAttribute, createRequestContext(request, mergedModel));
 		}
 
 		renderMergedOutputModel(mergedModel, request, response);
 	}
 
-	/** 
-	 * Subclasses must implement this method to render the view.
-	 * <p>The first take will be preparing the request: This may include setting
-	 * the model elements as request attributes, e.g. in the case of a JSP view.
-	 * @param model combined output Map, with dynamic values taking precedence
-	 * over static attributes
+	/**
+	 * Create a RequestContext to expose under the specified attribute name.
+	 * <p>Default implementation creates a standard RequestContext instance for the
+	 * given request and model. Can be overridden in subclasses for custom instances.
+	 * @param request current HTTP request
+	 * @param model combined output Map (never <code>null</code>),
+	 * with dynamic values taking precedence over static attributes
+	 * @return the RequestContext instance
+	 * @see #setRequestContextAttribute
+	 * @see org.springframework.web.servlet.support.RequestContext
+	 */
+	protected RequestContext createRequestContext(HttpServletRequest request, Map model) {
+		return new RequestContext(request, model);
+	}
+
+	/**
+	 * Subclasses must implement this method to actually render the view.
+	 * <p>The first step will be preparing the request: In the JSP case,
+	 * this would mean setting model objects as request attributes.
+	 * The second step will be the actual rendering of the view,
+	 * for example including the JSP via a RequestDispatcher.
+	 * @param model combined output Map (never <code>null</code>),
+	 * with dynamic values taking precedence over static attributes
 	 * @param request current HTTP request
 	 * @param response current HTTP response
 	 * @throws Exception if rendering failed
 	 */
-	protected abstract void renderMergedOutputModel(Map model, HttpServletRequest request,
-	                                                HttpServletResponse response) throws Exception;
+	protected abstract void renderMergedOutputModel(
+			Map model, HttpServletRequest request, HttpServletResponse response) throws Exception;
+
+
+	public String toString() {
+		StringBuffer sb = new StringBuffer(getClass().getName());
+		if (getBeanName() != null) {
+			sb.append(": name '").append(getBeanName()).append("'");
+		}
+		else {
+			sb.append(": unnamed");
+		}
+		return sb.toString();
+	}
 
 }

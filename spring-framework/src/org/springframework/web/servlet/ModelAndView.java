@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet;
 
@@ -52,31 +52,43 @@ public class ModelAndView {
 	/** Model */
 	private Map model;
 
+
 	/**
-	 * Convenient constructor when there is no model data to expose.
-	 * @param view View object to render
+	 * Default constructor for bean-style usage: populating bean
+	 * properties instead of passing in constructor arguments.
+	 * @see #setView(View)
+	 * @see #setViewName(String)
 	 */
-	public ModelAndView(View view) {
-		this.view = view;
-		this.model = new HashMap();
+	public ModelAndView() {
 	}
 
 	/**
 	 * Convenient constructor when there is no model data to expose.
+	 * Can also be used in conjunction with <code>addObject</code>.
+	 * @param view View object to render
+	 * @see #addObject
+	 */
+	public ModelAndView(View view) {
+		this.view = view;
+	}
+
+	/**
+	 * Convenient constructor when there is no model data to expose.
+	 * Can also be used in conjunction with <code>addObject</code>.
 	 * @param viewName name of the View to render, to be resolved
 	 * by the DispatcherServlet
+	 * @see #addObject
 	 */
 	public ModelAndView(String viewName) {
 		this.viewName = viewName;
-		this.model = new HashMap();
 	}
 
 	/**
 	 * Creates new ModelAndView given a View object and a model.
 	 * @param view View object to render
 	 * @param model Map of model names (Strings) to model objects
-	 * (Objects). Model entries may not be null, but the model Map
-	 * may be null if there is no model data.
+	 * (Objects). Model entries may not be <code>null</code>, but the model Map
+	 * may be <code>null</code> if there is no model data.
 	 */
 	public ModelAndView(View view, Map model) {
 		this.view = view;
@@ -88,8 +100,8 @@ public class ModelAndView {
 	 * @param viewName name of the View to render, to be resolved
 	 * by the DispatcherServlet
 	 * @param model Map of model names (Strings) to model objects
-	 * (Objects). Model entries may not be null, but the model Map
-	 * may be null if there is no model data.
+	 * (Objects). Model entries may not be <code>null</code>, but the model Map
+	 * may be <code>null</code> if there is no model data.
 	 */
 	public ModelAndView(String viewName, Map model) {
 		this.viewName = viewName;
@@ -103,8 +115,8 @@ public class ModelAndView {
 	 * @param modelObject the single model object
 	 */
 	public ModelAndView(View view, String modelName, Object modelObject) {
-		this(view);
-		this.model.put(modelName, modelObject);
+		this.view = view;
+		addObject(modelName, modelObject);
 	}
 
 	/**
@@ -115,21 +127,10 @@ public class ModelAndView {
 	 * @param modelObject the single model object
 	 */
 	public ModelAndView(String viewName, String modelName, Object modelObject) {
-		this(viewName);
-		this.model.put(modelName, modelObject);
+		this.viewName = viewName;
+		addObject(modelName, modelObject);
 	}
 
-	/**
-	 * Add an object to the model.
-	 * @param modelName name of the object to add to the model
-	 * @param modelObject object to add to the model. May not be null.
-	 * @return this ModelAndView, convenient to allow usages like
-	 * return modelAndView.addObject("foo", bar);
-	 */
-	public ModelAndView addObject(String modelName, Object modelObject) {
-		this.model.put(modelName, modelObject);
-		return this;
-	}
 
 	/**
 	 * Set a View object for this ModelAndView. Will override any
@@ -141,7 +142,7 @@ public class ModelAndView {
 	}
 
 	/**
-	 * Return the View object, or null if we are using a view name
+	 * Return the View object, or <code>null</code> if we are using a view name
 	 * to be resolved by the DispatcherServlet via a ViewResolver.
 	 */
 	public View getView() {
@@ -160,7 +161,7 @@ public class ModelAndView {
 
 	/**
 	 * Return the view name to be resolved by the DispatcherServlet
-	 * via a ViewResolver, or null if we are using a View object.
+	 * via a ViewResolver, or <code>null</code> if we are using a View object.
 	 */
 	public String getViewName() {
 		return viewName;
@@ -172,15 +173,74 @@ public class ModelAndView {
 	 * DispatcherServlet via a ViewResolver.
 	 */
 	public boolean isReference() {
-		return viewName != null;
+		return (this.viewName != null);
 	}
 
 	/**
-	 * Return the model map. May be null.
+	 * Return the model map. May return null.
+	 * Called by DispatcherServlet for evaluation of the model.
+	 */
+	protected Map getModelInternal() {
+		return this.model;
+	}
+
+	/**
+	 * Return the model map. Never returns null.
+	 * To be called by application code for modifying the model.
 	 */
 	public Map getModel() {
-		return model;
+		if (this.model == null) {
+			this.model = new HashMap(1);
+		}
+		return this.model;
 	}
+
+	/**
+	 * Add an object to the model.
+	 * @param modelName name of the object to add to the model
+	 * @param modelObject object to add to the model. May not be <code>null</code>.
+	 * @return this ModelAndView, convenient to allow usages like
+	 * return modelAndView.addObject("foo", bar);
+	 */
+	public ModelAndView addObject(String modelName, Object modelObject) {
+		getModel().put(modelName, modelObject);
+		return this;
+	}
+
+	/**
+	 * Add all entries contained in the provided map to the model.
+	 * @param modelMap a map of modelName->modelObject pairs
+	 * @return this ModelAndView, convenient to allow usages like
+	 * return modelAndView.addAllObjects(myModelMap);
+	 */
+	public ModelAndView addAllObjects(Map modelMap) {
+		getModel().putAll(modelMap);
+		return this;
+	}
+
+	/**
+	 * Clear the state of this ModelAndView object.
+	 * The object will be empty afterwards.
+	 * <p>Can be used to suppress rendering of a given ModelAndView object
+	 * in the <code>postHandle</code> method of a HandlerInterceptor.
+	 * @see #isEmpty
+	 * @see HandlerInterceptor#postHandle
+	 */
+	public void clear() {
+		this.view = null;
+		this.viewName = null;
+		this.model = null;
+	}
+
+	/**
+	 * Return whether this ModelAndView object is empty,
+	 * i.e. whether it does not hold any view and does not contain a model.
+	 * @see #clear
+	 */
+	public boolean isEmpty() {
+		return (this.view == null && this.viewName == null && this.model == null);
+	}
+
 
 	/**
 	 * Return diagnostic information about this model and view.
@@ -188,12 +248,12 @@ public class ModelAndView {
 	public String toString() {
 		StringBuffer buf = new StringBuffer("ModelAndView: ");
 		if (isReference()) {
-			buf.append("reference to view with name [").append(this.viewName).append(']');
+			buf.append("reference to view with name '").append(this.viewName).append("'");
 		}
 		else {
 			buf.append("materialized View is [").append(this.view).append(']');
 		}
-		buf.append("; model=[").append(this.model).append(']');
+		buf.append("; model is ").append(this.model);
 		return buf.toString();
 	}
 

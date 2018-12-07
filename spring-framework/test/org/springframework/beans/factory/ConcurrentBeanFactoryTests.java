@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory;
 
@@ -29,6 +29,7 @@ import org.apache.commons.logging.LogFactory;
 
 import org.springframework.beans.factory.xml.XmlBeanFactory;
 import org.springframework.beans.propertyeditors.CustomDateEditor;
+import org.springframework.core.io.ClassPathResource;
 
 /**
  * @author Guillaume Poirier
@@ -62,7 +63,7 @@ public class ConcurrentBeanFactoryTests extends TestCase {
 	private Throwable ex = null;
 
 	protected void setUp() throws Exception {
-		XmlBeanFactory factory = new XmlBeanFactory(getClass().getResourceAsStream("concurrent.xml"));
+		XmlBeanFactory factory = new XmlBeanFactory(new ClassPathResource("concurrent.xml", getClass()));
 		CustomDateEditor editor = new CustomDateEditor(df, false);
 		factory.registerCustomEditor(Date.class, editor);
 		this.factory = factory;
@@ -99,6 +100,15 @@ public class ConcurrentBeanFactoryTests extends TestCase {
 		}
 	}
 
+	private void performTest() {
+		ConcurrentBean b1 = (ConcurrentBean) factory.getBean("bean1");
+		ConcurrentBean b2 = (ConcurrentBean) factory.getBean("bean2");
+
+		assertEquals(b1.getDate(), date1);
+		assertEquals(b2.getDate(), date2);
+	}
+
+
 	private class TestRun implements Runnable {
 
 		public void run() {
@@ -116,17 +126,7 @@ public class ConcurrentBeanFactoryTests extends TestCase {
 					set.notifyAll();
 				}
 			}
-		};
-
-	}
-
-	private void performTest() {
-
-		ConcurrentBean b1 = (ConcurrentBean) factory.getBean("bean1");
-		ConcurrentBean b2 = (ConcurrentBean) factory.getBean("bean2");
-
-		assertEquals(b1.getDate(), date1);
-		assertEquals(b2.getDate(), date2);
+		}
 	}
 
 

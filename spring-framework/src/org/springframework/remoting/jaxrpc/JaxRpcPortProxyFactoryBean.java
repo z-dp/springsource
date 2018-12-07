@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.remoting.jaxrpc;
 
@@ -48,17 +48,22 @@ public class JaxRpcPortProxyFactoryBean extends JaxRpcPortClientInterceptor impl
 
 	private Object serviceProxy;
 
+
 	public void afterPropertiesSet() throws ServiceException {
+		if (getServiceInterface() == null) {
+			throw new IllegalArgumentException("serviceInterface is required");
+		}
 		super.afterPropertiesSet();
 		this.serviceProxy = ProxyFactory.getProxy(getServiceInterface(), this);
 	}
+
 
 	public Object getObject() {
 		return this.serviceProxy;
 	}
 
 	public Class getObjectType() {
-		return (this.serviceProxy != null) ? this.serviceProxy.getClass() : getServiceInterface();
+		return getServiceInterface();
 	}
 
 	public boolean isSingleton() {

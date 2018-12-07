@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.remoting.rmi;
 
@@ -20,6 +20,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.rmi.RemoteException;
 
 import org.springframework.remoting.support.RemoteInvocation;
+import org.springframework.util.Assert;
 
 /**
  * Server-side implementation of RmiInvocationHandler. An instance
@@ -36,16 +37,29 @@ class RmiInvocationWrapper implements RmiInvocationHandler {
 
 	private final Object wrappedObject;
 
-	private final RmiServiceExporter rmiServiceExporter;
+	private final RmiBasedExporter rmiExporter;
 
-	public RmiInvocationWrapper(Object wrappedObject, RmiServiceExporter rmiServiceExporter) {
+
+	/**
+	 * Create a new RmiInvocationWrapper for the given object
+	 * @param wrappedObject the object to wrap with an RmiInvocationHandler
+	 * @param rmiExporter the RMI exporter to handle the actual invocation
+	 */
+	public RmiInvocationWrapper(Object wrappedObject, RmiBasedExporter rmiExporter) {
+		Assert.notNull(wrappedObject, "Object to wrap is required");
+		Assert.notNull(rmiExporter, "RMI exporter is required");
 		this.wrappedObject = wrappedObject;
-		this.rmiServiceExporter = rmiServiceExporter;
+		this.rmiExporter = rmiExporter;
 	}
 
+	/**
+	 * Delegates the actual invocation handling to the RMI exporter.
+	 * @see RmiBasedExporter#invoke(org.springframework.remoting.support.RemoteInvocation, Object)
+	 */
 	public Object invoke(RemoteInvocation invocation)
 	    throws RemoteException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-		return this.rmiServiceExporter.invoke(invocation, this.wrappedObject);
+
+		return this.rmiExporter.invoke(invocation, this.wrappedObject);
 	}
 
 }

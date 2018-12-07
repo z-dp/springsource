@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.hibernate;
 
@@ -44,20 +44,15 @@ import net.sf.hibernate.transaction.TransactionManagerLookup;
  */
 public class LocalTransactionManagerLookup implements TransactionManagerLookup {
 
-	/**
-	 * This will hold the TransactionManager to use for the currently configured
-	 * Hibernate SessionFactory. It will be set just before initialization
-	 * of the respective SessionFactory, and reset immediately afterwards.
-	 */
-	protected static ThreadLocal configTimeTransactionManagerHolder = new ThreadLocal();
-
 	private final TransactionManager transactionManager;
 
+
 	public LocalTransactionManagerLookup() {
-		TransactionManager tm = (TransactionManager) configTimeTransactionManagerHolder.get();
+		TransactionManager tm = LocalSessionFactoryBean.getConfigTimeTransactionManager();
 		// absolutely needs thread-bound DataSource to initialize
 		if (tm == null) {
-			throw new IllegalStateException("No TransactionManager found - transactionManager property must be set on LocalSessionFactoryBean");
+			throw new IllegalStateException("No JTA TransactionManager found - " +
+			    "jtaTransactionManager property must be set on LocalSessionFactoryBean");
 		}
 		this.transactionManager = tm;
 	}

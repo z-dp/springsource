@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.hibernate;
 
@@ -26,11 +26,12 @@ import net.sf.hibernate.HibernateException;
 import net.sf.hibernate.JDBCException;
 import net.sf.hibernate.Session;
 import net.sf.hibernate.SessionFactory;
-
 import org.aopalliance.intercept.Interceptor;
 import org.aopalliance.intercept.Invocation;
 import org.aopalliance.intercept.MethodInvocation;
 import org.easymock.MockControl;
+
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -46,6 +47,8 @@ public class HibernateInterceptorTests extends TestCase {
 		Session session = (Session) sessionControl.getMock();
 		sf.openSession();
 		sfControl.setReturnValue(session, 1);
+		session.getSessionFactory();
+		sessionControl.setReturnValue(sf);
 		session.flush();
 		sessionControl.setVoidCallable(1);
 		session.close();
@@ -73,6 +76,8 @@ public class HibernateInterceptorTests extends TestCase {
 		Session session = (Session) sessionControl.getMock();
 		sf.openSession();
 		sfControl.setReturnValue(session, 1);
+		session.getSessionFactory();
+		sessionControl.setReturnValue(sf);
 		session.setFlushMode(FlushMode.NEVER);
 		sessionControl.setVoidCallable(1);
 		session.close();
@@ -94,11 +99,15 @@ public class HibernateInterceptorTests extends TestCase {
 		sessionControl.verify();
 	}
 
-	public void testInterceptorWithPrebound() {
+	public void testInterceptorWithThreadBound() {
 		MockControl sfControl = MockControl.createControl(SessionFactory.class);
 		SessionFactory sf = (SessionFactory) sfControl.getMock();
 		MockControl sessionControl = MockControl.createControl(Session.class);
 		Session session = (Session) sessionControl.getMock();
+		session.getSessionFactory();
+		sessionControl.setReturnValue(sf, 1);
+		session.isOpen();
+		sessionControl.setReturnValue(true, 1);
 		sfControl.replay();
 		sessionControl.replay();
 
@@ -119,11 +128,17 @@ public class HibernateInterceptorTests extends TestCase {
 		sessionControl.verify();
 	}
 
-	public void testInterceptorWithPreboundAndFlushEager() throws HibernateException {
+	public void testInterceptorWithThreadBoundAndFlushEager() throws HibernateException {
 		MockControl sfControl = MockControl.createControl(SessionFactory.class);
 		SessionFactory sf = (SessionFactory) sfControl.getMock();
 		MockControl sessionControl = MockControl.createControl(Session.class);
 		Session session = (Session) sessionControl.getMock();
+		session.getSessionFactory();
+		sessionControl.setReturnValue(sf, 1);
+		session.isOpen();
+		sessionControl.setReturnValue(true, 1);
+		session.getFlushMode();
+		sessionControl.setReturnValue(FlushMode.AUTO, 1);
 		session.flush();
 		sessionControl.setVoidCallable(1);
 		sfControl.replay();
@@ -147,13 +162,89 @@ public class HibernateInterceptorTests extends TestCase {
 		sessionControl.verify();
 	}
 
-	public void testInterceptorWithFlushingFailure() throws Throwable {
+	public void testInterceptorWithThreadBoundAndFlushEagerSwitch() throws HibernateException {
+		MockControl sfControl = MockControl.createControl(SessionFactory.class);
+		SessionFactory sf = (SessionFactory) sfControl.getMock();
+		MockControl sessionControl = MockControl.createControl(Session.class);
+		Session session = (Session) sessionControl.getMock();
+		session.getSessionFactory();
+		sessionControl.setReturnValue(sf, 1);
+		session.isOpen();
+		sessionControl.setReturnValue(true, 1);
+		session.getFlushMode();
+		sessionControl.setReturnValue(FlushMode.NEVER, 1);
+		session.setFlushMode(FlushMode.AUTO);
+		sessionControl.setVoidCallable(1);
+		session.flush();
+		sessionControl.setVoidCallable(1);
+		session.setFlushMode(FlushMode.NEVER);
+		sessionControl.setVoidCallable(1);
+		sfControl.replay();
+		sessionControl.replay();
+
+		TransactionSynchronizationManager.bindResource(sf, new SessionHolder(session));
+		HibernateInterceptor interceptor = new HibernateInterceptor();
+		interceptor.setFlushMode(HibernateInterceptor.FLUSH_EAGER);
+		interceptor.setSessionFactory(sf);
+		try {
+			interceptor.invoke(new TestInvocation(sf));
+		}
+		catch (Throwable t) {
+			fail("Should not have thrown Throwable: " + t.getMessage());
+		}
+		finally {
+			TransactionSynchronizationManager.unbindResource(sf);
+		}
+
+		sfControl.verify();
+		sessionControl.verify();
+	}
+
+	public void testInterceptorWithThreadBoundAndFlushCommit() {
+		MockControl sfControl = MockControl.createControl(SessionFactory.class);
+		SessionFactory sf = (SessionFactory) sfControl.getMock();
+		MockControl sessionControl = MockControl.createControl(Session.class);
+		Session session = (Session) sessionControl.getMock();
+		session.getSessionFactory();
+		sessionControl.setReturnValue(sf, 1);
+		session.isOpen();
+		sessionControl.setReturnValue(true, 1);
+		session.getFlushMode();
+		sessionControl.setReturnValue(FlushMode.AUTO, 1);
+		session.setFlushMode(FlushMode.COMMIT);
+		sessionControl.setVoidCallable(1);
+		session.setFlushMode(FlushMode.AUTO);
+		sessionControl.setVoidCallable(1);
+		sfControl.replay();
+		sessionControl.replay();
+
+		TransactionSynchronizationManager.bindResource(sf, new SessionHolder(session));
+		HibernateInterceptor interceptor = new HibernateInterceptor();
+		interceptor.setSessionFactory(sf);
+		interceptor.setFlushMode(HibernateInterceptor.FLUSH_COMMIT);
+		try {
+			interceptor.invoke(new TestInvocation(sf));
+		}
+		catch (Throwable t) {
+			fail("Should not have thrown Throwable: " + t.getMessage());
+		}
+		finally {
+			TransactionSynchronizationManager.unbindResource(sf);
+		}
+
+		sfControl.verify();
+		sessionControl.verify();
+	}
+
+	public void testInterceptorWithFlushFailure() throws Throwable {
 		MockControl sfControl = MockControl.createControl(SessionFactory.class);
 		SessionFactory sf = (SessionFactory) sfControl.getMock();
 		MockControl sessionControl = MockControl.createControl(Session.class);
 		Session session = (Session) sessionControl.getMock();
 		sf.openSession();
 		sfControl.setReturnValue(session, 1);
+		session.getSessionFactory();
+		sessionControl.setReturnValue(sf, 1);
 		SQLException sqlex = new SQLException("argh", "27");
 		session.flush();
 		sessionControl.setThrowable(new JDBCException(sqlex), 1);
@@ -187,6 +278,8 @@ public class HibernateInterceptorTests extends TestCase {
 		Session session = (Session) sessionControl.getMock();
 		sf.openSession(entityInterceptor);
 		sfControl.setReturnValue(session, 1);
+		session.getSessionFactory();
+		sessionControl.setReturnValue(sf, 1);
 		session.flush();
 		sessionControl.setVoidCallable(1);
 		session.close();
@@ -204,8 +297,66 @@ public class HibernateInterceptorTests extends TestCase {
 			fail("Should not have thrown Throwable: " + t.getMessage());
 		}
 
+		interceptorControl.verify();
 		sfControl.verify();
 		sessionControl.verify();
+	}
+
+	public void testInterceptorWithEntityInterceptorBeanName() throws HibernateException {
+		MockControl interceptorControl = MockControl.createControl(net.sf.hibernate.Interceptor.class);
+		net.sf.hibernate.Interceptor entityInterceptor = (net.sf.hibernate.Interceptor) interceptorControl.getMock();
+		interceptorControl.replay();
+		MockControl interceptor2Control = MockControl.createControl(net.sf.hibernate.Interceptor.class);
+		net.sf.hibernate.Interceptor entityInterceptor2 = (net.sf.hibernate.Interceptor) interceptor2Control.getMock();
+		interceptor2Control.replay();
+
+		MockControl sfControl = MockControl.createControl(SessionFactory.class);
+		SessionFactory sf = (SessionFactory) sfControl.getMock();
+		MockControl sessionControl = MockControl.createControl(Session.class);
+		Session session = (Session) sessionControl.getMock();
+		sf.openSession(entityInterceptor);
+		sfControl.setReturnValue(session, 1);
+		sf.openSession(entityInterceptor2);
+		sfControl.setReturnValue(session, 1);
+		session.getSessionFactory();
+		sessionControl.setReturnValue(sf, 2);
+		session.flush();
+		sessionControl.setVoidCallable(2);
+		session.close();
+		sessionControl.setReturnValue(null, 2);
+		sfControl.replay();
+		sessionControl.replay();
+
+		MockControl beanFactoryControl = MockControl.createControl(BeanFactory.class);
+		BeanFactory beanFactory = (BeanFactory) beanFactoryControl.getMock();
+		beanFactory.getBean("entityInterceptor", net.sf.hibernate.Interceptor.class);
+		beanFactoryControl.setReturnValue(entityInterceptor, 1);
+		beanFactory.getBean("entityInterceptor", net.sf.hibernate.Interceptor.class);
+		beanFactoryControl.setReturnValue(entityInterceptor2, 1);
+		beanFactoryControl.replay();
+
+		HibernateInterceptor interceptor = new HibernateInterceptor();
+		interceptor.setSessionFactory(sf);
+		interceptor.setEntityInterceptorBeanName("entityInterceptor");
+		interceptor.setBeanFactory(beanFactory);
+		for (int i = 0; i < 2; i++) {
+			try {
+				interceptor.invoke(new TestInvocation(sf));
+			}
+			catch (Throwable t) {
+				fail("Should not have thrown Throwable: " + t.getMessage());
+			}
+		}
+
+		interceptorControl.verify();
+		interceptor2Control.verify();
+		sfControl.verify();
+		sessionControl.verify();
+	}
+
+	protected void tearDown() {
+		assertTrue(TransactionSynchronizationManager.getResourceMap().isEmpty());
+		assertFalse(TransactionSynchronizationManager.isSynchronizationActive());
 	}
 
 
@@ -223,7 +374,6 @@ public class HibernateInterceptorTests extends TestCase {
 			}
 			return null;
 		}
-
 
 		public int getCurrentInterceptorIndex() {
 			return 0;

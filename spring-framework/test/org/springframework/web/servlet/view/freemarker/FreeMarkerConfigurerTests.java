@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,33 +12,47 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.view.freemarker;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Properties;
 
+import freemarker.cache.ClassTemplateLoader;
+import freemarker.cache.MultiTemplateLoader;
+import freemarker.cache.TemplateLoader;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
 import junit.framework.TestCase;
 
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.ui.freemarker.FreeMarkerConfigurationFactoryBean;
 import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
+import org.springframework.ui.freemarker.SpringTemplateLoader;
 
 /**
  * @author Juergen Hoeller
  * @since 14.03.2004
  */
 public class FreeMarkerConfigurerTests extends TestCase {
+
+	public void testTemplateLoaders() throws Exception {
+		FreeMarkerConfigurer fc = new FreeMarkerConfigurer();
+		fc.setTemplateLoaders(new TemplateLoader[] {});
+		fc.afterPropertiesSet();
+		assertTrue(fc.getConfiguration().getTemplateLoader() instanceof ClassTemplateLoader);
+
+		fc = new FreeMarkerConfigurer();
+		fc.setTemplateLoaders(new TemplateLoader[] {new ClassTemplateLoader()});
+		fc.afterPropertiesSet();
+		assertTrue(fc.getConfiguration().getTemplateLoader() instanceof MultiTemplateLoader);
+	}
 
 	public void testFreemarkerConfigurationFactoryBeanWithConfigLocation() throws TemplateException {
 		FreeMarkerConfigurationFactoryBean fcfb = new FreeMarkerConfigurationFactoryBean();
@@ -55,21 +69,12 @@ public class FreeMarkerConfigurerTests extends TestCase {
 		}
 	}
 
-	public void testVelocityEngineFactoryBeanWithResourceLoaderPath() throws IOException, TemplateException {
-		final File[] files = new File[1];
-		FreeMarkerConfigurationFactoryBean fcfb = new FreeMarkerConfigurationFactoryBean() {
-			protected Configuration newConfiguration() {
-				return new Configuration() {
-					public void setDirectoryForTemplateLoading(File file) throws IOException {
-						files[0] = file;
-					}
-				};
-			}
-		};
+	public void testFreeMarkerConfigurationFactoryBeanWithResourceLoaderPath() throws Exception {
+		FreeMarkerConfigurationFactoryBean fcfb = new FreeMarkerConfigurationFactoryBean();
 		fcfb.setTemplateLoaderPath("file:/mydir");
 		fcfb.afterPropertiesSet();
-		assertTrue(fcfb.getObject() instanceof Configuration);
-		assertEquals(new File("/mydir").getPath(), files[0].getPath());
+		Configuration cfg = (Configuration) fcfb.getObject();
+		assertTrue(cfg.getTemplateLoader() instanceof SpringTemplateLoader);
 	}
 
 	public void testFreemarkerConfigurationFactoryBeanWithNonFileResourceLoaderPath()
@@ -84,7 +89,7 @@ public class FreeMarkerConfigurerTests extends TestCase {
 				if (!("file:/mydir".equals(location) || "file:/mydir/test".equals(location))) {
 					throw new IllegalArgumentException(location);
 				}
-				return new InputStreamResource(new ByteArrayInputStream("test".getBytes()), "test");
+				return new ByteArrayResource("test".getBytes(), "test");
 			}
 		});
 		fcfb.afterPropertiesSet();
@@ -92,23 +97,6 @@ public class FreeMarkerConfigurerTests extends TestCase {
 		Configuration fc = (Configuration) fcfb.getObject();
 		Template ft = fc.getTemplate("test");
 		assertEquals("test", FreeMarkerTemplateUtils.processTemplateIntoString(ft, new HashMap()));
-	}
-
-	public void testFreemarkerConfigurer() throws IOException, TemplateException {
-		final File[] files = new File[1];
-		FreeMarkerConfigurer fc = new FreeMarkerConfigurer() {
-			protected Configuration newConfiguration() {
-				return new Configuration() {
-					public void setDirectoryForTemplateLoading(File file) throws IOException {
-						files[0] = file;
-					}
-				};
-			}
-		};
-		fc.setTemplateLoaderPath("file:/mydir");
-		fc.afterPropertiesSet();
-		assertTrue(fc.getConfiguration() instanceof Configuration);
-		assertEquals(new File("/mydir").getPath(), files[0].getPath());
 	}
 
 }

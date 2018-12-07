@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.context;
 
@@ -30,8 +30,7 @@ import org.springframework.beans.BeansException;
  * <p>This interface can also be implemented if an object needs access to file
  * resources, i.e. wants to call getResource, or access to the MessageSource.
  * However, it is preferable to implement the more specific ResourceLoaderAware
- * interface respectively receive a reference to the MessageSource bean in that
- * scenario.
+ * interface or receive a reference to the MessageSource bean in that scenario.
  *
  * <p>Note that Resource dependencies can also be exposed as bean properties
  * of type Resource, populated via Strings with automatic type conversion by
@@ -58,11 +57,11 @@ public interface ApplicationContextAware {
 	 * <p>Invoked after population of normal bean properties but before an init
 	 * callback like InitializingBean's afterPropertiesSet or a custom init-method.
 	 * Invoked after ResourceLoaderAware's setResourceLoader.
-	 * @param context ApplicationContext object to be used by this object
-	 * @throws ApplicationContextException in case of context initialization errors
-	 * @throws BeansException if thrown by application context methods
+	 * @param applicationContext ApplicationContext object to be used by this object
+	 * @throws ApplicationContextException in case of applicationContext initialization errors
+	 * @throws BeansException if thrown by application applicationContext methods
 	 * @see org.springframework.beans.factory.BeanInitializationException
 	 */
-	void setApplicationContext(ApplicationContext context) throws BeansException;
+	void setApplicationContext(ApplicationContext applicationContext) throws BeansException;
 
 }

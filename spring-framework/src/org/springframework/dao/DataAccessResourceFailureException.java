@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,21 +12,21 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.dao;
 
 /**
  * Data access exception thrown when a resource fails completely:
  * for example, if we can't connect to a database using JDBC.
+ *
  * @author Rod Johnson
- * @version $Id: DataAccessResourceFailureException.java,v 1.5 2004/03/18 02:46:07 trisberg Exp $
  */
 public class DataAccessResourceFailureException extends DataAccessException {
 
 	/**
 	 * Constructor for ResourceFailureDataAccessException.
-	 * @param msg message
+	 * @param msg the detail message
 	 */
 	public DataAccessResourceFailureException(String msg) {
 		super(msg);
@@ -34,7 +34,7 @@ public class DataAccessResourceFailureException extends DataAccessException {
 
 	/**
 	 * Constructor for ResourceFailureDataAccessException.
-	 * @param msg message
+	 * @param msg the detail message
 	 * @param ex root cause from data access API in use
 	 */
 	public DataAccessResourceFailureException(String msg, Throwable ex) {

@@ -15,6 +15,7 @@ import org.springframework.web.servlet.ModelAndView;
 public class EditOwnerForm extends AbstractClinicForm {
 
 	public EditOwnerForm() {
+		setCommandName("owner");
 		// need a session to hold the formBackingObject
 		setSessionForm(true);
 		// initialize the form from the formBackingObject
@@ -33,7 +34,7 @@ public class EditOwnerForm extends AbstractClinicForm {
 		// delegate the update to the Business layer
 		getClinic().storeOwner(owner);
 
-		return new ModelAndView(getSuccessView(), "ownerId", Long.toString(owner.getId()));
+		return new ModelAndView(getSuccessView(), "ownerId", owner.getId());
 	}
 
 }

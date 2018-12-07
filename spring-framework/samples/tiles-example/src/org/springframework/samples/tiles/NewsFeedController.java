@@ -17,20 +17,21 @@ import org.dom4j.Element;
 import org.dom4j.Node;
 import org.dom4j.io.SAXReader;
 
-import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.view.tiles.ComponentControllerSupport;
 
 /**
- * Controller for the news tiles that retrieves a feed mentioned in the definitions file
- * @author alef
+ * Controller for the news tile that retrieves a feed
+ * mentioned in the definitions file.
+ *
+ * @author Alef Arendsen
  */
 public class NewsFeedController extends ComponentControllerSupport {
 
-	protected void doPerform(ComponentContext componentContext, HttpServletRequest request,
-													 HttpServletResponse response) {
+	protected void doPerform(
+			ComponentContext componentContext, HttpServletRequest request, HttpServletResponse response)
+			throws Exception {
 
-		WebApplicationContext ctx = getWebApplicationContext();
-		NewsFeedConfigurer configurer = (NewsFeedConfigurer) ctx.getBean("feedConfigurer");
+		NewsFeedConfigurer configurer = (NewsFeedConfigurer) getApplicationContext().getBean("feedConfigurer");
 		String uri = configurer.feedUri((String) componentContext.getAttribute("sourceName"));
 		NewsReader reader = new NewsReader(uri);
 
@@ -43,7 +44,7 @@ public class NewsFeedController extends ComponentControllerSupport {
 			item.setSourceName((String) componentContext.getAttribute("sourceName"));
 			items.add(item);
 		}
-
+		
 		componentContext.putAttribute("items", items);
 	}
 
@@ -52,32 +53,20 @@ public class NewsFeedController extends ComponentControllerSupport {
 
 		private Document feed;
 
-		private String type = null;
+		private String type;
 
-		private static final String RSS = "rss";
-
-		private static final String RDF = "RDF";
-
-		public NewsReader(String uriString) {
+		public NewsReader(String uriString) throws MalformedURLException, DocumentException {
 			// get and parse the feed
-			try {
-				DocumentFactory docFactory = DocumentFactory.getInstance();
-				SAXReader saxReader = new SAXReader(docFactory, false);
-				URL uri = new URL(uriString);
-				feed = saxReader.read(uri);
-				// determine the type
-				type = feed.getRootElement().getName();
-			}
-			catch (MalformedURLException e) {
-				// @todo do something
-			}
-			catch (DocumentException e) {
-				// @todo do something
-			}
+			DocumentFactory docFactory = DocumentFactory.getInstance();
+			SAXReader saxReader = new SAXReader(docFactory, false);
+			URL uri = new URL(uriString);
+			this.feed = saxReader.read(uri);
+			// determine the type
+			this.type = feed.getRootElement().getName();
 		}
 
 		private String getChannelPrefix() {
-			if (RSS.equals(type)) {
+			if ("rss".equals(this.type)) {
 				return "/*/*/";
 			}
 			else {
@@ -85,44 +74,34 @@ public class NewsFeedController extends ComponentControllerSupport {
 			}
 		}
 
-		/*public String showTagNames() {
-			Iterator itr = feed.getRootElement().elements().iterator();
-			while (itr.hasNext()) {
-				System.out.println("itr.next = " + ((Element)itr.next()).getQualifiedName());
-			}
-			return "";
-		}*/
-
 		public int size() {
 			// todo: RDF somehow doesn't work with XPATH expression, fix it
-			if (type.equals("RDF")) {
+			if ("RDF".equals(this.type)) {
 				int size = 0;
-				Iterator itr = feed.getRootElement().elements().iterator();
-				while (itr.hasNext()) {
-					String qName = ((Element) itr.next()).getQualifiedName();
+				Iterator it = feed.getRootElement().elements().iterator();
+				while (it.hasNext()) {
+					String qName = ((Element) it.next()).getQualifiedName();
 					if (qName.equals("item")) {
 						size++;
 					}
 				}
-
 				return size;
 			}
-
-			return feed.selectNodes(getChannelPrefix() + "item").size();
+			return this.feed.selectNodes(getChannelPrefix() + "item").size();
 		}
 
 		public String getItemAsXML(int index) {
 			Node node = null;
 
 			// determine RDF or other format
-			if (type.equals("RDF")) {
+			if ("RDF".equals(this.type)) {
 				node = getRDFNodeAt(index, null);
 			}
 			else {
-				node = feed.selectSingleNode(getChannelPrefix() + "item[" + (index + 1) + "]");
+				node = this.feed.selectSingleNode(getChannelPrefix() + "item[" + (index + 1) + "]");
 			}
 
-			// return as xml
+			// return as XML
 			if (node != null) {
 				return node.asXML();
 			}
@@ -131,11 +110,11 @@ public class NewsFeedController extends ComponentControllerSupport {
 		}
 
 		public String getChannelTitle() {
-			return feed.getRootElement().element("channel").element("title").getText();
+			return this.feed.getRootElement().element("channel").element("title").getText();
 		}
 
 		public String getChannelLink() {
-			return feed.getRootElement().element("channel").element("link").getText();
+			return this.feed.getRootElement().element("channel").element("link").getText();
 		}
 
 		public String getLinkAt(int i) {
@@ -154,12 +133,12 @@ public class NewsFeedController extends ComponentControllerSupport {
 			String value = null;
 
 			// determine RDF or other format
-			if (type.equals("RDF")) {
+			if ("RDF".equals(this.type)) {
 				value = getRDFNodeAt(index, nodeName).getText();
 			}
 			else {
-				value = feed.selectSingleNode(getChannelPrefix() + "item[" + (index + 1) + "]" +
-																			"/" + nodeName).getText();
+				value = this.feed.selectSingleNode(
+						getChannelPrefix() + "item[" + (index + 1) + "]/" + nodeName).getText();
 			}
 
 			return value;
@@ -167,24 +146,22 @@ public class NewsFeedController extends ComponentControllerSupport {
 
 		private List getRDFItemNodes() {
 			// iterate through the entire document in search for item nodes
-			List items = new ArrayList(feed.getRootElement().elements().size());
-			Iterator itr = feed.getRootElement().elements().iterator();
-			while (itr.hasNext()) {
-				Element e = (Element) itr.next();
-				String qName = e.getQualifiedName();
-				if (qName.equals("item")) {
+			List items = new ArrayList(this.feed.getRootElement().elements().size());
+			Iterator it = this.feed.getRootElement().elements().iterator();
+			while (it.hasNext()) {
+				Element elem = (Element) it.next();
+				String qName = elem.getQualifiedName();
+				if ("item".equals(qName)) {
 					// found one, increment size
-					items.add(e);
+					items.add(elem);
 				}
 			}
-
 			return items;
 		}
 
 		private Node getRDFNodeAt(int i, String subNode) {
 			// get all the item nodes
 			List items = getRDFItemNodes();
-
 			// find the correct item, and either return a 'subNode' or itself
 			Element item = (Element) items.get(i);
 			if (subNode == null) {

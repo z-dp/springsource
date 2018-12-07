@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,17 +12,18 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet;
 
 import javax.servlet.ServletException;
 
-import org.springframework.web.servlet.ModelAndView;
+import org.springframework.util.Assert;
 
 /**
  * Exception to be thrown on error conditions that should forward
- * to a specific view with a specific model.
+ * to a specific view with a specific model. This is an exception
+ * with special semantics, since it is intended to cause a forward.
  *
  * <p>Can be thrown at any time during handler processing.
  * This includes any template methods of pre-built controllers.
@@ -36,15 +37,14 @@ public class ModelAndViewDefiningException extends ServletException {
 
 	private ModelAndView modelAndView;
 
+
 	/**
-	 * Create new ModelAndViewDefiningException with the given ModelAndView,
+	 * Create a new ModelAndViewDefiningException with the given ModelAndView,
 	 * typically representing a specific error page.
 	 * @param modelAndView ModelAndView with view to forward to and model to expose
 	 */
 	public ModelAndViewDefiningException(ModelAndView modelAndView) {
-		if (modelAndView == null) {
-			throw new IllegalArgumentException("modelAndView must not be null in ModelAndViewDefiningException");
-		}
+		Assert.notNull(modelAndView, "modelAndView must not be null in ModelAndViewDefiningException");
 		this.modelAndView = modelAndView;
 	}
 

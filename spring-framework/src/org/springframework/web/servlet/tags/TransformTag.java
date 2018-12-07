@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.tags;
 
@@ -23,23 +23,26 @@ import javax.servlet.jsp.JspException;
 import javax.servlet.jsp.tagext.TagSupport;
 
 import org.springframework.web.util.ExpressionEvaluationUtils;
+import org.springframework.web.util.HtmlUtils;
 import org.springframework.web.util.TagUtils;
 
 /**
- * Tag useful for transforming reference data values from form controllers and
+ * Tag for transforming reference data values from form controllers and
  * other objects inside a <code>spring:bind</code> tag.
  *
- * <p>The bind tag has a PropertyEditor that it used to transform the property
- * of bean to a String, useable in HTML forms. This tag uses that PropertyEditor
+ * <p>The BindTag has a PropertyEditor that it uses to transform properties of
+ * a bean to a String, useable in HTML forms. This tag uses that PropertyEditor
  * to transform objects passed into this tag.
  *
  * @author Alef Arendsen
+ * @author Juergen Hoeller
  * @since 20.09.2003
+ * @see BindTag
  */
-public class TransformTag extends RequestContextAwareTag {
+public class TransformTag extends HtmlEscapingAwareTag {
 
 	/** the value to transform using the appropriate property editor */
-	private String value;
+	private Object value;
 
 	/** the variable to put the result in */
 	private String var;
@@ -47,54 +50,71 @@ public class TransformTag extends RequestContextAwareTag {
 	/** the scope of the variable the result will be put in */
 	private String scope = TagUtils.SCOPE_PAGE;
 
+
 	/**
-	 * Set the value to finally transform using the appropriate property editor
-	 * that has to be found in the BindTag.
-	 * @param value the value
-	 * @throws JspException if expression evaluation fails
+	 * Set the value to transform, using the appropriate PropertyEditor
+	 * from the enclosing BindTag.
+	 * <p>The value can either be a plain value to transform (a hard-coded String
+	 * value in a JSP or a JSP expression), or a JSP EL expression to be evaluated
+	 * (transforming the result of the expression).
+	 * <p>Like all of Spring's JSP tags, this tag is capable of parsing EL expressions
+	 * itself, on any JSP version. Note, however, that EL expressions in a JSP 2.0 page
+	 * will be evaluated by the JSP container, with the result getting passed in here.
+	 * For this reason, the type of this property is Object (accepting any result
+	 * object from a pre-evaluated expression) rather than String.
 	 */
-	public void setValue(String value) throws JspException {
+	public void setValue(Object value) {
 		this.value = value;
 	}
 
 	/**
-	 * Set the name of the variable to which to export the result of the transformation.
-	 * @param var the name of the variable
+	 * Set PageContext attribute name under which to expose
+	 * a variable that contains the result of the transformation.
+	 * @see #setScope
+	 * @see javax.servlet.jsp.PageContext#setAttribute
 	 */
 	public void setVar(String var) {
 		this.var = var;
 	}
 
 	/**
-	 * Set the scope to which to export the variable indicated.
-	 * If the scope isn't one of the allowed scope, it'll be the default (SCOPE_PAGE).
-	 * @param scope the scope (SCOPE_PAGE, SCOPE_REQUEST, SCOPE_APPLICATION or SCOPE_SESSION)
+	 * Set the scope to export the variable to.
+	 * Default is SCOPE_PAGE ("page").
+	 * @see #setVar
+	 * @see org.springframework.web.util.TagUtils#SCOPE_PAGE
+	 * @see javax.servlet.jsp.PageContext#setAttribute
 	 */
-	public void setScope(String scope) throws JspException {
+	public void setScope(String scope) {
 		this.scope = scope;
 	}
 
-	public int doStartTagInternal() throws JspException {
-		Object resolvedValue = ExpressionEvaluationUtils.evaluate("value", this.value, Object.class, pageContext);
+
+	protected final int doStartTagInternal() throws JspException {
+		Object resolvedValue = this.value;
+		if (this.value instanceof String) {
+			String strValue = (String) this.value;
+			resolvedValue = ExpressionEvaluationUtils.evaluate("value", strValue, Object.class, pageContext);
+		}
 		if (resolvedValue != null) {
-			// find the bingtag (if applicable)
-			BindTag tag = (BindTag) TagSupport.findAncestorWithClass(this, org.springframework.web.servlet.tags.BindTag.class);
+			// Find the BindTag, if applicable.
+			BindTag tag = (BindTag) TagSupport.findAncestorWithClass(this, BindTag.class);
 			if (tag == null) {
-				// the tag can only be used inside a bind tag
+				// The tag can only be used within a BindTag.
 				throw new JspException("TransformTag can only be used within BindTag");
 			}
-			// ok, get the property editor
+			// OK, get the property editor.
 			PropertyEditor editor = tag.getEditor();
 			String result = null;
 			if (editor != null) {
-				// if an editor was found, edit the value
+				// If an editor was found, edit the value.
 				editor.setValue(resolvedValue);
 				result = editor.getAsText();
 			}
 			else {
-				// else, just do a toString
+				// Else, just do a toString.
 				result = resolvedValue.toString();
 			}
+			result = isHtmlEscape() ? HtmlUtils.htmlEscape(result) : result;
 			String resolvedVar = ExpressionEvaluationUtils.evaluateString("var", this.var, pageContext);
 			if (resolvedVar != null) {
 				String resolvedScope = ExpressionEvaluationUtils.evaluateString("scope", this.scope, pageContext);
@@ -102,7 +122,7 @@ public class TransformTag extends RequestContextAwareTag {
 			}
 			else {
 				try {
-					// else, just print it out
+					// Else, just print it out.
 					pageContext.getOut().print(result);
 				}
 				catch (IOException ex) {
@@ -111,15 +131,6 @@ public class TransformTag extends RequestContextAwareTag {
 			}
 		}
 		return SKIP_BODY;
-	}
-
-	/**
-	 * Releasing of resources.
-	 */
-	public void release() {
-		this.scope = TagUtils.SCOPE_PAGE;
-		this.var = null;
-		this.value = null;
 	}
 
 }

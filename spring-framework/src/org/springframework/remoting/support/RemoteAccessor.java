@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.remoting.support;
 
@@ -25,25 +25,35 @@ import org.apache.commons.logging.LogFactory;
  *
  * <p>Note that the service interface being used will show some signs of
  * remotability, like the granularity of method calls that it offers.
- * Furthermore, it has to require serializable arguments etc.
+ * Furthermore, it has to have serializable arguments etc.
+ *
+ * <p>Accessors are supposed to throw Spring's generic RemoteAccessException
+ * in case of remote invocation failure, provided that the service interface
+ * does not declare java.rmi.RemoteException.
  *
  * @author Juergen Hoeller
  * @since 13.05.2003
  * @see org.springframework.remoting.RemoteAccessException
+ * @see java.rmi.RemoteException
  */
 public abstract class RemoteAccessor {
 
+	/**
+	 * Logger, available to subclasses.
+	 */
 	protected final Log logger = LogFactory.getLog(getClass());
 
 	private Class serviceInterface;
 
+
 	/**
 	 * Set the interface of the service to access.
-	 * Typically required to be able to create a suitable serviuce proxy.
 	 * The interface must be suitable for the particular service and remoting tool.
+	 * <p>Typically required to be able to create a suitable service proxy,
+	 * but can also be optional if the lookup returns a typed proxy.
 	 */
 	public void setServiceInterface(Class serviceInterface) {
-		if (!serviceInterface.isInterface()) {
+		if (serviceInterface != null && !serviceInterface.isInterface()) {
 			throw new IllegalArgumentException("serviceInterface must be an interface");
 		}
 		this.serviceInterface = serviceInterface;
@@ -52,7 +62,7 @@ public abstract class RemoteAccessor {
 	/**
 	 * Return the interface of the service to access.
 	 */
-	protected Class getServiceInterface() {
+	public Class getServiceInterface() {
 		return serviceInterface;
 	}
 

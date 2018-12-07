@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.transaction.interceptor;
 
@@ -24,23 +24,19 @@ import org.springframework.transaction.TransactionDefinition;
 
 /**
  * Format is 
- * FQN.Method=tx attribute representation
+ * <code>FQN.Method=tx attribute representation</code>
+ *
  * @author Rod Johnson
- * @since 26-Apr-2003
- * @version $Revision: 1.7 $
+ * @since 26.04.2003
  */
 public class TransactionAttributeSourceEditorTests extends TestCase {
-
-	public TransactionAttributeSourceEditorTests(String arg0) {
-		super(arg0);
-	}
 
 	public void testNull() throws Exception {
 		TransactionAttributeSourceEditor pe = new TransactionAttributeSourceEditor();
 		pe.setAsText(null);
 		TransactionAttributeSource tas = (TransactionAttributeSource) pe.getValue();
 
-		Method m = Object.class.getMethod("hashCode", null);
+		Method m = Object.class.getMethod("hashCode", (Class[]) null);
 		assertTrue(tas.getTransactionAttribute(m, null) == null);
 	}
 
@@ -58,29 +54,29 @@ public class TransactionAttributeSourceEditorTests extends TestCase {
 	public void testMatchesSpecific() throws Exception {
 		TransactionAttributeSourceEditor pe = new TransactionAttributeSourceEditor();
 		// TODO need FQN?
-		pe.setAsText("java.lang.Object.hashCode=PROPAGATION_REQUIRED\n" +
-		             "java.lang.Object.equals=PROPAGATION_MANDATORY\n" +
-		             "java.lang.Object.*it=PROPAGATION_SUPPORTS\n" +
-		             "java.lang.Object.notify=PROPAGATION_SUPPORTS\n" +
-		             "java.lang.Object.not*=PROPAGATION_REQUIRED");
+		pe.setAsText(
+		    "java.lang.Object.hashCode=PROPAGATION_REQUIRED\n" +
+		    "java.lang.Object.equals=PROPAGATION_MANDATORY\n" +
+		    "java.lang.Object.*it=PROPAGATION_SUPPORTS\n" +
+		    "java.lang.Object.notify=PROPAGATION_SUPPORTS\n" +
+		    "java.lang.Object.not*=PROPAGATION_REQUIRED");
 		TransactionAttributeSource tas = (TransactionAttributeSource) pe.getValue();
 
-		checkTransactionProperties(tas, Object.class.getMethod("hashCode", null),
-		                     TransactionDefinition.PROPAGATION_REQUIRED);
+		checkTransactionProperties(tas, Object.class.getMethod("hashCode", (Class[]) null),
+		    TransactionDefinition.PROPAGATION_REQUIRED);
 		checkTransactionProperties(tas, Object.class.getMethod("equals", new Class[] { Object.class }),
-		                     TransactionDefinition.PROPAGATION_MANDATORY);
-		checkTransactionProperties(tas, Object.class.getMethod("wait", null),
-		                     TransactionDefinition.PROPAGATION_SUPPORTS);
+		    TransactionDefinition.PROPAGATION_MANDATORY);
+		checkTransactionProperties(tas, Object.class.getMethod("wait", (Class[]) null),
+		    TransactionDefinition.PROPAGATION_SUPPORTS);
 		checkTransactionProperties(tas, Object.class.getMethod("wait", new Class[] { long.class }),
-		                     TransactionDefinition.PROPAGATION_SUPPORTS);
+		    TransactionDefinition.PROPAGATION_SUPPORTS);
 		checkTransactionProperties(tas, Object.class.getMethod("wait", new Class[] { long.class, int.class }),
-		                     TransactionDefinition.PROPAGATION_SUPPORTS);
-		checkTransactionProperties(tas, Object.class.getMethod("notify", null),
-		                     TransactionDefinition.PROPAGATION_SUPPORTS);
-		checkTransactionProperties(tas, Object.class.getMethod("notifyAll", null),
-		                     TransactionDefinition.PROPAGATION_REQUIRED);
-		checkTransactionProperties(tas, Object.class.getMethod("toString", null),
-		                     -1);
+		    TransactionDefinition.PROPAGATION_SUPPORTS);
+		checkTransactionProperties(tas, Object.class.getMethod("notify", (Class[]) null),
+		    TransactionDefinition.PROPAGATION_SUPPORTS);
+		checkTransactionProperties(tas, Object.class.getMethod("notifyAll", (Class[]) null),
+		    TransactionDefinition.PROPAGATION_REQUIRED);
+		checkTransactionProperties(tas, Object.class.getMethod("toString", (Class[]) null), -1);
 	}
 
 	public void testMatchesAll() throws Exception {
@@ -88,22 +84,22 @@ public class TransactionAttributeSourceEditorTests extends TestCase {
 		pe.setAsText("java.lang.Object.*=PROPAGATION_REQUIRED");
 		TransactionAttributeSource tas = (TransactionAttributeSource) pe.getValue();
 
-		checkTransactionProperties(tas, Object.class.getMethod("hashCode", null),
-		                     TransactionDefinition.PROPAGATION_REQUIRED);
+		checkTransactionProperties(tas, Object.class.getMethod("hashCode", (Class[]) null),
+		    TransactionDefinition.PROPAGATION_REQUIRED);
 		checkTransactionProperties(tas, Object.class.getMethod("equals", new Class[] { Object.class }),
-		                     TransactionDefinition.PROPAGATION_REQUIRED);
-		checkTransactionProperties(tas, Object.class.getMethod("wait", null),
-		                     TransactionDefinition.PROPAGATION_REQUIRED);
+		    TransactionDefinition.PROPAGATION_REQUIRED);
+		checkTransactionProperties(tas, Object.class.getMethod("wait", (Class[]) null),
+		    TransactionDefinition.PROPAGATION_REQUIRED);
 		checkTransactionProperties(tas, Object.class.getMethod("wait", new Class[] { long.class }),
-		                     TransactionDefinition.PROPAGATION_REQUIRED);
+		    TransactionDefinition.PROPAGATION_REQUIRED);
 		checkTransactionProperties(tas, Object.class.getMethod("wait", new Class[] { long.class, int.class }),
-		                     TransactionDefinition.PROPAGATION_REQUIRED);
-		checkTransactionProperties(tas, Object.class.getMethod("notify", null),
-		                     TransactionDefinition.PROPAGATION_REQUIRED);
-		checkTransactionProperties(tas, Object.class.getMethod("notifyAll", null),
-		                     TransactionDefinition.PROPAGATION_REQUIRED);
-		checkTransactionProperties(tas, Object.class.getMethod("toString", null),
-		                     TransactionDefinition.PROPAGATION_REQUIRED);
+		    TransactionDefinition.PROPAGATION_REQUIRED);
+		checkTransactionProperties(tas, Object.class.getMethod("notify", (Class[]) null),
+		    TransactionDefinition.PROPAGATION_REQUIRED);
+		checkTransactionProperties(tas, Object.class.getMethod("notifyAll", (Class[]) null),
+		    TransactionDefinition.PROPAGATION_REQUIRED);
+		checkTransactionProperties(tas, Object.class.getMethod("toString", (Class[]) null),
+		    TransactionDefinition.PROPAGATION_REQUIRED);
 	}
 
 	private void checkTransactionProperties(TransactionAttributeSource tas, Method method, int propagationBehavior) {

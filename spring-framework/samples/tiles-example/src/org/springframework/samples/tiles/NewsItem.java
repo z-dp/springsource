@@ -2,7 +2,8 @@ package org.springframework.samples.tiles;
 
 /**
  * News item data class.
- * @author alef
+ *
+ * @author Alef Arendsen
  */
 public class NewsItem {
 	

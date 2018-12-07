@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.core;
 
@@ -35,7 +35,6 @@ import java.sql.SQLException;
  * This allows for better contextual information in case of exceptions.
  *
  * @author Rod Johnson
- * @version $Id: PreparedStatementCreator.java,v 1.7 2004/03/18 02:46:08 trisberg Exp $
  * @see JdbcTemplate#execute(PreparedStatementCreator, PreparedStatementCallback)
  * @see JdbcTemplate#query(PreparedStatementCreator, RowCallbackHandler)
  * @see JdbcTemplate#update(PreparedStatementCreator)

@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE beans PUBLIC  "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
 
 <beans>
+
+	<bean id="frozenProxyCreator" class="org.springframework.aop.framework.autoproxy.BeanNameAutoProxyCreator">
+		<property name="beanNames" value="frozenBean"/>
+		<property name="frozen" value="true"/>
+		<property name="interceptorNames" value="nopInterceptor"/>
+	</bean>
 
 	<bean id="_jdkBeanNameProxyCreator" class="org.springframework.aop.framework.autoproxy.BeanNameAutoProxyCreator">
 		<description>
@@ -78,8 +84,21 @@
 		<property name="name"><value>second-introductionUsingJdk</value></property>
 	</bean>
 	
+	<!--
+		Lazy only because it breaks other tests until this
+		test is fixed
+	-->
+	<bean id="factory-introductionUsingJdk" 
+		lazy-init="true"
+		class="org.springframework.aop.framework.autoproxy.CreatesTestBean">	
+	</bean>
+	
 	<bean id="jdk1" class="org.springframework.beans.TestBean">	
 		<property name="name"><value>jdk1</value></property>
+	</bean>
+
+	<bean id="frozenBean" class="org.springframework.beans.TestBean">
+		<property name="name" value="frozenBean"/>
 	</bean>
 	
 	<bean id="cglib1" class="org.springframework.beans.TestBean">	

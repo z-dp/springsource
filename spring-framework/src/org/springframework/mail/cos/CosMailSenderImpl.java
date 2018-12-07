@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.mail.cos;
 
@@ -24,6 +24,7 @@ import java.util.Map;
 import com.oreilly.servlet.MailMessage;
 
 import org.springframework.mail.MailException;
+import org.springframework.mail.MailParseException;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.MailSender;
 import org.springframework.mail.SimpleMailMessage;
@@ -37,11 +38,13 @@ import org.springframework.mail.SimpleMailMessage;
  * SimpleMailMessage, therefore there's no optional richer interface like
  * the JavaMailSender interface for the JavaMailSenderImpl implementation.
  *
+ * <p>Does not support "replyTo" and "sentDate" fields; will consequently
+ * throw an exception when encountering either of those.
+ *
  * @author Juergen Hoeller
  * @since 09.10.2003
  * @see com.oreilly.servlet.MailMessage
  * @see org.springframework.mail.javamail.JavaMailSenderImpl
- * @version $Id: CosMailSenderImpl.java,v 1.6 2004/03/18 02:46:10 trisberg Exp $
  */
 public class CosMailSenderImpl implements MailSender {
 
@@ -60,34 +63,45 @@ public class CosMailSenderImpl implements MailSender {
 
 	public void send(SimpleMailMessage[] simpleMessages) throws MailException {
 		Map failedMessages = new HashMap();
+
 		for (int i = 0; i < simpleMessages.length; i++) {
+			SimpleMailMessage simpleMessage = simpleMessages[i];
+
+			if (simpleMessage.getReplyTo() != null) {
+				throw new MailParseException("CosMailSenderImpl does not support replyTo field - " + simpleMessage);
+			}
+			if (simpleMessage.getSentDate() != null) {
+				throw new MailParseException("CosMailSenderImpl does not support sentDate field - " + simpleMessage);
+			}
+
 			try {
 				MailMessage cosMessage = new MailMessage(this.host);
-				cosMessage.from(simpleMessages[i].getFrom());
-				if (simpleMessages[i].getTo() != null) {
-					for (int j = 0; j < simpleMessages[i].getTo().length; j++) {
-						cosMessage.to(simpleMessages[i].getTo()[j]);
+				cosMessage.from(simpleMessage.getFrom());
+				if (simpleMessage.getTo() != null) {
+					for (int j = 0; j < simpleMessage.getTo().length; j++) {
+						cosMessage.to(simpleMessage.getTo()[j]);
 					}
 				}
-				if (simpleMessages[i].getCc() != null) {
-					for (int j = 0; j < simpleMessages[i].getCc().length; j++) {
-						cosMessage.cc(simpleMessages[i].getCc()[j]);
+				if (simpleMessage.getCc() != null) {
+					for (int j = 0; j < simpleMessage.getCc().length; j++) {
+						cosMessage.cc(simpleMessage.getCc()[j]);
 					}
 				}
-				if (simpleMessages[i].getBcc() != null) {
-					for (int j = 0; j < simpleMessages[i].getBcc().length; j++) {
-						cosMessage.bcc(simpleMessages[i].getBcc()[j]);
+				if (simpleMessage.getBcc() != null) {
+					for (int j = 0; j < simpleMessage.getBcc().length; j++) {
+						cosMessage.bcc(simpleMessage.getBcc()[j]);
 					}
 				}
-				cosMessage.setSubject(simpleMessages[i].getSubject());
+				cosMessage.setSubject(simpleMessage.getSubject());
 				PrintStream textStream = cosMessage.getPrintStream();
-				textStream.print(simpleMessages[i].getText());
+				textStream.print(simpleMessage.getText());
 				cosMessage.sendAndClose();
 			}
 			catch (IOException ex) {
-				failedMessages.put(simpleMessages[i], ex);
+				failedMessages.put(simpleMessage, ex);
 			}
 		}
+
 		if (!failedMessages.isEmpty()) {
 			throw new MailSendException(failedMessages);
 		}

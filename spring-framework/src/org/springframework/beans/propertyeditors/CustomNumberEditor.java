@@ -1,30 +1,32 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.propertyeditors;
 
 import java.beans.PropertyEditorSupport;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.text.NumberFormat;
-import java.text.ParseException;
+
+import org.springframework.util.NumberUtils;
+import org.springframework.util.StringUtils;
 
 /**
  * Property editor for any Number subclass like Integer, Long, Float, Double.
- * Uses a given NumberFormat for (locale-specific) parsing and rendering.
+ * Can use a given NumberFormat for (locale-specific) parsing and rendering,
+ * or alternatively the default <code>valueOf</code> respectively
+ * <code>toString</code> methods.
  *
  * <p>This is not meant to be used as system PropertyEditor but rather as
  * locale-specific number editor within custom controller code, to parse
@@ -32,37 +34,61 @@ import java.text.ParseException;
  * them in the UI form.
  *
  * <p>In web MVC code, this editor will typically be registered with
- * binder.registerCustomEditor calls in an implementation of
- * BaseCommandController's initBinder method.
+ * <code>binder.registerCustomEditor</code> calls in an implementation
+ * of BaseCommandController's <code>initBinder</code> method.
  *
  * @author Juergen Hoeller
  * @since 06.06.2003
+ * @see java.lang.Number
+ * @see java.text.NumberFormat
  * @see org.springframework.validation.DataBinder#registerCustomEditor
  * @see org.springframework.web.servlet.mvc.BaseCommandController#initBinder
- * @see org.springframework.web.bind.BindInitializer#initBinder
  */
 public class CustomNumberEditor extends PropertyEditorSupport {
 
-	private Class numberClass;
+	private final Class numberClass;
 
-	private NumberFormat numberFormat;
+	private final NumberFormat numberFormat;
 
 	private final boolean allowEmpty;
 
+
 	/**
-	 * Create a new instance, using the given NumberFormat for
-	 * parsing and rendering.
+	 * Create a new CustomNumberEditor instance, using the default
+	 * <code>valueOf</code> methods for parsing and <code>toString</code>
+	 * methods for rendering.
+	 * <p>The "allowEmpty" parameter states if an empty String should
+	 * be allowed for parsing, i.e. get interpreted as <code>null</code>  value.
+	 * Else, an IllegalArgumentException gets thrown in that case.
+	 * @param numberClass Number subclass to generate
+	 * @param allowEmpty if empty strings should be allowed
+	 * @throws IllegalArgumentException if an invalid numberClass has been specified
+	 * @see org.springframework.util.NumberUtils#parseNumber(String, Class)
+	 * @see Integer#valueOf
+	 * @see Integer#toString
+	 */
+	public CustomNumberEditor(Class numberClass, boolean allowEmpty) throws IllegalArgumentException {
+		this(numberClass, null, allowEmpty);
+	}
+
+	/**
+	 * Create a new CustomNumberEditor instance, using the given NumberFormat
+	 * for parsing and rendering.
 	 * <p>The allowEmpty parameter states if an empty String should
-	 * be allowed for parsing, i.e. get interpreted as null value.
+	 * be allowed for parsing, i.e. get interpreted as <code>null</code>  value.
 	 * Else, an IllegalArgumentException gets thrown in that case.
 	 * @param numberClass Number subclass to generate
 	 * @param numberFormat NumberFormat to use for parsing and rendering
 	 * @param allowEmpty if empty strings should be allowed
 	 * @throws IllegalArgumentException if an invalid numberClass has been specified
+	 * @see org.springframework.util.NumberUtils#parseNumber(String, Class, java.text.NumberFormat)
+	 * @see java.text.NumberFormat#parse
+	 * @see java.text.NumberFormat#format
 	 */
 	public CustomNumberEditor(Class numberClass, NumberFormat numberFormat, boolean allowEmpty)
 	    throws IllegalArgumentException {
-		if (!Number.class.isAssignableFrom(numberClass)) {
+
+		if (numberClass == null || !Number.class.isAssignableFrom(numberClass)) {
 			throw new IllegalArgumentException("Property class must be a subclass of Number");
 		}
 		this.numberClass = numberClass;
@@ -70,49 +96,53 @@ public class CustomNumberEditor extends PropertyEditorSupport {
 		this.allowEmpty = allowEmpty;
 	}
 
+
+	/**
+	 * Parse the Number from the given text, using the specified NumberFormat.
+	 */
 	public void setAsText(String text) throws IllegalArgumentException {
-		if (this.allowEmpty && text.trim().equals("")) {
+		if (this.allowEmpty && !StringUtils.hasText(text)) {
+			// Treat empty String as null value.
 			setValue(null);
 		}
+		else if (this.numberFormat != null) {
+			// Use given NumberFormat for parsing text.
+			setValue(NumberUtils.parseNumber(text, this.numberClass, this.numberFormat));
+		}
 		else {
-			try {
-				Number number = this.numberFormat.parse(text);
-				if (this.numberClass.isInstance(number)) {
-					setValue(number);
-				}
-				else if (this.numberClass.equals(Short.class)) {
-					setValue(new Short(number.shortValue()));
-				}
-				else if (this.numberClass.equals(Integer.class)) {
-					setValue(new Integer(number.intValue()));
-				}
-				else if (this.numberClass.equals(Long.class)) {
-					setValue(new Long(number.longValue()));
-				}
-				else if (this.numberClass.equals(BigInteger.class)) {
-					setValue(BigInteger.valueOf(number.longValue()));
-				}
-				else if (this.numberClass.equals(Float.class)) {
-					setValue(new Float(number.floatValue()));
-				}
-				else if (this.numberClass.equals(Double.class)) {
-					setValue(new Double(number.doubleValue()));
-				}
-				else if (this.numberClass.equals(BigDecimal.class)) {
-					setValue(new BigDecimal(Double.toString(number.doubleValue())));
-				}
-				else {
-					throw new IllegalArgumentException("Cannot convert [" + text + "] to [" + this.numberClass + "]");
-				}
-			}
-			catch (ParseException ex) {
-				throw new IllegalArgumentException("Cannot parse number: " + ex.getMessage());
-			}
+			// Use default valueOf methods for parsing text.
+			setValue(NumberUtils.parseNumber(text, this.numberClass));
 		}
 	}
 
+	/**
+	 * Coerce a Number value into the required target class, if necessary.
+	 */
+	public void setValue(Object value) {
+		if (value instanceof Number) {
+			super.setValue(NumberUtils.convertNumberToTargetClass((Number) value, this.numberClass));
+		}
+		else {
+			super.setValue(value);
+		}
+	}
+
+	/**
+	 * Format the Number as String, using the specified NumberFormat.
+	 */
 	public String getAsText() {
-		return this.numberFormat.format(getValue());
+		Object value = getValue();
+		if (value == null) {
+			return "";
+		}
+		if (this.numberFormat != null) {
+			// Use NumberFormat for rendering value.
+			return this.numberFormat.format(value);
+		}
+		else {
+			// Use toString method for rendering value.
+			return value.toString();
+		}
 	}
 
 }

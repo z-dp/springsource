@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.support;
 
@@ -21,6 +21,7 @@ import java.io.Serializable;
 /**
  * Mutable implementation of SortDefinition.
  * Supports toggling the ascending value on setting the same property again.
+ *
  * @author Juergen Hoeller
  * @author Jean-Pierre Pawlak
  * @since 26.05.2003
@@ -36,29 +37,56 @@ public class MutableSortDefinition implements SortDefinition, Serializable {
 
 	private boolean toggleAscendingOnProperty = false;
 
+
+	/**
+	 * Create an empty MutableSortDefinition,
+	 * to be populated via its bean properties.
+	 * @see #setProperty
+	 * @see #setIgnoreCase
+	 * @see #setAscending
+	 */
 	public MutableSortDefinition() {
 	}
 
+	/**
+	 * Copy constructor: create a new MutableSortDefinition
+	 * that mirrors the given sort definition.
+	 * @param source the original sort definition
+	 */
 	public MutableSortDefinition(SortDefinition source) {
 		this.property = source.getProperty();
 		this.ignoreCase = source.isIgnoreCase();
 		this.ascending = source.isAscending();
 	}
 
+	/**
+	 * Create a MutableSortDefinition for the given settings.
+	 * @param property the property to compare
+	 * @param ignoreCase whether upper and lower case in String values should be ignored
+	 * @param ascending whether to sort ascending (true) or descending (false)
+	 */
 	public MutableSortDefinition(String property, boolean ignoreCase, boolean ascending) {
 		this.property = property;
 		this.ignoreCase = ignoreCase;
 		this.ascending = ascending;
 	}
 
+	/**
+	 * Create a new MutableSortDefinition.
+	 * @param toggleAscendingOnSameProperty whether to toggle the ascending flag
+	 * if the same property gets set again (that is, <code>setProperty</code> gets
+	 * called with already set property name again).
+	 */
 	public MutableSortDefinition(boolean toggleAscendingOnSameProperty) {
 		this.toggleAscendingOnProperty = toggleAscendingOnSameProperty;
 	}
 
+
 	/**
-	 * Set the sort property.
-	 * If the property was the same as the current, the sort is reversed if
+	 * Set the property to compare.
+	 * <p>If the property was the same as the current, the sort is reversed if
 	 * "toggleAscendingOnProperty" is activated, else simply ignored.
+	 * @see #setToggleAscendingOnProperty
 	 */
 	public void setProperty(String property) {
 		if (property == null || "".equals(property)) {
@@ -66,9 +94,9 @@ public class MutableSortDefinition implements SortDefinition, Serializable {
 		}
 		else {
 			// implicit toggling of ascending?
-			if (this.toggleAscendingOnProperty) {
+			if (isToggleAscendingOnProperty()) {
 				if (property.equals(this.property)) {
-					ascending = !ascending;
+					this.ascending = !this.ascending;
 				}
 				else {
 					this.ascending = true;
@@ -82,6 +110,9 @@ public class MutableSortDefinition implements SortDefinition, Serializable {
 		return property;
 	}
 
+	/**
+	 * Set whether upper and lower case in String values should be ignored.
+	 */
 	public void setIgnoreCase(boolean ignoreCase) {
 		this.ignoreCase = ignoreCase;
 	}
@@ -90,6 +121,9 @@ public class MutableSortDefinition implements SortDefinition, Serializable {
 		return ignoreCase;
 	}
 
+	/**
+	 * Set whether to sort ascending (true) or descending (false).
+	 */
 	public void setAscending(boolean ascending) {
 		this.ascending = ascending;
 	}
@@ -98,29 +132,45 @@ public class MutableSortDefinition implements SortDefinition, Serializable {
 		return ascending;
 	}
 
+	/**
+	 * Set whether to toggle the ascending flag if the same property gets set again
+	 * (that is, <code>setProperty</code> gets called with already set property name
+	 * again).
+	 * <p>This is particularly useful for parameter binding through a web request,
+	 * where clicking on the field header again might be supposed to trigger a
+	 * resort for the same field but opposite order.
+	 */
 	public void setToggleAscendingOnProperty(boolean toggleAscendingOnProperty) {
 		this.toggleAscendingOnProperty = toggleAscendingOnProperty;
 	}
 
+	/**
+	 * Return whether to toggle the ascending flag if the same property gets set again
+	 * (that is, <code>setProperty</code> gets called with already set property name
+	 * again).
+	 */
 	public boolean isToggleAscendingOnProperty() {
 		return toggleAscendingOnProperty;
 	}
 
-	public boolean equals(Object obj) {
-		if (!(obj instanceof SortDefinition)) {
+
+	public boolean equals(Object other) {
+		if (this == other) {
+			return true;
+		}
+		if (!(other instanceof SortDefinition)) {
 			return false;
 		}
-		SortDefinition sd = (SortDefinition) obj;
-		return (getProperty().equals(sd.getProperty()) &&
-		    isAscending() == sd.isAscending() && isIgnoreCase() == sd.isIgnoreCase());
+		SortDefinition otherSd = (SortDefinition) other;
+		return (getProperty().equals(otherSd.getProperty()) &&
+		    isAscending() == otherSd.isAscending() && isIgnoreCase() == otherSd.isIgnoreCase());
 	}
 
 	public int hashCode() {
-		int result;
-		result = this.property.hashCode();
-		result = 29 * result + (this.ignoreCase ? 1 : 0);
-		result = 29 * result + (this.ascending ? 1 : 0);
-		return result;
+		int hashCode = getProperty().hashCode();
+		hashCode = 29 * hashCode + (isIgnoreCase() ? 1 : 0);
+		hashCode = 29 * hashCode + (isAscending() ? 1 : 0);
+		return hashCode;
 	}
 
 }

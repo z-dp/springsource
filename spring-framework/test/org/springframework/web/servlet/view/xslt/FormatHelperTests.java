@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.view.xslt;
 
@@ -20,39 +20,38 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 import junit.framework.TestCase;
-
 import org.w3c.dom.Element;
 
 /**
  * Test the FormatHelper methods.
+ *
  * @author Rod Johnson
  * @author Darren Davison
- * @since 26-Jul-2003
- * @version $Id: FormatHelperTests.java,v 1.7 2004/03/18 03:01:40 trisberg Exp $
+ * @since 26.07.2003
  */
 public class FormatHelperTests extends TestCase {
 
-	static long testTime = 1064359582063L; //appx 00:26 on 24/9/2003 in the UK (GMT +1)
+	private static final long testTime = 1064359582063L; //appx 00:26 on 24/9/2003 in the UK (GMT +1)
 		
 	/**
-	 * test null params for Locale
+	 * Test null params for Locale.
 	 */
 	public void testNullParamsForLocale() {
-		Element e;
-		String s;
 		try {
-			e = (Element) FormatHelper.dateTimeElement(testTime, null, null);
+			Element e = (Element) FormatHelper.dateTimeElement(testTime, null, null);
 			e = (Element) FormatHelper.dateTimeElement(testTime, "", null);
 			e = (Element) FormatHelper.dateTimeElement(testTime, null, "");						
-		} catch (Throwable ex) {
+		}
+		catch (Throwable ex) {
 			fail( "Passing null params to dateTimeElement(long, String, String) throws " + ex.getClass().getName());
 		}
 
 		try {
-			s = FormatHelper.currency(50d, null, null);
+			String s = FormatHelper.currency(50d, null, null);
 			s = FormatHelper.currency(50d, "", null);
 			s = FormatHelper.currency(50d, null, "");
-		} catch (Throwable ex) {
+		}
+		catch (Throwable ex) {
 			fail( "Passing null params to currency(long, String, String) throws " + ex.getClass().getName());
 		}
 	}
@@ -65,8 +64,7 @@ public class FormatHelperTests extends TestCase {
 
 		Element e = (Element) FormatHelper.dateTimeElement(testTime, Locale.UK);
 		assertTrue(e.getTagName().equals("formatted-date"));
-		Element el;
-		el = (Element) e.getElementsByTagName("year").item(0);
+		Element el = (Element) e.getElementsByTagName("year").item(0);
 		assertTrue("2003".equals(el.getFirstChild().getNodeValue()));
 		el = (Element) e.getElementsByTagName("month").item(0);
 		assertTrue("September".equals(el.getFirstChild().getNodeValue()));
@@ -84,15 +82,16 @@ public class FormatHelperTests extends TestCase {
 		// prove a different locale changes the output
 		e = (Element) FormatHelper.dateTimeElement(testTime, Locale.FRANCE);
 		el = (Element) e.getElementsByTagName("day-of-week").item(0);
-		assertTrue("mercredi".equals(el.getFirstChild().getNodeValue()));
+	
+		//FIX: IBM JVM 1.5.0 SR3 will return "Mercredi".
+		assertTrue("mercredi".equals(el.getFirstChild().getNodeValue()) || "Mercredi".equals(el.getFirstChild().getNodeValue()) );
 
 		// reset TZ in case later tests have a problem
 		TimeZone.setDefault(curr);
 	}
 	
 	public void testCurrency() {
-		String s;
-		s = FormatHelper.currency( 50.0d, Locale.US);
+		String s = FormatHelper.currency( 50.0d, Locale.US);
 		assertTrue( "$50.00".equals(s));
 		
 		// pound sign (#163)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.support;
 
@@ -23,22 +23,12 @@ import junit.framework.TestCase;
 /**
  * TODO this test case needs attention: I wrote it based on Isabelle's documentation
  * and it appears that JdbcUtils doesn't work exactly as documented.
+ *
  * @author Rod Johnson
  * @author Juergen Hoeller
- * @version $Id: JdbcUtilsTests.java,v 1.3 2004/03/18 03:01:15 trisberg Exp $
  */
 public class JdbcUtilsTests extends TestCase {
 
-	/**
-	 * Constructor for JdbcUtilsTests.
-	 * @param arg0
-	 */
-	public JdbcUtilsTests(String arg0) {
-		super(arg0);
-	}
-
-	/**
-	 */
 	public void testCountParameterPlaceholders() {
 		assertTrue(JdbcUtils.countParameterPlaceholders(null, '?', '\'') == 0);
 
@@ -51,7 +41,19 @@ public class JdbcUtilsTests extends TestCase {
 		assertTrue(JdbcUtils.countParameterPlaceholders("The big ?? bad wolf", '?', '\'') == 2);
 		
 		assertTrue(JdbcUtils.countParameterPlaceholders("The big 'ba''ad?' ? wolf", '?', '\'') == 1);
-	}
+
+		assertTrue(JdbcUtils.countParameterPlaceholders(null, '?', "\"'") == 0);
+
+		assertTrue(JdbcUtils.countParameterPlaceholders("", '?', "\"'") == 0);
+
+		assertTrue(JdbcUtils.countParameterPlaceholders("?", '?', "\"'") == 1);
+
+		assertTrue(JdbcUtils.countParameterPlaceholders("The \"big\" ? 'bad wolf'", '?', "\"'") == 1);
+		
+		assertTrue(JdbcUtils.countParameterPlaceholders("The big ?? bad wolf", '?', "\"'") == 2);
+		
+		assertTrue(JdbcUtils.countParameterPlaceholders("The \"big?\" 'ba''ad?' ? wolf", '?', "\"'") == 1);
+}
 
 	public void testIsNumeric() {
 		assertTrue(JdbcUtils.isNumeric(Types.BIGINT));

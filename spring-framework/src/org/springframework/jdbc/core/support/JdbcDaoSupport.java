@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.core.support;
 
@@ -20,11 +20,7 @@ import java.sql.Connection;
 
 import javax.sql.DataSource;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import org.springframework.beans.factory.InitializingBean;
-import org.springframework.jdbc.CannotCloseJdbcConnectionException;
+import org.springframework.dao.support.DaoSupport;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceUtils;
@@ -45,24 +41,36 @@ import org.springframework.jdbc.support.SQLExceptionTranslator;
  * @see org.springframework.jdbc.core.JdbcTemplate
  * @see org.springframework.jdbc.datasource.DataSourceUtils
  */
-public abstract class JdbcDaoSupport implements InitializingBean {
-
-	protected final Log logger = LogFactory.getLog(getClass());
+public abstract class JdbcDaoSupport extends DaoSupport {
 
 	private JdbcTemplate jdbcTemplate;
+
 
 	/**
 	 * Set the JDBC DataSource to be used by this DAO.
 	 */
 	public final void setDataSource(DataSource dataSource) {
-	  this.jdbcTemplate = new JdbcTemplate(dataSource);
+	  this.jdbcTemplate = createJdbcTemplate(dataSource);
+	}
+
+	/**
+	 * Create a JdbcTemplate for the given DataSource.
+	 * Only invoked if populating the DAO with a DataSource reference!
+	 * <p>Can be overridden in subclasses to provide a JdbcTemplate instance
+	 * with different configuration, or a custom JdbcTemplate subclass.
+	 * @param dataSource the JDBC DataSource to create a JdbcTemplate for
+	 * @return the new JdbcTemplate instance
+	 * @see #setDataSource
+	 */
+	protected JdbcTemplate createJdbcTemplate(DataSource dataSource) {
+		return new JdbcTemplate(dataSource);
 	}
 
 	/**
 	 * Return the JDBC DataSource used by this DAO.
 	 */
-	protected final DataSource getDataSource() {
-		return jdbcTemplate.getDataSource();
+	public final DataSource getDataSource() {
+		return (this.jdbcTemplate != null ? this.jdbcTemplate.getDataSource() : null);
 	}
 
 	/**
@@ -77,29 +85,22 @@ public abstract class JdbcDaoSupport implements InitializingBean {
 	 * Return the JdbcTemplate for this DAO,
 	 * pre-initialized with the DataSource or set explicitly.
 	 */
-	protected final JdbcTemplate getJdbcTemplate() {
+	public final JdbcTemplate getJdbcTemplate() {
 	  return jdbcTemplate;
 	}
 
-	public final void afterPropertiesSet() throws Exception {
+	protected final void checkDaoConfig() {
 		if (this.jdbcTemplate == null) {
 			throw new IllegalArgumentException("dataSource or jdbcTemplate is required");
 		}
-		initDao();
 	}
 
-	/**
-	 * Subclasses can override this for custom initialization behavior.
-	 * Gets called after population of this instance's bean properties.
-	 * @throws Exception if initialization fails
-	 */
-	protected void initDao() throws Exception {
-	}
 
 	/**
 	 * Get a JDBC Connection, either from the current transaction or a new one.
 	 * @return the JDBC Connection
 	 * @throws org.springframework.jdbc.CannotGetJdbcConnectionException if the attempt to get a Connection failed
+	 * @see org.springframework.jdbc.datasource.DataSourceUtils#getConnection(javax.sql.DataSource)
 	 */
 	protected final Connection getConnection() throws CannotGetJdbcConnectionException {
 		return DataSourceUtils.getConnection(getDataSource());
@@ -108,20 +109,30 @@ public abstract class JdbcDaoSupport implements InitializingBean {
 	/**
 	 * Return the SQLExceptionTranslator of this DAO's JdbcTemplate,
 	 * for translating SQLExceptions in custom JDBC access code.
+	 * @see org.springframework.jdbc.core.JdbcTemplate#getExceptionTranslator
 	 */
 	protected final SQLExceptionTranslator getExceptionTranslator() {
 		return this.jdbcTemplate.getExceptionTranslator();
 	}
 
 	/**
-	 * Close the given JDBC Connection if necessary, created via this bean's
-	 * DataSource, if it isn't bound to the thread.
-	 * @param con Connection to close
-	 * @throws org.springframework.jdbc.CannotCloseJdbcConnectionException if the attempt to close the
-	 * Connection failed
+	 * Close the given JDBC Connection, created via this DAO's DataSource,
+	 * if it isn't bound to the thread.
+	 * @deprecated in favor of releaseConnection
+	 * @see #releaseConnection
 	 */
-	protected final void closeConnectionIfNecessary(Connection con) throws CannotCloseJdbcConnectionException {
-		DataSourceUtils.closeConnectionIfNecessary(con, getDataSource());
+	protected final void closeConnectionIfNecessary(Connection con) {
+		releaseConnection(con);
+	}
+
+	/**
+	 * Close the given JDBC Connection, created via this DAO's DataSource,
+	 * if it isn't bound to the thread.
+	 * @param con Connection to close
+	 * @see org.springframework.jdbc.datasource.DataSourceUtils#releaseConnection
+	 */
+	protected final void releaseConnection(Connection con) {
+		DataSourceUtils.releaseConnection(con, getDataSource());
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.jdo;
 
@@ -44,7 +44,7 @@ import javax.jdo.PersistenceManager;
 public interface JdoCallback {
 
 	/**
-	 * Gets called by JdoTemplate.execute with an active PersistenceManager.
+	 * Gets called by <code>JdoTemplate.execute</code> with an active PersistenceManager.
 	 * Does not need to care about activating or closing the PersistenceManager,
 	 * or handling transactions.
 	 *
@@ -59,8 +59,8 @@ public interface JdoCallback {
 	 * it gets propagated to the caller of the template.
 	 *
 	 * @param pm active PersistenceManager
-	 * @return a result object, or null if none
-	 * @throws javax.jdo.JDOException in case of JDO errors
+	 * @return a result object, or <code>null</code> if none
+	 * @throws JDOException in case of JDO errors
 	 * @see JdoTemplate#execute
 	 * @see JdoTransactionManager
 	 */

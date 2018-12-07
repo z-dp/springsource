@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory.xml;
 
@@ -21,20 +21,24 @@ import org.springframework.beans.TestBean;
 
 /**
  * Simple bean used to check constructor dependency checking.
+ *
  * @author Juergen Hoeller
  * @since 09.11.2003
  */
-public class DerivedConstructorDependenciesBean extends ConstructorDependenciesBean {
+class DerivedConstructorDependenciesBean extends ConstructorDependenciesBean {
 
-	public DerivedConstructorDependenciesBean(TestBean spouse1, TestBean spouse2, IndexedTestBean other) {
+	boolean initialized;
+	boolean destroyed;
+
+	DerivedConstructorDependenciesBean(TestBean spouse1, TestBean spouse2, IndexedTestBean other) {
 		super(spouse1, spouse2, other);
 	}
 
-	public DerivedConstructorDependenciesBean(TestBean spouse1, Object spouse2, IndexedTestBean other) {
+	private DerivedConstructorDependenciesBean(TestBean spouse1, Object spouse2, IndexedTestBean other) {
 		super(spouse1, null, other);
 	}
 
-	public DerivedConstructorDependenciesBean(TestBean spouse1, TestBean spouse2, IndexedTestBean other, int age, int otherAge) {
+	protected DerivedConstructorDependenciesBean(TestBean spouse1, TestBean spouse2, IndexedTestBean other, int age, int otherAge) {
 		super(spouse1, spouse2, other);
 	}
 
@@ -42,6 +46,14 @@ public class DerivedConstructorDependenciesBean extends ConstructorDependenciesB
 		super(spouse1, spouse2, other);
 		setAge(age);
 		setName(name);
+	}
+
+	private void init() {
+		this.initialized = true;
+	}
+
+	private void destroy() {
+		this.destroyed = true;
 	}
 
 }

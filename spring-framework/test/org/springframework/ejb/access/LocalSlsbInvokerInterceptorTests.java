@@ -1,6 +1,6 @@
 
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.ejb.access;
 
@@ -24,8 +24,8 @@ import javax.naming.Context;
 import javax.naming.NamingException;
 
 import junit.framework.TestCase;
-
 import org.easymock.MockControl;
+
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.jndi.JndiTemplate;
 
@@ -35,21 +35,11 @@ import org.springframework.jndi.JndiTemplate;
 public class LocalSlsbInvokerInterceptorTests extends TestCase {
 
 	/**
-	 * Constructor for SimpleRemoteSlsbInvokerInterceptorTests.
-	 * @param arg0
-	 */
-	public LocalSlsbInvokerInterceptorTests(String arg0) {
-		super(arg0);
-	}
-	
-	
-	/**
-	 * Test that it performs the correct lookup
-	 * @throws java.lang.Exception
+	 * Test that it performs the correct lookup.
 	 */
 	public void testPerformsLookup() throws Exception {
-		MockControl ejbControl = MockControl.createControl(LocalInterface.class);
-		final LocalInterface ejb = (LocalInterface) ejbControl.getMock();
+		MockControl ejbControl = MockControl.createControl(LocalInterfaceWithBusinessMethods.class);
+		final LocalInterfaceWithBusinessMethods ejb = (LocalInterfaceWithBusinessMethods) ejbControl.getMock();
 		ejbControl.replay();
 		
 		final String jndiName= "foobar";
@@ -84,13 +74,14 @@ public class LocalSlsbInvokerInterceptorTests extends TestCase {
 		}
 	}
 	
-	
 	public void testInvokesMethodOnEjbInstance() throws Exception {
 		Object retVal = new Object();
-		MockControl ejbControl = MockControl.createControl(LocalInterface.class);
-		final LocalInterface ejb = (LocalInterface) ejbControl.getMock();
+		MockControl ejbControl = MockControl.createControl(LocalInterfaceWithBusinessMethods.class);
+		final LocalInterfaceWithBusinessMethods ejb = (LocalInterfaceWithBusinessMethods) ejbControl.getMock();
 		ejb.targetMethod();
 		ejbControl.setReturnValue(retVal, 1);
+		ejb.remove();
+		ejbControl.setVoidCallable(1);
 		ejbControl.replay();
 	
 		final String jndiName= "foobar";
@@ -98,9 +89,9 @@ public class LocalSlsbInvokerInterceptorTests extends TestCase {
 	
 		LocalSlsbInvokerInterceptor si = configuredInterceptor(contextControl, jndiName);
 	
-		ProxyFactory pf = new ProxyFactory(new Class[] { LocalInterface.class } );
-		pf.addInterceptor(si);
-		LocalInterface target = (LocalInterface) pf.getProxy();
+		ProxyFactory pf = new ProxyFactory(new Class[] { BusinessMethods.class } );
+		pf.addAdvice(si);
+		BusinessMethods target = (BusinessMethods) pf.getProxy();
 	
 		assertTrue(target.targetMethod() == retVal);
 	
@@ -108,9 +99,34 @@ public class LocalSlsbInvokerInterceptorTests extends TestCase {
 		ejbControl.verify();
 	}
 	
-	private void testException(Exception expected) throws Exception {
+	public void testInvokesMethodOnEjbInstanceWithSeparateBusinessMethods() throws Exception {
+		Object retVal = new Object();
 		MockControl ejbControl = MockControl.createControl(LocalInterface.class);
 		final LocalInterface ejb = (LocalInterface) ejbControl.getMock();
+		ejb.targetMethod();
+		ejbControl.setReturnValue(retVal, 1);
+		ejb.remove();
+		ejbControl.setVoidCallable(1);
+		ejbControl.replay();
+
+		final String jndiName= "foobar";
+		MockControl contextControl = contextControl(jndiName, ejb);
+
+		LocalSlsbInvokerInterceptor si = configuredInterceptor(contextControl, jndiName);
+
+		ProxyFactory pf = new ProxyFactory(new Class[] { BusinessMethods.class } );
+		pf.addAdvice(si);
+		BusinessMethods target = (BusinessMethods) pf.getProxy();
+
+		assertTrue(target.targetMethod() == retVal);
+
+		contextControl.verify();
+		ejbControl.verify();
+	}
+
+	private void testException(Exception expected) throws Exception {
+		MockControl ejbControl = MockControl.createControl(LocalInterfaceWithBusinessMethods.class);
+		final LocalInterfaceWithBusinessMethods ejb = (LocalInterfaceWithBusinessMethods) ejbControl.getMock();
 		ejb.targetMethod();
 		ejbControl.setThrowable(expected);
 		ejbControl.replay();
@@ -120,9 +136,9 @@ public class LocalSlsbInvokerInterceptorTests extends TestCase {
 
 		LocalSlsbInvokerInterceptor si = configuredInterceptor(contextControl, jndiName);
 
-		ProxyFactory pf = new ProxyFactory(new Class[] { LocalInterface.class } );
-		pf.addInterceptor(si);
-		LocalInterface target = (LocalInterface) pf.getProxy();
+		ProxyFactory pf = new ProxyFactory(new Class[] { LocalInterfaceWithBusinessMethods.class } );
+		pf.addAdvice(si);
+		LocalInterfaceWithBusinessMethods target = (LocalInterfaceWithBusinessMethods) pf.getProxy();
 
 		try {
 			target.targetMethod();
@@ -139,10 +155,10 @@ public class LocalSlsbInvokerInterceptorTests extends TestCase {
 	public void testApplicationException() throws Exception {
 		testException(new ApplicationException());
 	}
-	
-	
-	
-	protected MockControl contextControl(final String jndiName, final LocalInterface ejbInstance) throws Exception {
+
+	protected MockControl contextControl(final String jndiName, final EJBLocalObject ejbInstance)
+			throws Exception {
+
 		MockControl homeControl = MockControl.createControl(SlsbHome.class);
 		final SlsbHome mockHome = (SlsbHome) homeControl.getMock();
 		mockHome.create();
@@ -160,7 +176,9 @@ public class LocalSlsbInvokerInterceptorTests extends TestCase {
 		return ctxControl;
 	}
 		
-	protected LocalSlsbInvokerInterceptor configuredInterceptor(MockControl contextControl, final String jndiName) throws Exception {
+	protected LocalSlsbInvokerInterceptor configuredInterceptor(MockControl contextControl, final String jndiName)
+			throws Exception {
+
 		final Context mockCtx = (Context) contextControl.getMock();
 		LocalSlsbInvokerInterceptor si = new LocalSlsbInvokerInterceptor();
 		si.setJndiTemplate(new JndiTemplate() {
@@ -177,21 +195,32 @@ public class LocalSlsbInvokerInterceptorTests extends TestCase {
 	
 	
 	/** 
-	 * Needed so that we can mock create() method
+	 * Needed so that we can mock the create() method.
 	 */
-	protected interface SlsbHome extends EJBLocalHome {
+	private interface SlsbHome extends EJBLocalHome {
+
 		LocalInterface create() throws CreateException;
 	}
-	
-	protected interface BusinessMethods {
+
+
+	private interface BusinessMethods {
+
 		Object targetMethod() throws ApplicationException;
 	}
-		
-	protected interface LocalInterface extends EJBLocalObject, BusinessMethods {
-		
+
+
+	private interface LocalInterface extends EJBLocalObject {
+
+		Object targetMethod() throws ApplicationException;
 	}
-	
-	protected class ApplicationException extends Exception {
+
+
+	private interface LocalInterfaceWithBusinessMethods extends LocalInterface, BusinessMethods {
+	}
+
+
+	private class ApplicationException extends Exception {
+
 		public ApplicationException() {
 			super("appException");
 		}

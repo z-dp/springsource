@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,10 +12,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.remoting.caucho;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 
 import javax.servlet.ServletException;
@@ -26,9 +27,12 @@ import com.caucho.burlap.io.BurlapInput;
 import com.caucho.burlap.io.BurlapOutput;
 import com.caucho.burlap.server.BurlapSkeleton;
 
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.remoting.support.RemoteExporter;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.Controller;
+import org.springframework.web.servlet.support.WebContentGenerator;
+import org.springframework.web.util.NestedServletException;
 
 /**
  * Web controller that exports the specified service bean as Burlap service
@@ -46,21 +50,26 @@ import org.springframework.web.servlet.mvc.Controller;
  *
  * @author Juergen Hoeller
  * @since 13.05.2003
+ * @see BurlapClientInterceptor
  * @see BurlapProxyFactoryBean
+ * @see org.springframework.remoting.caucho.HessianServiceExporter
+ * @see org.springframework.remoting.httpinvoker.HttpInvokerServiceExporter
+ * @see org.springframework.remoting.rmi.RmiServiceExporter
  */
-public class BurlapServiceExporter extends RemoteExporter implements Controller {
+public class BurlapServiceExporter extends RemoteExporter implements Controller, InitializingBean {
 
 	private BurlapSkeleton skeleton;
 
 	public void afterPropertiesSet() throws Exception {
-		super.afterPropertiesSet();
 		try {
-			// try Burlap 3.x (with service interface argument)
+			// Try Burlap 3.x (with service interface argument).
 			Constructor ctor = BurlapSkeleton.class.getConstructor(new Class[] {Object.class, Class.class});
-			this.skeleton = (BurlapSkeleton) ctor.newInstance(new Object[] {getService(), getServiceInterface()});
+			checkService();
+			checkServiceInterface();
+			this.skeleton = (BurlapSkeleton) ctor.newInstance(new Object[] {getProxyForService(), getServiceInterface()});
 		}
 		catch (NoSuchMethodException ex) {
-			// fall back to Burlap 2.x (without service interface argument)
+			// Fall back to Burlap 2.x (without service interface argument).
 			Constructor ctor = BurlapSkeleton.class.getConstructor(new Class[] {Object.class});
 			this.skeleton = (BurlapSkeleton) ctor.newInstance(new Object[] {getProxyForService()});
 		}
@@ -69,22 +78,22 @@ public class BurlapServiceExporter extends RemoteExporter implements Controller 
 	/**
 	 * Process the incoming Burlap request and create a Burlap response.
 	 */
-	public ModelAndView handleRequest(HttpServletRequest request, HttpServletResponse response) throws Exception {
+	public ModelAndView handleRequest(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+
+		if (!WebContentGenerator.METHOD_POST.equals(request.getMethod())) {
+			throw new ServletException("BurlapServiceExporter only supports POST requests");
+		}
+
 		BurlapInput in = new BurlapInput(request.getInputStream());
 		BurlapOutput out = new BurlapOutput(response.getOutputStream());
 		try {
 		  this.skeleton.invoke(in, out);
-		}
-		catch (Exception ex) {
-			throw ex;
-		}
-		catch (Error ex) {
-			throw ex;
+			return null;
 		}
 		catch (Throwable ex) {
-		  throw new ServletException(ex);
+		  throw new NestedServletException("Burlap skeleton invocation failed", ex);
 		}
-		return null;
 	}
 
 }

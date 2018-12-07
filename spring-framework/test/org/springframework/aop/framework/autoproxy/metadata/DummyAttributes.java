@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework.autoproxy.metadata;
 
@@ -23,22 +23,23 @@ import org.springframework.transaction.interceptor.NoRollbackRuleAttribute;
 import org.springframework.transaction.interceptor.RollbackRuleAttribute;
 import org.springframework.transaction.interceptor.RuleBasedTransactionAttribute;
 
-
 /**
  * Hardcoded to return the same attributes as are on the TxClass and TxClassWithClassAttribute.
+ *
  * @author Rod Johnson
- * @version $Id: DummyAttributes.java,v 1.4 2004/03/18 03:01:17 trisberg Exp $
  */
 public class DummyAttributes extends MapAttributes {
 
 	public DummyAttributes() throws Exception {
-		register(TxClassImpl.class.getMethod("defaultTxAttribute", null), 
-			new Object[] { new DefaultTransactionAttribute()});
-		Object[] echoAtts = new Object[] { 
+		register(TxClassImpl.class.getMethod("defaultTxAttribute", (Class[]) null),
+		    new Object[] { new DefaultTransactionAttribute()});
+
+		Object[] echoAtts = new Object[] {
 			new RuleBasedTransactionAttribute(),
 			new RollbackRuleAttribute("java.lang.Exception"),
 			new NoRollbackRuleAttribute("ServletException")
 		};
+
 		register(TxClassImpl.class.getMethod("echoException", new Class[] { Exception.class }), echoAtts);
 		
 		PoolingAttribute pa = new PoolingAttribute(10);
@@ -50,6 +51,5 @@ public class DummyAttributes extends MapAttributes {
 		
 		register(ModifiableTestBean.class, new Object[] { new ModifiableAttribute() });
 	}
-	
-	
+
 }

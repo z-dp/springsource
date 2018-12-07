@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.transaction;
 
@@ -21,16 +21,25 @@ package org.springframework.transaction;
  * relies on an existing transaction (such as setting
  * rollback status) and there is no existing transaction.
  * This represents an illegal usage of the transaction API.
+ *
  * @author Rod Johnson
- * @since 17-Mar-2003
- * @version $Revision: 1.2 $
+ * @since 17.03.2003
  */
 public class NoTransactionException extends TransactionUsageException {
 
+	/**
+	 * Constructor for NoTransactionException.
+	 * @param msg the detail message
+	 */
 	public NoTransactionException(String msg) {
 		super(msg);
 	}
 
+	/**
+	 * Constructor for NoTransactionException.
+	 * @param msg the detail message
+	 * @param ex root cause from transaction API in use
+	 */
 	public NoTransactionException(String msg, Throwable ex) {
 		super(msg, ex);
 	}

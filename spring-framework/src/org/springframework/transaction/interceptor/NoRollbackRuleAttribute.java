@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,21 +12,21 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.transaction.interceptor;
 
 /**
- * Tag class. Its class means it has the opposite behaviour to the
- * RollbackRule superclass.
+ * Tag subclass of RollbackRule. Its class name means that it has the
+ * opposite behavior to the RollbackRule superclass.
+ *
  * @author Rod Johnson
- * @since 09-Apr-2003
- * @version $Id: NoRollbackRuleAttribute.java,v 1.5 2004/03/18 02:46:05 trisberg Exp $
+ * @since 09.04.2003
  */
 public class NoRollbackRuleAttribute extends RollbackRuleAttribute {
 	
 	/**
-	 * Constrct a new NoRollbackRule for the given throwable class.
+	 * Construct a new NoRollbackRule for the given throwable class.
 	 * @param clazz throwable class
 	 */
 	public NoRollbackRuleAttribute(Class clazz) {
@@ -47,5 +47,6 @@ public class NoRollbackRuleAttribute extends RollbackRuleAttribute {
 	public String toString() {
 		return "No" + super.toString();
 	}
-
+	
+	// rely on superclass equals and hashCode methods
 }

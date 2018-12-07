@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework.autoproxy.metadata;
 
@@ -23,47 +23,34 @@ import javax.servlet.ServletException;
 import junit.framework.TestCase;
 
 import org.springframework.aop.framework.Advised;
-import org.springframework.aop.framework.support.AopUtils;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.aop.target.AbstractPoolingTargetSource;
 import org.springframework.aop.target.PrototypeTargetSource;
 import org.springframework.aop.target.ThreadLocalTargetSource;
 import org.springframework.beans.ITestBean;
 import org.springframework.beans.TestBean;
 import org.springframework.beans.factory.BeanFactory;
-import org.springframework.transaction.CountingTxManager;
+import org.springframework.transaction.CallCountingTransactionManager;
 
 /**
- * Abstract tests for EnterpriseServices. Subclasses must
- * load the appropriate bean factory defining the necessary beans
- * and their transaction attributes.
- * See the enterpriseServics.xml file for definitions of beans;
- * define the EnterpriseServices bean in a separate file to
- * change how attributes are source. 
+ * Abstract tests for auto-proxying. Subclasses must load the appropriate
+ * bean factory defining the necessary beans and their transaction attributes.
+ *
+ * <p>See the enterpriseServices.xml file for definitions of beans.
+ *
  * @author Rod Johnson
- * @version $Id: AbstractMetadataAutoProxyTests.java,v 1.4 2004/03/18 03:01:17 trisberg Exp $
  */
 public abstract class AbstractMetadataAutoProxyTests extends TestCase {
 	
 	private static final String TXMANAGER_BEAN_NAME = "es.txManager";
-	/**
-	 * Constructor for ProxyFactoryBeanTests.
-	 * @param arg0
-	 */
-	protected AbstractMetadataAutoProxyTests(String arg0) {
-		super(arg0);
-	}
-	
+
 	/**
 	 * Return a bean factory with attributes and EnterpriseServices configured.
-	 * @return
-	 * @throws IOException
 	 */
 	protected abstract BeanFactory getBeanFactory() throws IOException;
-	
-	
+
 	/**
-	 * If no pointcuts match (no atts) there should be proxying
-	 * @throws Exception
+	 * If no pointcuts match (no atts) there should be proxying.
 	 */
 	public void testNoProxy() throws Exception {
 		BeanFactory bf = getBeanFactory();
@@ -91,7 +78,7 @@ public abstract class AbstractMetadataAutoProxyTests extends TestCase {
 		BeanFactory bf = getBeanFactory();
 		TxClass txClass = (TxClass) bf.getBean("txClass");
 		
-		CountingTxManager txMan = (CountingTxManager) bf.getBean(TXMANAGER_BEAN_NAME);
+		CallCountingTransactionManager txMan = (CallCountingTransactionManager) bf.getBean(TXMANAGER_BEAN_NAME);
 		
 		assertEquals(0, txMan.commits);
 		int count = txClass.defaultTxAttribute();
@@ -109,7 +96,7 @@ public abstract class AbstractMetadataAutoProxyTests extends TestCase {
 		TxClass txClass = (TxClass) bf.getBean("txClass");
 		assertTrue(AopUtils.isAopProxy(txClass));
 	
-		CountingTxManager txMan = (CountingTxManager) bf.getBean(TXMANAGER_BEAN_NAME);
+		CallCountingTransactionManager txMan = (CallCountingTransactionManager) bf.getBean(TXMANAGER_BEAN_NAME);
 	
 		assertEquals(0, txMan.commits);
 		txClass.echoException(null);
@@ -130,7 +117,7 @@ public abstract class AbstractMetadataAutoProxyTests extends TestCase {
 		BeanFactory bf = getBeanFactory();
 		TxClass txClass = (TxClass) bf.getBean("txClass");
 
-		CountingTxManager txMan = (CountingTxManager) bf.getBean(TXMANAGER_BEAN_NAME);
+		CallCountingTransactionManager txMan = (CallCountingTransactionManager) bf.getBean(TXMANAGER_BEAN_NAME);
 
 		assertEquals(0, txMan.commits);
 		// Should NOT roll back on ServletException 
@@ -146,7 +133,7 @@ public abstract class AbstractMetadataAutoProxyTests extends TestCase {
 	public void testProgrammaticRollback() throws Exception {
 		BeanFactory bf = getBeanFactory();
 
-		CountingTxManager txMan = (CountingTxManager) bf.getBean(TXMANAGER_BEAN_NAME);
+		CallCountingTransactionManager txMan = (CallCountingTransactionManager) bf.getBean(TXMANAGER_BEAN_NAME);
 		
 		TxClassWithClassAttribute txClass = (TxClassWithClassAttribute) bf.getBean("txClassWithClassAttribute");
 		// No interface, so must be a CGLIB proxy
@@ -164,7 +151,7 @@ public abstract class AbstractMetadataAutoProxyTests extends TestCase {
 		BeanFactory bf = getBeanFactory();
 		TxClassWithClassAttribute txClass = (TxClassWithClassAttribute) bf.getBean("txClassWithClassAttribute");
 	
-		CountingTxManager txMan = (CountingTxManager) bf.getBean(TXMANAGER_BEAN_NAME);
+		CallCountingTransactionManager txMan = (CallCountingTransactionManager) bf.getBean(TXMANAGER_BEAN_NAME);
 	
 		assertEquals(0, txMan.commits);
 		int ret = txClass.inheritClassTxAttribute(25);
@@ -182,8 +169,7 @@ public abstract class AbstractMetadataAutoProxyTests extends TestCase {
 	}
 	
 	/**
-	 * Plain old class with no special attributes
-	 * @throws Exception
+	 * Plain old class with no special attributes.
 	 */
 	public void testNoAutoProxying() throws Exception {
 		BeanFactory bf = getBeanFactory();
@@ -230,8 +216,7 @@ public abstract class AbstractMetadataAutoProxyTests extends TestCase {
 	}
 	
 	/**
-	 * Test that the pooling TargetSourceCreator works
-	 * @throws Exception
+	 * Test that the pooling TargetSourceCreator works.
 	 */
 	public void testAutoPooling() throws Exception {
 		BeanFactory bf = getBeanFactory();
@@ -251,7 +236,6 @@ public abstract class AbstractMetadataAutoProxyTests extends TestCase {
 	 * a Modifiable mixin. Tests that the autoproxy infrastructure can create
 	 * advised objects with independent interceptor instances.
 	 * The Modifiable behaviour of each instance of TestBean should be distinct.
-	 * @throws Exception
 	 */
 	public void testIntroductionViaPrototype() throws Exception {
 		BeanFactory bf = getBeanFactory();

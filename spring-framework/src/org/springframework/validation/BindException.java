@@ -1,31 +1,37 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2007 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.validation;
 
 import java.beans.PropertyEditor;
-import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EmptyStackException;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 
 import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.BeanWrapperImpl;
+import org.springframework.beans.PropertyAccessorUtils;
+import org.springframework.beans.PropertyEditorRegistry;
+import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 /**
  * Default implementation of the Errors interface, supporting
@@ -38,14 +44,17 @@ import org.springframework.beans.BeanWrapperImpl;
  *
  * <p>Supports exporting a model, suitable for example for web MVC.
  * Thus, it is sometimes used as parameter type instead of the Errors interface
- * itself - if extracting the model makes sense in the respective context.
+ * itself - if extracting the model makes sense in the particular context.
  *
  * @author Rod Johnson
  * @author Juergen Hoeller
- * @see #getModel
- * @see DataBinder#getErrors
+ * @see #getModel()
+ * @see DataBinder#getErrors()
  */
 public class BindException extends Exception implements Errors {
+
+	/** Use serialVersionUID from Spring 1.2.8 for interoperability */
+	private static final long serialVersionUID = -5555744933646811432L;;
 
 	/**
 	 * Prefix for the name of the Errors instance in a model,
@@ -53,57 +62,139 @@ public class BindException extends Exception implements Errors {
 	 */
 	public static final String ERROR_KEY_PREFIX = BindException.class.getName() + ".";
 
-	private List errors = new ArrayList();
 
-	private BeanWrapper beanWrapper;
+	private final List errors = new LinkedList();
 
-	private String objectName;
+	private final Object target;
+
+	private final String objectName;
+
+	private transient BeanWrapper beanWrapper;
+
+	private MessageCodesResolver messageCodesResolver = new DefaultMessageCodesResolver();
 
 	private String nestedPath = "";
+
+	private final Stack nestedPathStack = new Stack();
+
 
 	/**
 	 * Create a new BindException instance.
 	 * @param target target object to bind onto
-	 * @param name name of the target object
+	 * @param objectName the name of the target object
+	 * @see DefaultMessageCodesResolver
 	 */
-	public BindException(Object target, String name) {
-		this.beanWrapper = new BeanWrapperImpl(target);
-		this.objectName = name;
-		this.nestedPath = "";
+	public BindException(Object target, String objectName) {
+		Assert.notNull(target, "Target object must not be null");
+		this.target = target;
+		this.objectName = objectName;
+	}
+
+
+	/**
+	 * Return the wrapped target object.
+	 */
+	public Object getTarget() {
+		return this.target;
+	}
+
+	public String getObjectName() {
+		return this.objectName;
 	}
 
 	/**
 	 * Return the BeanWrapper that this instance uses.
+	 * Creates a new one if none existed before.
 	 */
 	protected BeanWrapper getBeanWrapper() {
-		return beanWrapper;
+		if (this.beanWrapper == null) {
+			this.beanWrapper = new BeanWrapperImpl(this.target);
+		}
+		return this.beanWrapper;
+	}
+
+	/**
+	 * Return the underlying BeanWrapper as PropertyEditorRegistry.
+	 * @see #getBeanWrapper()
+	 */
+	public PropertyEditorRegistry getPropertyEditorRegistry() {
+		return getBeanWrapper();
+	}
+
+	/**
+	 * Set the strategy to use for resolving errors into message codes.
+	 * Default is DefaultMessageCodesResolver.
+	 * @see DefaultMessageCodesResolver
+	 */
+	public void setMessageCodesResolver(MessageCodesResolver messageCodesResolver) {
+		this.messageCodesResolver = messageCodesResolver;
+	}
+
+	/**
+	 * Return the strategy to use for resolving errors into message codes.
+	 */
+	public MessageCodesResolver getMessageCodesResolver() {
+		return this.messageCodesResolver;
+	}
+
+
+	public void setNestedPath(String nestedPath) {
+		doSetNestedPath(nestedPath);
+		this.nestedPathStack.clear();
+	}
+
+	public String getNestedPath() {
+		return this.nestedPath;
+	}
+
+	public void pushNestedPath(String subPath) {
+		this.nestedPathStack.push(getNestedPath());
+		doSetNestedPath(getNestedPath() + subPath);
+	}
+
+	public void popNestedPath() throws IllegalArgumentException {
+		try {
+			String formerNestedPath = (String) this.nestedPathStack.pop();
+			doSetNestedPath(formerNestedPath);
+		}
+		catch (EmptyStackException ex) {
+			throw new IllegalStateException("Cannot pop nested path: no nested path on stack");
+		}
+	}
+
+	/**
+	 * Actually set the nested path.
+	 * Delegated to by setNestedPath and pushNestedPath.
+	 */
+	protected void doSetNestedPath(String nestedPath) {
+		if (nestedPath == null) {
+			nestedPath = "";
+		}
+		nestedPath = PropertyAccessorUtils.canonicalPropertyName(nestedPath);
+		if (nestedPath.length() > 0 && !nestedPath.endsWith(NESTED_PATH_SEPARATOR)) {
+			nestedPath += NESTED_PATH_SEPARATOR;
+		}
+		this.nestedPath = nestedPath;
 	}
 
 	/**
 	 * Transform the given field into its full path,
 	 * regarding the nested path of this instance.
 	 */
-	private String fixedField(String field) {
-		return this.nestedPath + field;
+	protected String fixedField(String field) {
+		if (StringUtils.hasLength(field)) {
+			return getNestedPath() + PropertyAccessorUtils.canonicalPropertyName(field);
+		}
+		else {
+			String path = getNestedPath();
+			return (path.endsWith(Errors.NESTED_PATH_SEPARATOR) ?
+					path.substring(0, path.length() - NESTED_PATH_SEPARATOR.length()) : path);
+		}
 	}
 
-	/**
-	 * Add a FieldError to the errors list.
-	 * Intended to be used by subclasses like DataBinder.
-	 */
-	protected void addFieldError(FieldError fe) {
-		this.errors.add(fe);
-	}
 
-	/**
-	 * Return the wrapped target object.
-	 */
-	public Object getTarget() {
-		return this.beanWrapper.getWrappedInstance();
-	}
-
-	public String getObjectName() {
-		return objectName;
+	public void reject(String errorCode) {
+		reject(errorCode, null, null);
 	}
 
 	public void reject(String errorCode, String defaultMessage) {
@@ -111,7 +202,11 @@ public class BindException extends Exception implements Errors {
 	}
 
 	public void reject(String errorCode, Object[] errorArgs, String defaultMessage) {
-		this.errors.add(new ObjectError(this.objectName, errorCode, errorArgs, defaultMessage));
+		addError(new ObjectError(getObjectName(), resolveMessageCodes(errorCode), errorArgs, defaultMessage));
+	}
+
+	public void rejectValue(String field, String errorCode) {
+		rejectValue(field, errorCode, null, null);
 	}
 
 	public void rejectValue(String field, String errorCode, String defaultMessage) {
@@ -119,11 +214,63 @@ public class BindException extends Exception implements Errors {
 	}
 
 	public void rejectValue(String field, String errorCode, Object[] errorArgs, String defaultMessage) {
-		field = fixedField(field);
-		Object newVal = getBeanWrapper().getPropertyValue(field);
-		FieldError fe = new FieldError(this.objectName, field, newVal, false, errorCode, errorArgs, defaultMessage);
-		this.errors.add(fe);
+		if ("".equals(getNestedPath()) && !StringUtils.hasLength(field)) {
+			// We're at the top of the nested object hierarchy,
+			// so the present level is not a field but rather the top object.
+			// The best we can do is register a global error here...
+			reject(errorCode, errorArgs, defaultMessage);
+			return;
+		}
+		String fixedField = fixedField(field);
+		Object newVal = getBeanWrapper().getPropertyValue(fixedField);
+		FieldError fe = new FieldError(
+				getObjectName(), fixedField, newVal, false,
+				resolveMessageCodes(errorCode, field), errorArgs, defaultMessage);
+		addError(fe);
 	}
+
+	/**
+	 * Resolve the given error code into message codes.
+	 * Calls the MessageCodesResolver with appropriate parameters.
+	 * @param errorCode the error code to resolve into message codes
+	 * @return the resolved message codes
+	 * @see #setMessageCodesResolver
+	 */
+	public String[] resolveMessageCodes(String errorCode) {
+		return getMessageCodesResolver().resolveMessageCodes(errorCode, getObjectName());
+	}
+
+	/**
+	 * Resolve the given error code into message codes for the given field.
+	 * Calls the MessageCodesResolver with appropriate parameters.
+	 * @param errorCode the error code to resolve into message codes
+	 * @param field the field to resolve message codes for
+	 * @return the resolved message codes
+	 * @see #setMessageCodesResolver
+	 */
+	public String[] resolveMessageCodes(String errorCode, String field) {
+		String fixedField = fixedField(field);
+		Class fieldType = getBeanWrapper().getPropertyType(fixedField);
+		return getMessageCodesResolver().resolveMessageCodes(errorCode, getObjectName(), fixedField, fieldType);
+	}
+
+	/**
+	 * Add an ObjectError or FieldError to the errors list.
+	 * <p>Intended to be used by subclasses like DataBinder,
+	 * or by cooperating strategies like a BindingErrorProcessor.
+	 * @see ObjectError
+	 * @see FieldError
+	 * @see DataBinder
+	 * @see BindingErrorProcessor
+	 */
+	public void addError(ObjectError error) {
+		this.errors.add(error);
+	}
+
+	public void addAllErrors(Errors errors) {
+		this.errors.addAll(errors.getAllErrors());
+	}
+
 
 	public boolean hasErrors() {
 		return !this.errors.isEmpty();
@@ -146,11 +293,11 @@ public class BindException extends Exception implements Errors {
 	}
 
 	public List getGlobalErrors() {
-		List result = new ArrayList();
+		List result = new LinkedList();
 		for (Iterator it = this.errors.iterator(); it.hasNext();) {
-			ObjectError fe = (ObjectError) it.next();
-			if (!(fe instanceof FieldError)) {
-				result.add(fe);
+			Object error = it.next();
+			if (!(error instanceof FieldError)) {
+				result.add(error);
 			}
 		}
 		return Collections.unmodifiableList(result);
@@ -158,9 +305,9 @@ public class BindException extends Exception implements Errors {
 
 	public ObjectError getGlobalError() {
 		for (Iterator it = this.errors.iterator(); it.hasNext();) {
-			ObjectError fe = (ObjectError) it.next();
-			if (!(fe instanceof FieldError)) {
-				return fe;
+			ObjectError objectError = (ObjectError) it.next();
+			if (!(objectError instanceof FieldError)) {
+				return objectError;
 			}
 		}
 		return null;
@@ -175,79 +322,99 @@ public class BindException extends Exception implements Errors {
 	}
 
 	public List getFieldErrors(String field) {
-		List result = new ArrayList();
-		field = fixedField(field);
+		List result = new LinkedList();
+		String fixedField = fixedField(field);
 		for (Iterator it = this.errors.iterator(); it.hasNext();) {
-			ObjectError fe = (ObjectError) it.next();
-			if (fe instanceof FieldError && field.equals(((FieldError) fe).getField())) {
-				result.add(fe);
+			Object error = it.next();
+			if (error instanceof FieldError && isMatchingFieldError(fixedField, ((FieldError) error))) {
+				result.add(error);
 			}
 		}
 		return Collections.unmodifiableList(result);
 	}
 
 	public FieldError getFieldError(String field) {
-		field = fixedField(field);
+		String fixedField = fixedField(field);
 		for (Iterator it = this.errors.iterator(); it.hasNext();) {
-			ObjectError fe = (ObjectError) it.next();
-			if (fe instanceof FieldError && field.equals(((FieldError) fe).getField())) {
-				return (FieldError) fe;
+			Object error = it.next();
+			if (error instanceof FieldError) {
+				FieldError fe = (FieldError) error;
+				if (isMatchingFieldError(fixedField, fe)) {
+					return fe;
+				}
 			}
 		}
 		return null;
 	}
 
+	/**
+	 * Check whether the given FieldError matches the given field.
+	 * @param field the field that we are looking up FieldErrors for
+	 * @param fieldError the candidate FieldError
+	 * @return whether the FieldError matches the given field
+	 */
+	protected boolean isMatchingFieldError(String field, FieldError fieldError) {
+		return (field.equals(fieldError.getField()) ||
+				(field.endsWith("*") && fieldError.getField().startsWith(field.substring(0, field.length() - 1))));
+	}
+
 	public Object getFieldValue(String field) {
-		field = fixedField(field);
 		FieldError fe = getFieldError(field);
-		// use rejected value in case of error, current bean property value else
-		Object value = (fe != null) ? fe.getRejectedValue() : getBeanWrapper().getPropertyValue(field);
-		// apply custom editor, but not on binding failures like type mismatches
-		if (value != null && (fe == null || !fe.isBindingFailure())) {
-			PropertyEditor customEditor = getBeanWrapper().findCustomEditor(null, field);
+		String fixedField = fixedField(field);
+		// Use rejected value in case of error, current bean property value else.
+		Object value = (fe != null) ? fe.getRejectedValue() : getBeanWrapper().getPropertyValue(fixedField);
+		// Apply custom editor, but not on binding failures like type mismatches.
+		if (fe == null || !fe.isBindingFailure()) {
+			PropertyEditor customEditor = getCustomEditor(fixedField);
 			if (customEditor != null) {
 				customEditor.setValue(value);
-				return customEditor.getAsText();
+				String textValue = customEditor.getAsText();
+				// If the PropertyEditor returned null, there is no appropriate
+				// text representation for this value: only use it if non-null.
+				if (textValue != null) {
+					value = textValue;
+				}
 			}
 		}
 		return value;
 	}
 
+	/**
+	 * Retrieve the custom PropertyEditor for the given field, if any.
+	 * @param field the field name
+	 * @return the custom PropertyEditor, or <code>null</code>
+	 */
 	public PropertyEditor getCustomEditor(String field) {
-		field = fixedField(field);
-		FieldError fe = getFieldError(field);
-		return (fe == null ? getBeanWrapper().findCustomEditor(null, field) : null);
+		String fixedField = fixedField(field);
+		Class type = getBeanWrapper().getPropertyType(fixedField);
+		return getBeanWrapper().findCustomEditor(type, fixedField);
 	}
 
-	public void setNestedPath(String nestedPath) {
-		if (nestedPath == null) {
-			nestedPath = "";
-		}
-		if (nestedPath.length() > 0 && !nestedPath.endsWith(".")) {
-			nestedPath += ".";
-		}
-		this.nestedPath = nestedPath;
-	}
-
-	public String getNestedPath() {
-		return nestedPath;
-	}
 
 	/**
 	 * Return a model Map for the obtained state, exposing an Errors
 	 * instance as '{@link #ERROR_KEY_PREFIX ERROR_KEY_PREFIX} + objectName'
 	 * and the object itself.
-	 * <p>Note that the Map is constructed each time you're calling this method,
-	 * adding things to the map and then re-calling it will not do...
+	 * <p>Note that the Map is constructed every time you're calling this method.
+	 * Adding things to the map and then re-calling this method will not work.
+	 * <p>The attributes in the model Map returned by this method are usually
+	 * included in the ModelAndView for a form view that uses Spring's bind tag,
+	 * which needs access to the Errors instance. Spring's SimpleFormController
+	 * will do this for you when rendering its form or success view. When
+	 * building the ModelAndView yourself, you need to include the attributes
+	 * from the model Map returned by this method yourself.
 	 * @see #getObjectName
 	 * @see #ERROR_KEY_PREFIX
+	 * @see org.springframework.web.servlet.ModelAndView
+	 * @see org.springframework.web.servlet.tags.BindTag
+	 * @see org.springframework.web.servlet.mvc.SimpleFormController
 	 */
-	public final Map getModel() {
+	public Map getModel() {
 		Map model = new HashMap();
-		// errors instance, even if no errors
-		model.put(ERROR_KEY_PREFIX + this.objectName, this);
-		// mapping from name to target object
-		model.put(this.objectName, this.beanWrapper.getWrappedInstance());
+		// Errors instance, even if no errors.
+		model.put(ERROR_KEY_PREFIX + getObjectName(), this);
+		// Mapping from name to target object.
+		model.put(getObjectName(), getTarget());
 		return model;
 	}
 
@@ -255,10 +422,11 @@ public class BindException extends Exception implements Errors {
 	 * Returns diagnostic information about the errors held in this object.
 	 */
 	public String getMessage() {
-		StringBuffer sb = new StringBuffer("BindException: " + getErrorCount() + " errors");
+		StringBuffer sb = new StringBuffer("BindException: ");
+		sb.append(getErrorCount()).append(" errors");
 		Iterator it = this.errors.iterator();
 		while (it.hasNext()) {
-			sb.append("; " + it.next());
+			sb.append("; ").append(it.next());
 		}
 		return sb.toString();
 	}

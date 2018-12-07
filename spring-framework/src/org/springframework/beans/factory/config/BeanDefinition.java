@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import org.springframework.beans.MutablePropertyValues;
  *
  * @author Juergen Hoeller
  * @since 19.03.2004
- * @see ConfigurableBeanFactory#getBeanDefinition
+ * @see ConfigurableListableBeanFactory#getBeanDefinition
  * @see BeanFactoryPostProcessor
  * @see PropertyPlaceholderConfigurer
  * @see org.springframework.beans.factory.support.RootBeanDefinition
@@ -38,12 +38,33 @@ import org.springframework.beans.MutablePropertyValues;
 public interface BeanDefinition {
 
 	/**
-	 * Return the PropertyValues to be applied to a new instance of the bean.
+	 * Return whether this bean is "abstract", i.e. not meant to be instantiated.
+	 */
+	boolean isAbstract();
+
+	/**
+	 * Return whether this a <b>Singleton</b>, with a single, shared instance
+	 * returned on all calls.
+	 */
+	boolean isSingleton();
+
+	/**
+	 * Return whether this bean should be lazily initialized, i.e. not
+	 * eagerly instantiated on startup. Only applicable to a singleton bean.
+	 */
+	boolean isLazyInit();
+
+	/**
+	 * Return the PropertyValues to be applied to a new instance of the bean, if any.
+	 * Can be modified during bean factory post-processing.
+	 * @return the PropertyValues object, or <code>null</code>
 	 */
 	MutablePropertyValues getPropertyValues();
 
 	/**
-	 * Return the constructor argument values for this bean.
+	 * Return the constructor argument values for this bean, if any.
+	 * Can be modified during bean factory post-processing.
+	 * @return the ConstructorArgumentValues object, or <code>null</code>
 	 */
 	ConstructorArgumentValues getConstructorArgumentValues();
 

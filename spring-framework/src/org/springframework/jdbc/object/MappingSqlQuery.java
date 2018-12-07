@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.object;
 
@@ -39,7 +39,7 @@ import javax.sql.DataSource;
 public abstract class MappingSqlQuery extends MappingSqlQueryWithParameters {
 
 	/**
-	 * Constructor to allow use as a JavaBean.
+	 * Constructor that allows use as a JavaBean.
 	 */
 	public MappingSqlQuery() {
 	}
@@ -54,25 +54,28 @@ public abstract class MappingSqlQuery extends MappingSqlQueryWithParameters {
 	}
 
 	/**
-	 * This method is implemented to invoke the protected abstract
-	 * mapRow() method, ignoring parameters.
-	 * @see MappingSqlQueryWithParameters#mapRow(ResultSet, int, Object[], Map)
+	 * This method is implemented to invoke the simpler mapRow
+	 * template method, ignoring parameters.
+	 * @see #mapRow(ResultSet, int)
 	 */
-	protected final Object mapRow(ResultSet rs, int rowNum, Object[] parameters, Map context) throws SQLException {
+	protected final Object mapRow(ResultSet rs, int rowNum, Object[] parameters, Map context)
+			throws SQLException {
+
 		return mapRow(rs, rowNum);
 	}
 
 	/**
 	 * Subclasses must implement this method to convert each row of the
-	 * ResultSet into an object of the result type. Subclasses of this class,
-	 * as opposed to direct subclasses of MappingSqlQueryWithParameters,
-	 * don't need to concern themselves with the parameters to the execute()
-	 * method of the query object.
+	 * ResultSet into an object of the result type.
+	 * <p>Subclasses of this class, as opposed to direct subclasses of
+	 * MappingSqlQueryWithParameters, don't need to concern themselves
+	 * with the parameters to the execute method of the query object.
 	 * @param rs ResultSet we're working through
 	 * @param rowNum row number (from 0) we're up to
 	 * @return an object of the result type
 	 * @throws SQLException if there's an error extracting data.
-	 * Subclasses can simply fail to catch SQLExceptions.
+	 * Subclasses can simply not catch SQLExceptions, relying on the
+	 * framework to clean up.
 	 */
 	protected abstract Object mapRow(ResultSet rs, int rowNum) throws SQLException;
 

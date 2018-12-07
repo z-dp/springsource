@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework.autoproxy;
 
@@ -30,8 +30,8 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
  * It doesn't actually <i>do</i> anything except count
  * method invocations and check for presence of transaction context.
  * <br>Matches setters.
+ *
  * @author Rod Johnson
- * @version $Id: OrderedTxCheckAdvisor.java,v 1.5 2004/03/23 14:32:00 jhoeller Exp $
  */
 public class OrderedTxCheckAdvisor extends StaticMethodMatcherPointcutAdvisor implements InitializingBean {
 

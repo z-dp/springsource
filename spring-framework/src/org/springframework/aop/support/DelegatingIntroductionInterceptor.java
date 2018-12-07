@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,49 +12,49 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.support;
 
-import java.util.HashSet;
-import java.util.Set;
-
 import org.aopalliance.intercept.MethodInvocation;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+
+import org.springframework.aop.DynamicIntroductionAdvice;
 import org.springframework.aop.IntroductionInterceptor;
-import org.springframework.aop.framework.support.AopUtils;
+import org.springframework.aop.ProxyMethodInvocation;
+import org.springframework.util.Assert;
 
 /**
  * Convenient implementation of the IntroductionInterceptor interface.
- * <br/>Subclasses merely need to extend this class and
- * implement the interfaces to be introduced themselves.
- * In this case the delegate is the subclass instance itself.
- * Alternatively a separate delegate may implement the interface,
- * and be set via the delegate bean property.
- * Delegates or subclasses may implement any number of interfaces.
- * All interfaces except IntroductionInterceptor are picked up 
- * from the subclass or delegate by default.<br>
- * The suppressInterface() method can be used to suppress interfaces implemented
- * by the delegate but which should not be introduced to the owning
+ *
+ * <p>Subclasses merely need to extend this class and implement the interfaces
+ * to be introduced themselves. In this case the delegate is the subclass
+ * instance itself. Alternatively a separate delegate may implement the
+ * interface, and be set via the delegate bean property.
+ *
+ * <p>Delegates or subclasses may implement any number of interfaces.
+ * All interfaces except IntroductionInterceptor are picked up from
+ * the subclass or delegate by default.
+ *
+ * <p>The <code>suppressInterface</code> method can be used to suppress interfaces
+ * implemented by the delegate but which should not be introduced to the owning
  * AOP proxy.
+ * 
+ * <p>A DelegatingIntroductionInterceptor is serializable if the delegate is.
+ *
  * @author Rod Johnson
- * @version $Id: DelegatingIntroductionInterceptor.java,v 1.2 2004/03/18 02:46:11 trisberg Exp $
+ * @since 16.11.2003
+ * @see #suppressInterface
  */
-public class DelegatingIntroductionInterceptor implements IntroductionInterceptor {
-
-	protected final Log logger = LogFactory.getLog(getClass());
+public class DelegatingIntroductionInterceptor extends IntroductionInfoSupport
+		implements IntroductionInterceptor {
 		
-	/** Set of Class */
-	private Set publishedInterfaces = new HashSet();
-	
 	/**
 	 * Object that actually implements the interfaces.
 	 * May be "this" if a subclass implements the introduced interfaces.
 	 */
 	private Object delegate;
-	
-	
+
+
 	/**
 	 * Construct a new DelegatingIntroductionInterceptor, providing
 	 * a delegate that implements the interfaces to be introduced.
@@ -72,43 +72,23 @@ public class DelegatingIntroductionInterceptor implements IntroductionIntercepto
 	protected DelegatingIntroductionInterceptor() {
 		init(this);
 	}
-	
+
+
 	/**
 	 * Both constructors use this, as it's impossible to pass
 	 * "this" from one constructor to another. 
 	 */
 	private void init(Object delegate) {
-		if (delegate == null) 
-			throw new IllegalArgumentException("Delegate cannot be null in DelegatingIntroductionInterceptor");
+		Assert.notNull(delegate, "delegate is required");
 		this.delegate = delegate;
-		this.publishedInterfaces.addAll(AopUtils.getAllInterfacesAsList(delegate));
+		implementInterfacesOnObject(delegate);
+
 		// We don't want to expose the control interface
 		suppressInterface(IntroductionInterceptor.class);
+		suppressInterface(DynamicIntroductionAdvice.class);
 	}
 		
 	
-	/**
-	 * Suppress the specified interface, which will have
-	 * been autodetected due to its implementation by
-	 * the delegate.
-	 * Does nothing if it's not implemented by the delegate
-	 * @param intf interface to suppress
-	 */
-	public void suppressInterface(Class intf) {
-		this.publishedInterfaces.remove(intf);
-	}
-
-	public Class[] getIntroducedInterfaces() {
-		return (Class[]) this.publishedInterfaces.toArray(new Class[this.publishedInterfaces.size()]);
-	}
-	
-	/**
-	 * @see org.springframework.aop.IntroductionInterceptor#implementsInterface(java.lang.Class)
-	 */
-	public boolean implementsInterface(Class intf) {
-		return this.publishedInterfaces.contains(intf);
-	}
-
 	/**
 	 * Subclasses may need to override this if they want to  perform custom
 	 * behaviour in around advice. However, subclasses should invoke this
@@ -116,22 +96,24 @@ public class DelegatingIntroductionInterceptor implements IntroductionIntercepto
 	 */
 	public Object invoke(MethodInvocation mi) throws Throwable {
 		if (isMethodOnIntroducedInterface(mi)) {
-			if (logger.isDebugEnabled())
-				logger.debug("invoking self on invocation [" + mi + "]; breaking interceptor chain");
-			return mi.getMethod().invoke(this.delegate, mi.getArguments());
+			if (logger.isDebugEnabled()) {
+				logger.debug("Invoking self on invocation [" + mi + "]; breaking interceptor chain");
+			}
+			// Using the following method rather than direct reflection, we
+			// get correct handling of InvocationTargetException
+			// if the introduced method throws an exception.
+			Object retVal = AopUtils.invokeJoinpointUsingReflection(this.delegate, mi.getMethod(), mi.getArguments());
+			
+			// Massage return value if possible: if the delegate returned itself,
+			// we really want to return the proxy.
+			if (retVal == delegate && (mi instanceof ProxyMethodInvocation)) {
+				retVal = ((ProxyMethodInvocation) mi).getProxy();
+			}
+			return retVal;
 		}
 		
-		// If we get here, just pass the invocation on
+		// If we get here, just pass the invocation on.
 		return mi.proceed();
-	}
-
-	/**
-	 * Is this method on an introduced interface?
-	 * @param mi method invocation
-	 * @return whether the method is on an introduced interface
-	 */
-	protected final boolean isMethodOnIntroducedInterface(MethodInvocation mi) {
-		return this.publishedInterfaces.contains(mi.getMethod().getDeclaringClass());
 	}
 
 }

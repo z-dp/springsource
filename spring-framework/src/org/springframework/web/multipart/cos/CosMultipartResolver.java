@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.multipart.cos;
 
@@ -29,6 +29,7 @@ import org.apache.commons.logging.LogFactory;
 
 import org.springframework.core.io.Resource;
 import org.springframework.web.context.ServletContextAware;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.springframework.web.multipart.MultipartResolver;
@@ -83,7 +84,7 @@ public class CosMultipartResolver implements MultipartResolver, ServletContextAw
 	}
 
 	/**
-	 * Set the maximum allowed file size (in bytes) before uploads are refused.
+	 * Set the maximum allowed size (in bytes) before uploads are refused.
 	 * -1 indicates no limit (the default).
 	 * @param maxUploadSize the maximum file size allowed
 	 */
@@ -92,7 +93,7 @@ public class CosMultipartResolver implements MultipartResolver, ServletContextAw
 	}
 
 	/**
-	 * Return the maximum allowed file size (in bytes) before uploads are refused.
+	 * Return the maximum allowed size (in bytes) before uploads are refused.
 	 */
 	protected int getMaxUploadSize() {
 		return maxUploadSize;
@@ -130,8 +131,7 @@ public class CosMultipartResolver implements MultipartResolver, ServletContextAw
 	 */
 	public void setUploadTempDir(Resource uploadTempDir) throws IOException {
 		if (!uploadTempDir.exists() && !uploadTempDir.getFile().mkdirs()) {
-			throw new IllegalArgumentException("Given uploadTempDir [" + uploadTempDir +
-																				 "] could not be created");
+			throw new IllegalArgumentException("Given uploadTempDir [" + uploadTempDir + "] could not be created");
 		}
 		this.uploadTempDir = uploadTempDir.getFile();
 	}
@@ -163,14 +163,21 @@ public class CosMultipartResolver implements MultipartResolver, ServletContextAw
 					String fileName = (String) fileNames.nextElement();
 					File file = multipartRequest.getFile(fileName);
 					logger.debug("Found multipart file '" + fileName + "' of size " + (file != null ? file.length() : 0) +
-											 " bytes with original file name [" + multipartRequest.getOriginalFileName(fileName) +
-											 "], " + (file != null ? "stored at [" + file.getAbsolutePath() + "]" : "empty"));
+					    " bytes with original filename [" + multipartRequest.getOriginalFileName(fileName) +
+					    "], " + (file != null ? "stored at [" + file.getAbsolutePath() + "]" : "empty"));
 				}
 			}
 			return new CosMultipartHttpServletRequest(request, multipartRequest);
 		}
 		catch (IOException ex) {
-			throw new MultipartException("Could not parse multipart request", ex);
+			// Unfortunately, COS always throws an IOException,
+			// so we need to check the error message here!
+			if (ex.getMessage().indexOf("exceeds limit") != -1) {
+				throw new MaxUploadSizeExceededException(this.maxUploadSize, ex);
+			}
+			else {
+				throw new MultipartException("Could not parse multipart request", ex);
+			}
 		}
 	}
 
@@ -193,7 +200,7 @@ public class CosMultipartResolver implements MultipartResolver, ServletContextAw
 	 * <p>The default implementation checks the request encoding,
 	 * falling back to the default encoding specified for this resolver.
 	 * @param request current HTTP request
-	 * @return the encoding for the request (never null)
+	 * @return the encoding for the request (never <code>null</code>)
 	 * @see javax.servlet.ServletRequest#getCharacterEncoding
 	 * @see #setDefaultEncoding
 	 */
@@ -215,22 +222,22 @@ public class CosMultipartResolver implements MultipartResolver, ServletContextAw
 				if (file.exists()) {
 					if (file.delete()) {
 						if (logger.isDebugEnabled()) {
-						logger.debug("Cleaned up multipart file '" + fileName + "' with original file name [" +
-												 multipartRequest.getOriginalFileName(fileName) +
-												 "], stored at [" + file.getAbsolutePath() + "]");
+						logger.debug("Cleaned up multipart file '" + fileName + "' with original filename [" +
+						    multipartRequest.getOriginalFileName(fileName) + "], stored at [" +
+						    file.getAbsolutePath() + "]");
 						}
 					}
 					else {
-						logger.warn("Could not delete multipart file '" + fileName + "' with original file name [" +
-						            multipartRequest.getOriginalFileName(fileName) +
-						            "], stored at [" + file.getAbsolutePath() + "]");
+						logger.warn("Could not delete multipart file '" + fileName + "' with original filename [" +
+						    multipartRequest.getOriginalFileName(fileName) + "], stored at [" +
+						    file.getAbsolutePath() + "]");
 					}
 				}
 				else {
 					if (logger.isDebugEnabled()) {
-						logger.debug("Multipart file '" + fileName + "' with original file name [" +
-												 multipartRequest.getOriginalFileName(fileName) +
-												 "] has already been moved - no cleanup necessary");
+						logger.debug("Multipart file '" + fileName + "' with original filename [" +
+						    multipartRequest.getOriginalFileName(fileName) +
+						    "] has already been moved - no cleanup necessary");
 					}
 				}
 			}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,10 +12,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.ui.context.support;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -23,6 +24,8 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import org.springframework.context.HierarchicalMessageSource;
+import org.springframework.context.MessageSource;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.ui.context.HierarchicalThemeSource;
 import org.springframework.ui.context.Theme;
@@ -32,9 +35,12 @@ import org.springframework.ui.context.ThemeSource;
  * ThemeSource implementation that looks up an individual ResourceBundle
  * per theme. The theme name gets interpreted as ResourceBundle basename,
  * supporting a common basename prefix for all themes.
+ *
  * @author Jean-Pierre Pawlak
  * @author Juergen Hoeller
  * @see #setBasenamePrefix
+ * @see java.util.ResourceBundle
+ * @see org.springframework.context.support.ResourceBundleMessageSource
  */
 public class ResourceBundleThemeSource implements HierarchicalThemeSource {
 
@@ -45,11 +51,15 @@ public class ResourceBundleThemeSource implements HierarchicalThemeSource {
 	private String basenamePrefix = "";
 
 	/** Map from theme name to Theme instance */
-	private Map themes = new HashMap();
+	private Map themeMap = Collections.synchronizedMap(new HashMap());
+
 
 	public void setParentThemeSource(ThemeSource parent) {
 		this.parentThemeSource = parent;
-		Iterator it = this.themes.values().iterator();
+
+		// Update existing Theme objects.
+		// Usually there shouldn't be any at the time of this call.
+		Iterator it = this.themeMap.values().iterator();
 		while (it.hasNext()) {
 			initParent((Theme) it.next());
 		}
@@ -64,41 +74,70 @@ public class ResourceBundleThemeSource implements HierarchicalThemeSource {
 	 * i.e. the theme names.
 	 * E.g.: basenamePrefix="test.", themeName="theme" -> basename="test.theme".
 	 * @param basenamePrefix prefix for ResourceBundle basenames
+	 * @see java.util.ResourceBundle
 	 */
 	public void setBasenamePrefix(String basenamePrefix) {
-		this.basenamePrefix = (basenamePrefix != null) ? basenamePrefix : "";
+		this.basenamePrefix = (basenamePrefix != null ? basenamePrefix : "");
 	}
 
+
+	/**
+	 * This implementation returns a SimpleTheme instance, holding a
+	 * ResourceBundle-based MessageSource whose basename corresponds to
+	 * the given theme name (prefixed by the configured "basenamePrefix").
+	 * <p>SimpleTheme instances are cached per theme name. Use a reloadable
+	 * MessageSource if themes should reflect changes to the underlying files.
+	 * @see #setBasenamePrefix
+	 * @see #createMessageSource
+	 */
 	public Theme getTheme(String themeName) {
 		if (themeName == null) {
 			return null;
 		}
-		Theme theme = (Theme) this.themes.get(themeName);
+		Theme theme = (Theme) this.themeMap.get(themeName);
 		if (theme == null) {
-			ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
-			logger.info("Theme created: name=" + themeName + ", baseName=" + this.basenamePrefix + themeName);
-			messageSource.setBasename(this.basenamePrefix + themeName);
+			String basename = this.basenamePrefix + themeName;
+			MessageSource messageSource = createMessageSource(basename);
 			theme = new SimpleTheme(themeName, messageSource);
 			initParent(theme);
-			this.themes.put(themeName, theme);
+			this.themeMap.put(themeName, theme);
+			if (logger.isInfoEnabled()) {
+				logger.info("Theme created: name '" + themeName + "', basename [" + basename + "]");
+			}
 		}
 		return theme;
 	}
 
 	/**
+	 * Create a MessageSource for the given basename,
+	 * to be used as MessageSource for the corresponding theme.
+	 * <p>Default implementation creates a ResourceBundleMessageSource.
+	 * for the given basename. A subclass could create a specifically
+	 * configured ReloadableResourceBundleMessageSource, for example.
+	 * @param basename the basename to create a MessageSource for
+	 * @return the MessageSource
+	 * @see org.springframework.context.support.ResourceBundleMessageSource
+	 * @see org.springframework.context.support.ReloadableResourceBundleMessageSource
+	 */
+	protected MessageSource createMessageSource(String basename) {
+		ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+		messageSource.setBasename(basename);
+		return messageSource;
+	}
+
+	/**
 	 * Initialize the MessageSource of the given theme with the
-	 * one from the respective parentThemeSource of this ThemeSource.
+	 * one from the corresponding parent of this ThemeSource.
 	 */
 	protected void initParent(Theme theme) {
-		ResourceBundleMessageSource messageSource = (ResourceBundleMessageSource) theme.getMessageSource();
-		if (this.parentThemeSource != null) {
-			Theme parentTheme = this.parentThemeSource.getTheme(theme.getName());
-			if (parentTheme != null) {
-				messageSource.setParentMessageSource(parentTheme.getMessageSource());
+		if (theme.getMessageSource() instanceof HierarchicalMessageSource) {
+			HierarchicalMessageSource messageSource = (HierarchicalMessageSource) theme.getMessageSource();
+			if (getParentThemeSource() != null && messageSource.getParentMessageSource() == null) {
+				Theme parentTheme = getParentThemeSource().getTheme(theme.getName());
+				if (parentTheme != null) {
+					messageSource.setParentMessageSource(parentTheme.getMessageSource());
+				}
 			}
-		}
-		else {
-			messageSource.setParentMessageSource(null);
 		}
 	}
 

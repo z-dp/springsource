@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.ibatis;
 
@@ -21,8 +21,8 @@ import java.sql.SQLException;
 import com.ibatis.sqlmap.client.SqlMapExecutor;
 
 /**
- * Callback interface for data access code that works on an iBATIS Database Layer
- * SqlMapSession. To be used with SqlMapClientTemplate's execute method,
+ * Callback interface for data access code that works with the iBATIS Database Layer
+ * SqlMapExecutor interfae. To be used with SqlMapClientTemplate's execute method,
  * assumably often as anonymous classes within a method implementation.
  *
  * <p>NOTE: The SqlMapClient/SqlMapSession API is the API of iBATIS SQL Maps 2.
@@ -30,13 +30,14 @@ import com.ibatis.sqlmap.client.SqlMapExecutor;
  *
  * @author Juergen Hoeller
  * @since 24.02.2004
+ * @see SqlMapClientTemplate#execute(SqlMapClientCallback)
  */
 public interface SqlMapClientCallback {
 
 	/**
-	 * Gets called by SqlMapClientTemplate.execute with an active SqlMapSession.
-	 * Does not need to care about activating or closing the session,
-	 * or handling transactions.
+	 * Gets called by <code>SqlMapClientTemplate.execute</code> with an active
+	 * SqlMapExecutor. Does not need to care about activating or closing the
+	 * session, or handling transactions.
 	 *
 	 * <p>If called without a thread-bound JDBC transaction (initiated by
 	 * DataSourceTransactionManager), the code will simply get executed on the
@@ -52,9 +53,8 @@ public interface SqlMapClientCallback {
 	 *
 	 * @param executor an active iBATIS SqlMapSession, passed-in as
 	 * SqlMapExecutor interface here to avoid manual lifecycle handling
-	 * @return a result object, or null if none
+	 * @return a result object, or <code>null</code> if none
 	 * @throws SQLException if throw my the iBATIS SQL Maps API
-	 * @see SqlMapClientTemplate#execute
 	 * @see SqlMapClientTemplate#queryForList
 	 * @see SqlMapClientTemplate#queryForMap
 	 * @see SqlMapClientTemplate#queryForObject

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,22 +12,22 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.view.velocity;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 import junit.framework.TestCase;
 import org.apache.velocity.app.VelocityEngine;
 import org.apache.velocity.exception.VelocityException;
 
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.ui.velocity.VelocityEngineFactoryBean;
@@ -54,6 +54,22 @@ public class VelocityConfigurerTests extends TestCase {
 		}
 	}
 
+	public void testVelocityEngineFactoryBeanWithVelocityProperties() throws VelocityException, IOException {
+		VelocityEngineFactoryBean vefb = new VelocityEngineFactoryBean();
+		Properties props = new Properties();
+		props.setProperty("myprop", "/mydir");
+		vefb.setVelocityProperties(props);
+		Object value = new Object();
+		Map map = new HashMap();
+		map.put("myentry", value);
+		vefb.setVelocityPropertiesMap(map);
+		vefb.afterPropertiesSet();
+		assertTrue(vefb.getObject() instanceof VelocityEngine);
+		VelocityEngine ve = (VelocityEngine) vefb.getObject();
+		assertEquals("/mydir", ve.getProperty("myprop"));
+		assertEquals(value, ve.getProperty("myentry"));
+	}
+
 	public void testVelocityEngineFactoryBeanWithResourceLoaderPath() throws IOException, VelocityException {
 		VelocityEngineFactoryBean vefb = new VelocityEngineFactoryBean();
 		vefb.setResourceLoaderPath("file:/mydir");
@@ -71,7 +87,7 @@ public class VelocityConfigurerTests extends TestCase {
 				if (!("file:/mydir".equals(location) || "file:/mydir/test".equals(location))) {
 					throw new IllegalArgumentException(location);
 				}
-				return new InputStreamResource(new ByteArrayInputStream("test".getBytes()), "test");
+				return new ByteArrayResource("test".getBytes(), "test");
 			}
 		});
 		vefb.afterPropertiesSet();

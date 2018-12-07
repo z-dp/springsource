@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.support.incrementer;
 
@@ -25,10 +25,10 @@ import org.springframework.dao.DataAccessException;
  * Implementation of DataFieldMaxValueIncrementer that delegates
  * to a single getNextKey template method that returns a long.
  * Uses longs for String values, padding with zeroes if required.
+ *
  * @author Dmitriy Kopylenko
  * @author Juergen Hoeller
  * @author Jean-Pierre Pawlak
- * @version $Id: AbstractDataFieldMaxValueIncrementer.java,v 1.4 2004/03/18 02:46:11 trisberg Exp $
  */
 public abstract class AbstractDataFieldMaxValueIncrementer implements DataFieldMaxValueIncrementer, InitializingBean {
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.scheduling.timer;
 
@@ -20,12 +20,13 @@ import java.util.TimerTask;
 
 /**
  * JavaBean that describes a scheduled TimerTask, consisting of
- * the TimerTask itself and a delay plus period. Period needs to
- * be specified; there is no point in a default for it.
+ * the TimerTask itself (or a Runnable to create a TimerTask for)
+ * and a delay plus period. Period needs to be specified;
+ * there is no point in a default for it.
  *
- * <p>The J2SE Timer does not offer more sophisticated scheduling
- * options like cron expressions. Consider using Quartz for such
- * demanding needs.
+ * <p>The JDK Timer does not offer more sophisticated scheduling
+ * options such as  cron expressions. Consider using Quartz for
+ * such advanced needs.
  *
  * <p>Note that Timer uses a TimerTask instance that is shared
  * between repeated executions, in contrast to Quartz which
@@ -47,14 +48,93 @@ public class ScheduledTimerTask {
 
 	private boolean fixedRate = false;
 
+
+	/**
+	 * Create a new ScheduledTimerTask,
+	 * to be populated via bean properties.
+	 * @see #setTimerTask
+	 * @see #setDelay
+	 * @see #setPeriod
+	 * @see #setFixedRate
+	 */
 	public ScheduledTimerTask() {
 	}
 
+	/**
+	 * Create a new ScheduledTimerTask, with default
+	 * one-time execution without delay.
+	 * @param timerTask the TimerTask to schedule
+	 */
+	public ScheduledTimerTask(TimerTask timerTask) {
+		this.timerTask = timerTask;
+	}
+
+	/**
+	 * Create a new ScheduledTimerTask, with default
+	 * one-time execution with the given delay.
+	 * @param timerTask the TimerTask to schedule
+	 * @param delay the delay before starting the task for the first time (ms)
+	 */
+	public ScheduledTimerTask(TimerTask timerTask, long delay) {
+		this.timerTask = timerTask;
+		this.delay = delay;
+	}
+
+	/**
+	 * Create a new ScheduledTimerTask.
+	 * @param timerTask the TimerTask to schedule
+	 * @param delay the delay before starting the task for the first time (ms)
+	 * @param period the period between repeated task executions (ms)
+	 * @param fixedRate whether to schedule as fixed-rate execution
+	 */
 	public ScheduledTimerTask(TimerTask timerTask, long delay, long period, boolean fixedRate) {
 		this.timerTask = timerTask;
 		this.delay = delay;
 		this.period = period;
 		this.fixedRate = fixedRate;
+	}
+
+	/**
+	 * Create a new ScheduledTimerTask, with default
+	 * one-time execution without delay.
+	 * @param timerTask the Runnable to schedule as TimerTask
+	 */
+	public ScheduledTimerTask(Runnable timerTask) {
+		setRunnable(timerTask);
+	}
+
+	/**
+	 * Create a new ScheduledTimerTask, with default
+	 * one-time execution with the given delay.
+	 * @param timerTask the Runnable to schedule as TimerTask
+	 * @param delay the delay before starting the task for the first time (ms)
+	 */
+	public ScheduledTimerTask(Runnable timerTask, long delay) {
+		setRunnable(timerTask);
+		this.delay = delay;
+	}
+
+	/**
+	 * Create a new ScheduledTimerTask.
+	 * @param timerTask the Runnable to schedule as TimerTask
+	 * @param delay the delay before starting the task for the first time (ms)
+	 * @param period the period between repeated task executions (ms)
+	 * @param fixedRate whether to schedule as fixed-rate execution
+	 */
+	public ScheduledTimerTask(Runnable timerTask, long delay, long period, boolean fixedRate) {
+		setRunnable(timerTask);
+		this.delay = delay;
+		this.period = period;
+		this.fixedRate = fixedRate;
+	}
+
+
+	/**
+	 * Set the Runnable to schedule as TimerTask.
+	 * @see DelegatingTimerTask
+	 */
+	public void setRunnable(Runnable timerTask) {
+		this.timerTask = new DelegatingTimerTask(timerTask);
 	}
 
 	/**
@@ -88,9 +168,13 @@ public class ScheduledTimerTask {
 	}
 
 	/**
-	 * Set the period between repeated task executions,
-	 * in milliseconds. Default is 0; this property needs to
-	 * be set to a positive value for proper execution.
+	 * Set the period between repeated task executions, in milliseconds.
+	 * Default is 0, leading to one-time execution. In case of a positive
+	 * value, the task will be executed repeatedly, with the given interval
+	 * inbetween executions.
+	 * <p>Note that the semantics of the period vary between fixed-rate
+	 * and fixed-delay execution.
+	 * @see #setFixedRate
 	 */
 	public void setPeriod(long period) {
 		this.period = period;
@@ -105,8 +189,8 @@ public class ScheduledTimerTask {
 
 	/**
 	 * Set whether to schedule as fixed-rate execution, rather than
-	 * fixed-delay execution. Default is false, i.e. fixed delay.
-	 * See Timer javadoc for details on those execution modes.
+	 * fixed-delay execution. Default is "false", i.e. fixed delay.
+	 * <p>See Timer javadoc for details on those execution modes.
 	 * @see java.util.Timer#schedule(TimerTask, long, long)
 	 * @see java.util.Timer#scheduleAtFixedRate(TimerTask, long, long)
 	 */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,22 +12,38 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework.adapter;
-
-import org.springframework.aop.framework.AopConfigException;
 
 /**
  * Exception thrown when an attempt is made to use an unsupported
  * Advisor or Advice type.
+ *
  * @author Rod Johnson
- * @version $Id: UnknownAdviceTypeException.java,v 1.4 2004/03/18 02:46:10 trisberg Exp $
+ * @author Juergen Hoeller
+ * @see org.aopalliance.aop.Advice
+ * @see org.springframework.aop.Advisor
  */
-public class UnknownAdviceTypeException extends AopConfigException {
-	
+public class UnknownAdviceTypeException extends IllegalArgumentException {
+
+	/**
+	 * Create a new UnknownAdviceTypeException for the given advice object.
+	 * Will create a message text that says that the object is neither a
+	 * subinterface of Advice nor an Advisor.
+	 * @param advice the advice object of unknown type
+	 */
 	public UnknownAdviceTypeException(Object advice) {
-		super("No adapter for Advice of class '" + advice.getClass().getName() + "'");
+		super("Advice object [" + advice + "] is neither a supported subinterface of " +
+				"[org.aopalliance.aop.Advice] nor an [org.springframework.aop.Advisor]");
+	}
+
+	/**
+	 * Create a new UnknownAdviceTypeException with the given message.
+	 * @param message the message text
+	 */
+	public UnknownAdviceTypeException(String message) {
+		super(message);
 	}
 
 }

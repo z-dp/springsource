@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.theme;
 
@@ -20,21 +20,26 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.springframework.web.servlet.ThemeResolver;
+import org.springframework.web.util.CookieGenerator;
 import org.springframework.web.util.WebUtils;
 
 /**
  * Implementation of ThemeResolver that uses a cookie sent back to the user
- * in case of a custom setting, with a fallback to the fixed locale.
- * This is especially useful for stateless applications without user sessions.
+ * in case of a custom setting, with a fallback to the default theme.
+ * This is particularly useful for stateless applications without user sessions.
  *
- * <p>Custom controllers can thus override the user's theme by calling setTheme,
- * e.g. responding to a certain theme change request.
+ * <p>Custom controllers can thus override the user's theme by calling
+ * <code>setThemeName</code>, e.g. responding to a certain theme change request.
  *
  * @author Jean-Pierre Pawlak
  * @author Juergen Hoeller
  * @since 17.06.2003
+ * @see #setThemeName
  */
-public class CookieThemeResolver extends AbstractThemeResolver {
+public class CookieThemeResolver extends CookieGenerator implements ThemeResolver {
+
+	public final static String ORIGINAL_DEFAULT_THEME_NAME = "theme";
 
 	/**
 	 * Name of the request attribute that holds the theme name. Only used
@@ -47,85 +52,59 @@ public class CookieThemeResolver extends AbstractThemeResolver {
 
 	public static final String DEFAULT_COOKIE_NAME = CookieThemeResolver.class.getName() + ".THEME";
 
-	public static final String DEFAULT_COOKIE_PATH = "/";
 
-	public static final int DEFAULT_COOKIE_MAX_AGE = Integer.MAX_VALUE;
+	private String defaultThemeName = ORIGINAL_DEFAULT_THEME_NAME;
 
-	private String cookieName = DEFAULT_COOKIE_NAME;
 
-	private int cookieMaxAge = DEFAULT_COOKIE_MAX_AGE;
-
-	private String cookiePath = DEFAULT_COOKIE_PATH;
-	
-	/**
-	 * Use the given name for theme cookies, containing the theme name.
-	 */
-	public void setCookieName(String cookieName) {
-		this.cookieName = cookieName;
+	public CookieThemeResolver() {
+		setCookieName(DEFAULT_COOKIE_NAME);
 	}
 
-	public String getCookieName() {
-		return cookieName;
+
+	/**
+	 * Set the name of the default theme.
+	 */
+	public void setDefaultThemeName(String defaultThemeName) {
+		this.defaultThemeName = defaultThemeName;
 	}
 
 	/**
-	 * Use the given path for theme cookies.
-	 * The cookie is only visible for URLs in the path and below. 
+	 * Return the name of the default theme.
 	 */
-	public String getCookiePath() {
-		return cookiePath;
+	public String getDefaultThemeName() {
+		return defaultThemeName;
 	}
 
-	public void setCookiePath(String cookiePath) {
-		this.cookiePath = cookiePath;
-	}
-
-	/**
-	 * Use the given maximum age, specified in seconds, for locale cookies.
-	 * Useful special value: -1 ... not persistent, deleted when client shuts down
-	 */
-	public void setCookieMaxAge(int cookieMaxAge) {
-		this.cookieMaxAge = cookieMaxAge;
-	}
-
-	public int getCookieMaxAge() {
-		return cookieMaxAge;
-	}
 
 	public String resolveThemeName(HttpServletRequest request) {
-		// check theme for preparsed resp. preset theme
+		// Check request for preparsed or preset theme.
 		String theme = (String) request.getAttribute(THEME_REQUEST_ATTRIBUTE_NAME);
-		if (theme != null)
+		if (theme != null) {
 			return theme;
+		}
 
-		// retrieve cookie value
+		// Retrieve cookie value from request.
 		Cookie cookie = WebUtils.getCookie(request, getCookieName());
-
 		if (cookie != null) {
 			return cookie.getValue();
 		}
 
-		// fallback
+		// Fall back to default theme.
 		return getDefaultThemeName();
 	}
 
 	public void setThemeName(HttpServletRequest request, HttpServletResponse response, String themeName) {
-		Cookie cookie = null;
 		if (themeName != null) {
-			// set request attribute and add cookie
+			// Set request attribute and add cookie.
 			request.setAttribute(THEME_REQUEST_ATTRIBUTE_NAME, themeName);
-			cookie = new Cookie(getCookieName(), themeName);
-			cookie.setMaxAge(getCookieMaxAge());
-			cookie.setPath(cookiePath);
+			addCookie(response, themeName);
 		}
+
 		else {
-			// set request attribute to fallback theme and remove cookie
+			// Set request attribute to fallback theme and remove cookie.
 			request.setAttribute(THEME_REQUEST_ATTRIBUTE_NAME, getDefaultThemeName());
-			cookie = new Cookie(getCookieName(), "");
-			cookie.setMaxAge(0);
-			cookie.setPath(cookiePath);
+			removeCookie(response);
 		}
-		response.addCookie(cookie);
 	}
 
 }

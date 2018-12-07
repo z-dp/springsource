@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2007 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.core.io;
 
@@ -23,7 +23,7 @@ import java.io.InputStream;
 import java.net.URL;
 
 /**
- * Convenience base class for Resource implementations,
+ * Convenience base class for {@link Resource} implementations,
  * pre-implementing typical behavior.
  *
  * <p>The "exists" method will check whether a File or InputStream can
@@ -35,33 +35,31 @@ import java.net.URL;
  */
 public abstract class AbstractResource implements Resource {
 
-	protected static final String URL_PROTOCOL_FILE = "file";
-
 	/**
 	 * This implementation checks whether a File can be opened,
 	 * falling back to whether an InputStream can be opened.
 	 * This will cover both directories and content resources.
 	 */
 	public boolean exists() {
-		// try file existence
+		// Try file existence: can we find the file in the file system?
 		try {
 			return getFile().exists();
 		}
 		catch (IOException ex) {
-			// fall back to stream existence
+			// Fall back to stream existence: can we open the stream?
 			try {
 				InputStream is = getInputStream();
 				is.close();
 				return true;
 			}
-			catch (IOException ex2) {
+			catch (Throwable isEx) {
 				return false;
 			}
 		}
 	}
 
 	/**
-	 * This implementations always returns false.
+	 * This implementation always returns <code>false</code>.
 	 */
 	public boolean isOpen() {
 		return false;
@@ -84,8 +82,38 @@ public abstract class AbstractResource implements Resource {
 	}
 
 	/**
+	 * This implementation throws a FileNotFoundException, assuming
+	 * that relative resources cannot be created for this resource.
+	 */
+	public Resource createRelative(String relativePath) throws IOException {
+		throw new FileNotFoundException("Cannot create a relative resource for " + getDescription());
+	}
+
+	/**
+	 * This implementation always throws IllegalStateException,
+	 * assuming that the resource does not carry a filename.
+	 */
+	public String getFilename() throws IllegalStateException {
+		throw new IllegalStateException(getDescription() + " does not carry a filename");
+	}
+
+	/**
+	 * This abstract method declaration shadows the method in the Resource interface.
+	 * This is necessary to make the <code>toString</code> implementation in this
+	 * class work on Sun's JDK 1.3 classic VM, which can't find the method when
+	 * executing <code>toString</code> else. Furthermore, <code>getDescription</code>
+	 * is also called from <code>equals</code> and <code>hashCode</code>
+	 * @see Resource#getDescription()
+	 * @see #toString()
+	 * @see #equals(Object)
+	 * @see #hashCode()
+	 */
+	public abstract String getDescription();
+
+
+	/**
 	 * This implementation returns the description of this resource.
-	 * @see #getDescription
+	 * @see #getDescription()
 	 */
 	public String toString() {
 		return getDescription();
@@ -93,15 +121,16 @@ public abstract class AbstractResource implements Resource {
 
 	/**
 	 * This implementation compares description strings.
-	 * @see #getDescription
+	 * @see #getDescription()
 	 */
 	public boolean equals(Object obj) {
-		return (obj instanceof Resource && ((Resource) obj).getDescription().equals(getDescription()));
+		return (obj == this ||
+		    (obj instanceof Resource && ((Resource) obj).getDescription().equals(getDescription())));
 	}
 
 	/**
 	 * This implementation returns the description's hash code.
-	 * @see #getDescription
+	 * @see #getDescription()
 	 */
 	public int hashCode() {
 		return getDescription().hashCode();

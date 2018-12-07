@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.transaction;
 
@@ -20,11 +20,16 @@ package org.springframework.transaction;
  * Exception that gets thrown when an invalid isolation level is specified,
  * i.e. an isolation level that the transaction manager implementation
  * doesn't support.
+ *
  * @author Juergen Hoeller
  * @since 12.05.2003
  */
 public class InvalidIsolationLevelException extends TransactionUsageException {
 
+	/**
+	 * Constructor for InvalidIsolationLevelException.
+	 * @param msg the detail message
+	 */
 	public InvalidIsolationLevelException(String msg) {
 		super(msg);
 	}

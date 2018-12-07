@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework.autoproxy;
 
@@ -24,71 +24,81 @@ import junit.framework.TestCase;
 
 import org.springframework.aop.framework.Advised;
 import org.springframework.aop.framework.Lockable;
-import org.springframework.aop.framework.support.AopUtils;
+import org.springframework.aop.framework.MethodCounter;
+import org.springframework.aop.framework.CountingBeforeAdvice;
 import org.springframework.aop.interceptor.NopInterceptor;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.aop.target.CommonsPoolTargetSource;
+import org.springframework.aop.target.LazyInitTargetSource;
 import org.springframework.aop.target.PrototypeTargetSource;
 import org.springframework.aop.target.ThreadLocalTargetSource;
 import org.springframework.beans.ITestBean;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
-import org.springframework.transaction.CountingTxManager;
+import org.springframework.transaction.CallCountingTransactionManager;
 
 /**
  * Tests for auto proxy creation by advisor recognition.
+ *
  * @author Rod Johnson
- * @version $Id: AdvisorAutoProxyCreatorTests.java,v 1.12 2004/03/23 14:32:00 jhoeller Exp $
  */
 public class AdvisorAutoProxyCreatorTests extends TestCase {
-	
+
 	private static final String ADVISOR_APC_BEAN_NAME = "aapc";
-	
+
 	private static final String TXMANAGER_BEAN_NAME = "txManager";
-	
+
 	/**
 	 * Return a bean factory with attributes and EnterpriseServices configured.
 	 */
 	protected BeanFactory getBeanFactory() throws IOException {
 		return new ClassPathXmlApplicationContext("/org/springframework/aop/framework/autoproxy/advisorAutoProxyCreator.xml");
 	}
-	
+
 	public void testDefaultExclusionPrefix() throws Exception {
 		DefaultAdvisorAutoProxyCreator aapc = (DefaultAdvisorAutoProxyCreator) getBeanFactory().getBean(ADVISOR_APC_BEAN_NAME);
-		assertEquals(ADVISOR_APC_BEAN_NAME + DefaultAdvisorAutoProxyCreator.SEPARATOR, aapc.getAdvisorBeanNamePrefix() );
-		assertFalse(aapc.getUsePrefix());
+		assertEquals(ADVISOR_APC_BEAN_NAME + DefaultAdvisorAutoProxyCreator.SEPARATOR, aapc.getAdvisorBeanNamePrefix());
+		assertFalse(aapc.isUsePrefix());
 	}
-	
+
 	/**
-	 * If no pointcuts match (no atts) there should be proxying
-	 * @throws Exception
+	 * If no pointcuts match (no attrs) there should be proxying.
 	 */
 	public void testNoProxy() throws Exception {
 		BeanFactory bf = getBeanFactory();
 		Object o = bf.getBean("noSetters");
 		assertFalse(AopUtils.isAopProxy(o));
 	}
-	
+
 	public void testTxIsProxied() throws Exception {
 		BeanFactory bf = getBeanFactory();
 		ITestBean test = (ITestBean) bf.getBean("test");
 		assertTrue(AopUtils.isAopProxy(test));
 	}
-	
+
+	public void testRegexpApplied() throws Exception {
+		BeanFactory bf = getBeanFactory();
+		ITestBean test = (ITestBean) bf.getBean("test");
+		MethodCounter counter = (MethodCounter) bf.getBean("countingAdvice");
+		assertEquals(0, counter.getCalls());
+		test.getName();
+		assertEquals(1, counter.getCalls());
+	}
+
 	/**
 	 * Check that we can provide a common interceptor that will
 	 * appear in the chain before "specific" interceptors,
 	 * which are sourced from matching advisors
-	 * @throws Exception
 	 */
 	public void testCommonInterceptorAndAdvisor() throws Exception {
 		BeanFactory bf = new ClassPathXmlApplicationContext("/org/springframework/aop/framework/autoproxy/advisorAutoProxyCreatorWithCommonInterceptors.xml");
 		ITestBean test1 = (ITestBean) bf.getBean("test1");
 		assertTrue(AopUtils.isAopProxy(test1));
-		
+
 		Lockable lockable1 = (Lockable) test1;
 		NopInterceptor nop = (NopInterceptor) bf.getBean("nopInterceptor");
 		assertEquals(0, nop.getCount());
-		
+
 		ITestBean test2 = (ITestBean) bf.getBean("test2");
 		Lockable lockable2 = (Lockable) test2;
 		
@@ -104,11 +114,10 @@ public class AdvisorAutoProxyCreatorTests extends TestCase {
 		assertFalse(lockable2.locked());
 		assertEquals(5, nop.getCount());
 	}
-	
+
 	/**
 	 * We have custom TargetSourceCreators but there's no match, and
 	 * hence no proxying, for this bean
-	 * @throws Exception
 	 */
 	public void testCustomTargetSourceNoMatch() throws Exception {
 		BeanFactory bf = new ClassPathXmlApplicationContext("/org/springframework/aop/framework/autoproxy/customTargetSource.xml");
@@ -117,7 +126,7 @@ public class AdvisorAutoProxyCreatorTests extends TestCase {
 		assertEquals("Rod", test.getName());
 		assertEquals("Kerry", test.getSpouse().getName());
 	}
-	
+
 	public void testCustomPoolingTargetSource() throws Exception {
 		BeanFactory bf = new ClassPathXmlApplicationContext("/org/springframework/aop/framework/autoproxy/customTargetSource.xml");
 		ITestBean test = (ITestBean) bf.getBean("poolingTest");
@@ -128,8 +137,9 @@ public class AdvisorAutoProxyCreatorTests extends TestCase {
 		// Check that references survived pooling
 		assertEquals("Kerry", test.getSpouse().getName());
 	}
-	
+
 	public void testCustomPrototypeTargetSource() throws Exception {
+		CountingTestBean.count = 0;
 		BeanFactory bf = new ClassPathXmlApplicationContext("/org/springframework/aop/framework/autoproxy/customTargetSource.xml");
 		ITestBean test = (ITestBean) bf.getBean("prototypeTest");
 		assertTrue(AopUtils.isAopProxy(test));
@@ -138,10 +148,27 @@ public class AdvisorAutoProxyCreatorTests extends TestCase {
 		assertEquals("Rod", test.getName());
 		// Check that references survived prototype creation
 		assertEquals("Kerry", test.getSpouse().getName());
+		assertEquals("Only 2 CountingTestBeans instantiated", 2, CountingTestBean.count);
+		CountingTestBean.count = 0;
 	}
-	
+
+	public void testLazyInitTargetSource() throws Exception {
+		CountingTestBean.count = 0;
+		BeanFactory bf = new ClassPathXmlApplicationContext("/org/springframework/aop/framework/autoproxy/customTargetSource.xml");
+		ITestBean test = (ITestBean) bf.getBean("lazyInitTest");
+		assertTrue(AopUtils.isAopProxy(test));
+		Advised advised = (Advised) test;
+		assertTrue(advised.getTargetSource() instanceof LazyInitTargetSource);
+		assertEquals("No CountingTestBean instantiated yet", 0, CountingTestBean.count);
+		assertEquals("Rod", test.getName());
+		assertEquals("Kerry", test.getSpouse().getName());
+		assertEquals("Only 1 CountingTestBean instantiated", 1, CountingTestBean.count);
+		CountingTestBean.count = 0;
+	}
+
 	public void testQuickTargetSourceCreator() throws Exception {
-		ClassPathXmlApplicationContext bf = new ClassPathXmlApplicationContext("/org/springframework/aop/framework/autoproxy/quickTargetSource.xml");
+		ClassPathXmlApplicationContext bf =
+				new ClassPathXmlApplicationContext("/org/springframework/aop/framework/autoproxy/quickTargetSource.xml");
 		ITestBean test = (ITestBean) bf.getBean("test");
 		assertFalse(AopUtils.isAopProxy(test));
 		assertEquals("Rod", test.getName());
@@ -167,17 +194,17 @@ public class AdvisorAutoProxyCreatorTests extends TestCase {
 		assertEquals("Kerry", test.getSpouse().getName());
 		
 		// Now test the Prototype TargetSource
-		 test = (ITestBean) bf.getBean("!test");
-		 assertTrue(AopUtils.isAopProxy(test));
-		 advised = (Advised) test;
-		 assertTrue(advised.getTargetSource() instanceof PrototypeTargetSource);
-		 assertEquals("Rod", test.getName());
-		 // Check that references survived pooling
-		 assertEquals("Kerry", test.getSpouse().getName());
-		 
-		 
-		 ITestBean test2 = (ITestBean) bf.getBean("!test");
-		 assertFalse("Prototypes cannot be the same object", test == test2);
+		test = (ITestBean) bf.getBean("!test");
+		assertTrue(AopUtils.isAopProxy(test));
+		advised = (Advised) test;
+		assertTrue(advised.getTargetSource() instanceof PrototypeTargetSource);
+		assertEquals("Rod", test.getName());
+		// Check that references survived pooling
+		assertEquals("Kerry", test.getSpouse().getName());
+
+
+		ITestBean test2 = (ITestBean) bf.getBean("!test");
+		assertFalse("Prototypes cannot be the same object", test == test2);
 		assertEquals("Rod", test2.getName());
 		assertEquals("Kerry", test2.getSpouse().getName());
 		bf.close();
@@ -196,17 +223,17 @@ public class AdvisorAutoProxyCreatorTests extends TestCase {
 	public void testTransactionAttributeOnMethod() throws Exception {
 		BeanFactory bf = getBeanFactory();
 		ITestBean test = (ITestBean) bf.getBean("test");
-		
-		CountingTxManager txMan = (CountingTxManager) bf.getBean(TXMANAGER_BEAN_NAME);
+
+		CallCountingTransactionManager txMan = (CallCountingTransactionManager) bf.getBean(TXMANAGER_BEAN_NAME);
 		OrderedTxCheckAdvisor txc = (OrderedTxCheckAdvisor) bf.getBean("orderedBeforeTransaction");
 		assertEquals(0, txc.getCountingBeforeAdvice().getCalls());
-				
+
 		assertEquals(0, txMan.commits);
 		assertEquals("Initial value was correct", 4, test.getAge());
 		int newAge = 5;
 		test.setAge(newAge);
 		assertEquals(1, txc.getCountingBeforeAdvice().getCalls());
-			
+
 		assertEquals("New value set correctly", newAge, test.getAge());
 		assertEquals("Transaction counts match", 1, txMan.commits);
 	}
@@ -217,17 +244,17 @@ public class AdvisorAutoProxyCreatorTests extends TestCase {
 	public void testRollbackRulesOnMethodCauseRollback() throws Exception {
 		BeanFactory bf = getBeanFactory();
 		Rollback rb = (Rollback) bf.getBean("rollback");
-	
-		CountingTxManager txMan = (CountingTxManager) bf.getBean(TXMANAGER_BEAN_NAME);
+
+		CallCountingTransactionManager txMan = (CallCountingTransactionManager) bf.getBean(TXMANAGER_BEAN_NAME);
 		OrderedTxCheckAdvisor txc = (OrderedTxCheckAdvisor) bf.getBean("orderedBeforeTransaction");
 		assertEquals(0, txc.getCountingBeforeAdvice().getCalls());
-		
+
 		assertEquals(0, txMan.commits);
 		rb.echoException(null);
 		// Fires only on setters
 		assertEquals(0, txc.getCountingBeforeAdvice().getCalls());
 		assertEquals("Transaction counts match", 1, txMan.commits);
-		
+
 		assertEquals(0, txMan.rollbacks);
 		Exception ex = new Exception();
 		try {
@@ -238,12 +265,12 @@ public class AdvisorAutoProxyCreatorTests extends TestCase {
 		}
 		assertEquals("Transaction counts match", 1, txMan.rollbacks);
 	}
-	
+
 	public void testRollbackRulesOnMethodPreventRollback() throws Exception {
 		BeanFactory bf = getBeanFactory();
 		Rollback rb = (Rollback) bf.getBean("rollback");
 
-		CountingTxManager txMan = (CountingTxManager) bf.getBean(TXMANAGER_BEAN_NAME);
+		CallCountingTransactionManager txMan = (CallCountingTransactionManager) bf.getBean(TXMANAGER_BEAN_NAME);
 
 		assertEquals(0, txMan.commits);
 		// Should NOT roll back on ServletException 
@@ -251,17 +278,17 @@ public class AdvisorAutoProxyCreatorTests extends TestCase {
 			rb.echoException(new ServletException());
 		}
 		catch (ServletException ex) {
-			
+
 		}
 		assertEquals("Transaction counts match", 1, txMan.commits);
 	}
-	
+
 	public void testProgrammaticRollback() throws Exception {
 		BeanFactory bf = getBeanFactory();
 
-		assertTrue(bf.getBean(TXMANAGER_BEAN_NAME) instanceof CountingTxManager);
-		CountingTxManager txMan = (CountingTxManager) bf.getBean(TXMANAGER_BEAN_NAME);
-		
+		assertTrue(bf.getBean(TXMANAGER_BEAN_NAME) instanceof CallCountingTransactionManager);
+		CallCountingTransactionManager txMan = (CallCountingTransactionManager) bf.getBean(TXMANAGER_BEAN_NAME);
+
 		Rollback rb = (Rollback) bf.getBean("rollback");
 		assertEquals(0, txMan.commits);
 		rb.rollbackOnly(false);
@@ -272,13 +299,26 @@ public class AdvisorAutoProxyCreatorTests extends TestCase {
 		assertEquals(1, txMan.rollbacks);
 	}
 
+	public void testWithOptimizedProxy() throws Exception {
+		BeanFactory beanFactory = new ClassPathXmlApplicationContext("org/springframework/aop/framework/autoproxy/optimizedAutoProxyCreator.xml");
+
+		ITestBean testBean = (ITestBean)beanFactory.getBean("optimizedTestBean");
+		assertTrue(AopUtils.isAopProxy(testBean));
+
+		CountingBeforeAdvice beforeAdvice = (CountingBeforeAdvice) beanFactory.getBean("countingAdvice");
+
+		testBean.setAge(23);
+		testBean.getAge();
+
+		assertEquals("Incorrect number of calls to proxy", 2, beforeAdvice.getCalls());
+	}
+
 	
 	/**
 	 * Tests an introduction pointcut. This is a prototype, so that it can add
 	 * a Modifiable mixin. Tests that the autoproxy infrastructure can create
 	 * advised objects with independent interceptor instances.
 	 * The Modifiable behaviour of each instance of TestBean should be distinct.
-	 * @throws Exception
 	 */
 	/*
 	public void testIntroductionViaPrototype() throws Exception {
@@ -309,5 +349,5 @@ public class AdvisorAutoProxyCreatorTests extends TestCase {
 		assertFalse(mod1.isModified());
 	}
 	*/
-	
+
 }

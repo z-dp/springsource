@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.bind;
 
@@ -30,9 +30,9 @@ import org.springframework.web.util.HtmlUtils;
  * for convenient usage in HTML views. Can be retrieved easily via
  * RequestContext's getErrors method.
  *
- * <p>Note that BindTag does not use this class to avoid unnecessary creation
- * of ObjectError instances. It just escapes the messages and values that get
- * copied into the respective BindStatus instance.
+ * <p>Note that BindTag does <i>not</i> use this class to avoid unnecessary
+ * creation of ObjectError instances. It just escapes the messages and values
+ * that get copied into the respective BindStatus instance.
  *
  * @author Juergen Hoeller
  * @since 01.03.2003
@@ -41,7 +41,8 @@ import org.springframework.web.util.HtmlUtils;
  */
 public class EscapedErrors implements Errors {
 
-	private Errors source = null;
+	private final Errors source;
+
 
 	/**
 	 * Create a new EscapedErrors instance for the given source instance.
@@ -57,8 +58,30 @@ public class EscapedErrors implements Errors {
 		return this.source;
 	}
 
+
 	public String getObjectName() {
 		return this.source.getObjectName();
+	}
+
+	public void setNestedPath(String nestedPath) {
+		this.source.setNestedPath(nestedPath);
+	}
+
+	public String getNestedPath() {
+		return this.source.getNestedPath();
+	}
+
+	public void pushNestedPath(String subPath) {
+		this.source.pushNestedPath(subPath);
+	}
+
+	public void popNestedPath() throws IllegalStateException {
+		this.source.popNestedPath();
+	}
+
+
+	public void reject(String errorCode) {
+		this.source.reject(errorCode);
 	}
 
 	public void reject(String errorCode, String defaultMessage) {
@@ -69,6 +92,10 @@ public class EscapedErrors implements Errors {
 		this.source.reject(errorCode, errorArgs, defaultMessage);
 	}
 
+	public void rejectValue(String field, String errorCode) {
+		this.source.rejectValue(field, errorCode);
+	}
+
 	public void rejectValue(String field, String errorCode, String defaultMessage) {
 		this.source.rejectValue(field, errorCode, defaultMessage);
 	}
@@ -76,6 +103,11 @@ public class EscapedErrors implements Errors {
 	public void rejectValue(String field, String errorCode, Object[] errorArgs, String defaultMessage) {
 		this.source.rejectValue(field, errorCode, errorArgs, defaultMessage);
 	}
+
+	public void addAllErrors(Errors errors) {
+		this.source.addAllErrors(errors);
+	}
+
 
 	public boolean hasErrors() {
 		return this.source.hasErrors();
@@ -126,13 +158,6 @@ public class EscapedErrors implements Errors {
 		return (value instanceof String ? HtmlUtils.htmlEscape((String) value) : value);
 	}
 
-	public void setNestedPath(String nestedPath) {
-		this.source.setNestedPath(nestedPath);
-	}
-
-	public String getNestedPath() {
-		return this.source.getNestedPath();
-	}
 
 	private ObjectError escapeObjectError(ObjectError source) {
 		if (source == null) {
@@ -142,17 +167,20 @@ public class EscapedErrors implements Errors {
 			FieldError fieldError = (FieldError) source;
 			Object value = fieldError.getRejectedValue();
 			if (value instanceof String) {
-				value = HtmlUtils.htmlEscape((String) fieldError.getRejectedValue());
+				value = HtmlUtils.htmlEscape((String) value);
 			}
-			return new FieldError(fieldError.getObjectName(), fieldError.getField(), value, fieldError.isBindingFailure(),
-														fieldError.getCode(), fieldError.getArguments(), HtmlUtils.htmlEscape(fieldError.getDefaultMessage()));
+			return new FieldError(
+					fieldError.getObjectName(), fieldError.getField(), value,
+					fieldError.isBindingFailure(), fieldError.getCodes(),
+					fieldError.getArguments(), HtmlUtils.htmlEscape(fieldError.getDefaultMessage()));
 		}
-		return new ObjectError(source.getObjectName(), source.getCode(), source.getArguments(),
-													 HtmlUtils.htmlEscape(source.getDefaultMessage()));
+		return new ObjectError(
+				source.getObjectName(), source.getCodes(), source.getArguments(),
+				HtmlUtils.htmlEscape(source.getDefaultMessage()));
 	}
 
 	private List escapeObjectErrors(List source) {
-		List escaped = new ArrayList();
+		List escaped = new ArrayList(source.size());
 		for (Iterator it = source.iterator(); it.hasNext();) {
 			ObjectError objectError = (ObjectError)it.next();
 			escaped.add(escapeObjectError(objectError));

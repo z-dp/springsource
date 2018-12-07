@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.mvc;
 
@@ -25,14 +25,14 @@ import org.springframework.web.servlet.ModelAndView;
  * <p>Trivial controller that always returns a named view. The view
  * can be configured using an exposed configuration property. This
  * controller offers an alternative to sending a request straight to a view
- * such as a JSP. The advantage here is, that you're decoupling the controller
- * and the view, letter the some the configuration determine (instead of
- * the controller) the viewtechnology.</p>
+ * such as a JSP. The advantage here is that the client is not exposed to
+ * the concrete view technology but rather just to the controller URL;
+ * the concrete view will be determined by the ViewResolver.
  *
- * <p>An alternative to the ParameterizableViewController is of the
- * {@link org.springframework.web.servlet.mvc.multiaction MultiAction controllers},
- * some of which allow the same behavior, but then for more views at in one
- * controller.</p>
+ * <p>An alternative to the ParameterizableViewController is a
+ * {@link org.springframework.web.servlet.mvc.multiaction.MultiActionController MultiActionController},
+ * which can define a variety of handler methods that just return a plain
+ * ModelAndView instance for a given view name.
  *
  * <p><b><a name="workflow">Workflow
  * (<a href="AbstractController.html#workflow">and that defined by superclass</a>):</b><br>
@@ -67,26 +67,36 @@ import org.springframework.web.servlet.ModelAndView;
 public class ParameterizableViewController extends AbstractController {
 	
 	private String viewName;
-	
+
+
 	/**
-	 * Set the view name to return.
+	 * Set the name of the view to delegate to.
 	 */
 	public void setViewName(String viewName) {
 		this.viewName = viewName;
 	}
 	
+	/**
+	 * Return the name of the view to delegate to.
+	 */
 	public String getViewName() {
 		return viewName;
 	}
 
-	protected ModelAndView handleRequestInternal(HttpServletRequest request, HttpServletResponse response) {
-		return new ModelAndView(this.viewName);
+	protected void initApplicationContext() {
+		if (this.viewName == null) {
+			throw new IllegalArgumentException("viewName is required");
+		}
 	}
 
-	protected void initApplicationContext() {
-		if (viewName == null) {
-			throw new IllegalArgumentException("viewName must be set in " + getClass().getName());
-		}
+
+	/**
+	 * Return a ModelAndView object with the specified view name.
+	 */
+	protected ModelAndView handleRequestInternal(HttpServletRequest request, HttpServletResponse response)
+			throws Exception {
+
+		return new ModelAndView(getViewName());
 	}
 
 }

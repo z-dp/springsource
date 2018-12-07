@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.scheduling.quartz;
 
@@ -24,35 +24,53 @@ import org.quartz.JobDetail;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.quartz.Scheduler;
+import org.quartz.StatefulJob;
 
 import org.springframework.beans.factory.BeanNameAware;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.support.ArgumentConvertingMethodInvoker;
 import org.springframework.util.MethodInvoker;
 
 /**
- * FactoryBean that exposes a JobDetail object that delegates
- * job execution to a specified (static or non-static) method.
- * Avoids the need to implement a one-line Quartz Job that just
- * invokes an existing business method.
+ * FactoryBean that exposes a JobDetail object that delegates job execution
+ * to a specified (static or non-static) method. Avoids the need to implement
+ * a one-line Quartz Job that just invokes an existing service method.
  *
- * <p>Derived from MethodInvoker to share common properties and
- * behavior with MethodInvokingFactoryBean.
+ * <p>Derived from MethodInvoker to share common properties and behavior
+ * with MethodInvokingFactoryBean.
+ * 
+ * <p>Supports both concurrently running jobs and non-currently running
+ * ones through the "concurrent" property.
+ *
+ * <p><b>Note: JobDetails created via this FactoryBean are <i>not</i>
+ * serializable and thus not suitable for persistent job stores.</b>
+ * You need to implement your own Quartz Job as a thin wrapper for each case
+ * where you want a persistent job to delegate to a specific service method.
  *
  * @author Juergen Hoeller
+ * @author Alef Arendsen
  * @since 18.02.2004
+ * @see #setTargetObject
+ * @see #setTargetMethod
+ * @see #setConcurrent
  * @see org.springframework.beans.factory.config.MethodInvokingFactoryBean
  */
-public class MethodInvokingJobDetailFactoryBean extends MethodInvoker
+public class MethodInvokingJobDetailFactoryBean extends ArgumentConvertingMethodInvoker
     implements FactoryBean, BeanNameAware, InitializingBean {
 
 	private String name;
 
 	private String group = Scheduler.DEFAULT_GROUP;
 
+	private boolean concurrent = true;
+
+	private String[] jobListenerNames;
+
 	private String beanName;
 
 	private JobDetail jobDetail;
+
 
 	/**
 	 * Set the name of the job.
@@ -72,24 +90,78 @@ public class MethodInvokingJobDetailFactoryBean extends MethodInvoker
 	public void setGroup(String group) {
 		this.group = group;
 	}
+	
+	/**
+	 * Specify whether or not multiple jobs should be run in a concurrent
+	 * fashion. The behavior when one does not want concurrent jobs to be
+	 * executed is realized through adding the {@link StatefulJob} interface.
+	 * More information on stateful versus stateless jobs can be found
+	 * <a href="http://www.opensymphony.com/quartz/tutorial.html#jobsMore">here</a>.
+	 * <p>The default setting is to run jobs concurrently.
+	 * @param concurrent whether one wants to execute multiple jobs created
+	 * by this bean concurrently
+	 */
+	public void setConcurrent(boolean concurrent) {
+		this.concurrent = concurrent;
+	}
+
+	/**
+	 * Set a list of JobListener names for this job, referring to
+	 * non-global JobListeners registered with the Scheduler.
+	 * <p>A JobListener name always refers to the name returned
+	 * by the JobListener implementation.
+	 * @see SchedulerFactoryBean#setJobListeners
+	 * @see org.quartz.JobListener#getName
+	 */
+	public void setJobListenerNames(String[] names) {
+		this.jobListenerNames = names;
+	}
 
 	public void setBeanName(String beanName) {
 		this.beanName = beanName;
 	}
 
+
 	public void afterPropertiesSet() throws ClassNotFoundException, NoSuchMethodException {
 		prepare();
-		this.jobDetail = new JobDetail(this.name != null ? this.name : this.beanName,
-		                               this.group, MethodInvokingJob.class);
+
+		// Use specific name if given, else fall back to bean name.
+		String name = (this.name != null ? this.name : this.beanName);
+
+		// Consider the concurrent flag to choose between stateful and stateless job.
+		Class jobClass = (this.concurrent ? (Class) MethodInvokingJob.class : StatefulMethodInvokingJob.class);
+
+		// Build JobDetail instance.
+		this.jobDetail = new JobDetail(name, this.group, jobClass);
 		this.jobDetail.getJobDataMap().put("methodInvoker", this);
+		this.jobDetail.setVolatility(true);
+		this.jobDetail.setDurability(true);
+
+		// Register job listener names.
+		if (this.jobListenerNames != null) {
+			for (int i = 0; i < this.jobListenerNames.length; i++) {
+				this.jobDetail.addJobListener(this.jobListenerNames[i]);
+			}
+		}
+
+		postProcessJobDetail(this.jobDetail);
 	}
+
+	/**
+	 * Callback for post-processing the JobDetail to be exposed by this FactoryBean.
+	 * <p>The default implementation is empty. Can be overridden in subclasses.
+	 * @param jobDetail the JobDetail prepared by this FactoryBean
+	 */
+	protected void postProcessJobDetail(JobDetail jobDetail) {
+	}
+
 
 	public Object getObject() {
 		return this.jobDetail;
 	}
 
 	public Class getObjectType() {
-		return (this.jobDetail != null) ? this.jobDetail.getClass() : JobDetail.class;
+		return JobDetail.class;
 	}
 
 	public boolean isSingleton() {
@@ -126,7 +198,7 @@ public class MethodInvokingJobDetailFactoryBean extends MethodInvoker
 				this.methodInvoker.invoke();
 			}
 			catch (InvocationTargetException ex) {
-				logger.warn(this.errorMessage + ": " + ex.getTargetException().getMessage());
+				logger.warn(this.errorMessage, ex.getTargetException());
 				if (ex.getTargetException() instanceof JobExecutionException) {
 					throw (JobExecutionException) ex.getTargetException();
 				}
@@ -135,10 +207,22 @@ public class MethodInvokingJobDetailFactoryBean extends MethodInvoker
 				throw new JobExecutionException(this.errorMessage, jobEx, false);
 			}
 			catch (Exception ex) {
-				logger.warn(this.errorMessage + ": " + ex.getMessage());
+				logger.warn(this.errorMessage, ex);
 				throw new JobExecutionException(this.errorMessage, ex, false);
 			}
 		}
+	}
+
+
+	/**
+	 * Extension of the MethodInvokingJob, implementing the StatefulJob interface.
+	 * Quartz checks whether or not jobs are stateful and if so,
+	 * won't let jobs interfere with each other.
+	 */
+	public static class StatefulMethodInvokingJob extends MethodInvokingJob implements StatefulJob {
+
+		// No implementation, just an addition of the tag interface StatefulJob
+		// in order to allow stateful method invoking jobs.
 	}
 
 }

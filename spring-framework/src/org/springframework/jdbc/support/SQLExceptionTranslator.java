@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.support;
 
@@ -31,7 +31,6 @@ import org.springframework.dao.DataAccessException;
  *
  * @author Rod Johnson
  * @see org.springframework.dao.DataAccessException
- * @version $Id: SQLExceptionTranslator.java,v 1.2 2004/03/18 02:46:15 trisberg Exp $
  */
 public interface SQLExceptionTranslator {
 
@@ -39,10 +38,10 @@ public interface SQLExceptionTranslator {
 	 * Translate the given SQL exception into a generic
 	 * data access exception.
 	 * @param task readable text describing the task being attempted
-	 * @param sql SQL query or update that caused the problem.
-	 * May be null.
-	 * @param sqlex SQLException encountered by JDBC implementation
+	 * @param sql SQL query or update that caused the problem. May be <code>null</code>.
+	 * @param sqlEx the offending SQLException
+	 * @return the DataAccessException to throw
 	 */
-	DataAccessException translate(String task, String sql, SQLException sqlex);
+	DataAccessException translate(String task, String sql, SQLException sqlEx);
 
 }

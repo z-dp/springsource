@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.support;
 
@@ -22,8 +22,8 @@ import java.util.Set;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 
+import org.springframework.util.StringUtils;
 import org.springframework.web.context.support.WebApplicationObjectSupport;
 
 /**
@@ -44,6 +44,8 @@ import org.springframework.web.context.support.WebApplicationObjectSupport;
  */
 public abstract class WebContentGenerator extends WebApplicationObjectSupport {
 
+	public static final String METHOD_HEAD = "HEAD";
+
 	public static final String METHOD_GET = "GET";
 
 	public static final String METHOD_POST = "POST";
@@ -56,7 +58,7 @@ public abstract class WebContentGenerator extends WebApplicationObjectSupport {
 
 
 	/** Set of supported methods. GET and POST by default. */
-	private Set	supportedMethods;
+	private Set	supportedMethods = new HashSet();
 
 	private boolean requireSession = false;
 
@@ -69,38 +71,49 @@ public abstract class WebContentGenerator extends WebApplicationObjectSupport {
 	private int cacheSeconds = -1;
 
 
-	/**
-	 * Create a new WebContentGenerator supporting GET and POST methods.
-	 */
 	public WebContentGenerator() {
-		this.supportedMethods = new HashSet();
+		this.supportedMethods.add(METHOD_HEAD);
 		this.supportedMethods.add(METHOD_GET);
 		this.supportedMethods.add(METHOD_POST);
 	}
 
 	/**
 	 * Set the HTTP methods that this content generator should support.
-	 * Default is GET and POST.
+	 * Default is HEAD, GET and POST.
 	 */
-	public final void setSupportedMethods(String[] supportedMethodsArray) {
-		if (supportedMethodsArray == null || supportedMethodsArray.length == 0) {
+	public final void setSupportedMethods(String[] methods) {
+		if (methods == null || methods.length == 0) {
 			throw new IllegalArgumentException("supportedMethods must not be empty");
 		}
 		this.supportedMethods.clear();
-		for (int i = 0; i < supportedMethodsArray.length; i++) {
-			this.supportedMethods.add(supportedMethodsArray[i]);
+		for (int i = 0; i < methods.length; i++) {
+			this.supportedMethods.add(methods[i]);
 		}
 	}
 
 	/**
-	 * Set if a session should be required to handle requests.
+	 * Return the HTTP methods that this content generator supports.
+	 */
+	public final String[] getSupportedMethods() {
+		return StringUtils.toStringArray(this.supportedMethods);
+	}
+
+	/**
+	 * Set whether a session should be required to handle requests.
 	 */
 	public final void setRequireSession(boolean requireSession) {
 		this.requireSession = requireSession;
 	}
 
 	/**
-	 * Set whether to use the HTTP 1.0 expires header. Default is true.
+	 * Return whether a session is required to handle requests.
+	 */
+	public final boolean isRequireSession() {
+		return requireSession;
+	}
+
+	/**
+	 * Set whether to use the HTTP 1.0 expires header. Default is "true".
 	 * <p>Note: Cache headers will only get applied if caching is enabled
 	 * for the current request.
 	 */
@@ -109,12 +122,26 @@ public abstract class WebContentGenerator extends WebApplicationObjectSupport {
 	}
 
 	/**
-	 * Set whether to use the HTTP 1.1 cache-control header. Default is true.
+	 * Return whether the HTTP 1.0 expires header is used.
+	 */
+	public final boolean isUseExpiresHeader() {
+		return useExpiresHeader;
+	}
+
+	/**
+	 * Set whether to use the HTTP 1.1 cache-control header. Default is "true".
 	 * <p>Note: Cache headers will only get applied if caching is enabled
 	 * for the current request.
 	 */
 	public final void setUseCacheControlHeader(boolean useCacheControlHeader) {
 		this.useCacheControlHeader = useCacheControlHeader;
+	}
+
+	/**
+	 * Return whether the HTTP 1.1 cache-control header is used.
+	 */
+	public final boolean isUseCacheControlHeader() {
+		return useCacheControlHeader;
 	}
 
 	/**
@@ -128,36 +155,61 @@ public abstract class WebContentGenerator extends WebApplicationObjectSupport {
 		this.cacheSeconds = seconds;
 	}
 
+	/**
+	 * Return the number of seconds that content is cached.
+	 */
+	public final int getCacheSeconds() {
+		return cacheSeconds;
+	}
+
 
 	/**
 	 * Check and prepare the given request and response according to the settings
 	 * of this generator. Checks for supported methods and a required session,
-	 * and applies the specified number of cache seconds.
+	 * and applies the number of cache seconds specified for this generator.
 	 * @param request current HTTP request
 	 * @param response current HTTP response
 	 * @param lastModified if the mapped handler provides Last-Modified support
 	 * @throws ServletException if the request cannot be handled because a check failed
 	 */
-	protected final void checkAndPrepare(HttpServletRequest request, HttpServletResponse response,
-	                                     boolean lastModified)
+	protected final void checkAndPrepare(
+			HttpServletRequest request, HttpServletResponse response, boolean lastModified)
+	    throws ServletException {
+
+		checkAndPrepare(request, response, this.cacheSeconds, lastModified);
+	}
+
+	/**
+	 * Check and prepare the given request and response according to the settings
+	 * of this generator. Checks for supported methods and a required session,
+	 * and applies the given number of cache seconds.
+	 * @param request current HTTP request
+	 * @param response current HTTP response
+	 * @param cacheSeconds positive number of seconds into the future that the
+	 * response should be cacheable for, 0 to prevent caching
+	 * @param lastModified if the mapped handler provides Last-Modified support
+	 * @throws ServletException if the request cannot be handled because a check failed
+	 */
+	protected final void checkAndPrepare(
+			HttpServletRequest request, HttpServletResponse response, int cacheSeconds, boolean lastModified)
 	    throws ServletException {
 
 		// check whether we should support the request method
 		String method = request.getMethod();
 		if (!this.supportedMethods.contains(method)) {
-			logger.info("Disallowed '" + method + "' request");
-			throw new ServletException("This resource does not support request method '" + method + "'");
+			throw new RequestMethodNotSupportedException("Request method '" + method + "' not supported");
 		}
 
-		// check whether session was required
-		HttpSession session = request.getSession(false);
-		if (this.requireSession && session == null) {
-			throw new ServletException("This resource requires a pre-existing HttpSession: none was found");
+		// check whether session is required
+		if (this.requireSession) {
+			if (request.getSession(false) == null) {
+				throw new SessionRequiredException("Pre-existing session required but none found");
+			}
 		}
 
-		// do declarative cache control
-		// revalidate if the controller supports last-modified
-		applyCacheSeconds(response, this.cacheSeconds, lastModified);
+		// Do declarative cache control.
+		// Revalidate if the controller supports last-modified.
+		applyCacheSeconds(response, cacheSeconds, lastModified);
 	}
 
 	/**
@@ -171,8 +223,10 @@ public abstract class WebContentGenerator extends WebApplicationObjectSupport {
 			response.setDateHeader(HEADER_EXPIRES, 1L);
 		}
 		if (this.useCacheControlHeader) {
-			// HTTP 1.1 header
+			// HTTP 1.1 header: "no-cache" is the standard value,
+			// "no-store" is necessary to prevent caching on FireFox.
 			response.setHeader(HEADER_CACHE_CONTROL, "no-cache");
+			response.addHeader(HEADER_CACHE_CONTROL, "no-store");
 		}
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.util;
 
@@ -42,6 +42,9 @@ import java.lang.reflect.Modifier;
  */
 public class MethodInvoker {
 
+	/**
+	 * Marker now used only by MethodInvokingFactoryBean, but left here for compatibility
+	 */
 	public static final VoidType VOID = new VoidType();
 
 
@@ -84,6 +87,9 @@ public class MethodInvoker {
 	 */
 	public void setTargetObject(Object targetObject) {
 		this.targetObject = targetObject;
+		if (targetObject != null) {
+			this.targetClass = targetObject.getClass();
+		}
 	}
 
 	/**
@@ -122,11 +128,11 @@ public class MethodInvoker {
 		int lastDotIndex = staticMethod.lastIndexOf('.');
 		if (lastDotIndex == -1 || lastDotIndex == staticMethod.length()) {
 			throw new IllegalArgumentException("staticMethod must be a fully qualified class plus method name: " +
-																				 "e.g. 'example.MyExampleClass.myExampleMethod'");
+					"e.g. 'example.MyExampleClass.myExampleMethod'");
 		}
 		String className = staticMethod.substring(0, lastDotIndex);
 		String methodName = staticMethod.substring(lastDotIndex + 1);
-		setTargetClass(Class.forName(className, true, Thread.currentThread().getContextClassLoader()));
+		setTargetClass(ClassUtils.forName(className));
 		setTargetMethod(methodName);
 	}
 
@@ -138,9 +144,13 @@ public class MethodInvoker {
 		this.arguments = arguments;
 	}
 
+	/**
+	 * Retrun the arguments for the method invocation.
+	 */
 	public Object[] getArguments() {
 		return arguments;
 	}
+
 
 	/**
 	 * Prepare the specified method.
@@ -149,7 +159,7 @@ public class MethodInvoker {
 	 * @see #invoke
 	 */
 	public void prepare() throws ClassNotFoundException, NoSuchMethodException {
-		if (this.targetClass == null && this.targetObject == null) {
+		if (this.targetClass == null) {
 			throw new IllegalArgumentException("Either targetClass or targetObject is required");
 		}
 		if (this.targetMethod == null) {
@@ -159,35 +169,57 @@ public class MethodInvoker {
 		if (this.arguments == null) {
 			this.arguments = new Object[0];
 		}
-		Class[] types = new Class[this.arguments.length];
+
+		Class[] argTypes = new Class[this.arguments.length];
 		for (int i = 0; i < this.arguments.length; ++i) {
-			types[i] = this.arguments[i].getClass();
+			argTypes[i] = (this.arguments[i] != null ? this.arguments[i].getClass() : Object.class);
 		}
 
-		// try to get the exact method first
-		Class targetClass = (this.targetObject != null) ? this.targetObject.getClass() : this.targetClass;
+		// Try to get the exact method first.
 		try {
-			this.methodObject = targetClass.getMethod(this.targetMethod, types);
+			this.methodObject = this.targetClass.getMethod(this.targetMethod, argTypes);
 		}
 		catch (NoSuchMethodException ex) {
-			int matches = 0;
-			// then try to get a method with the same number of arguments
-			// we'll fail at runtime if in fact the arguments are not assignment compatible
-			Method[] methods = targetClass.getMethods();
-			for (int i = 0; i < methods.length; ++i) {
-				Method method = methods[i];
-				if (method.getName().equals(this.targetMethod) && method.getParameterTypes().length == types.length) {
-					this.methodObject = method;
-					++matches;
-				}
-			}
-			// just rethrow exception if we can't get a match
-			if (this.methodObject == null || matches > 1) {
+			// Just rethrow exception if we can't get any match.
+			this.methodObject = findMatchingMethod();
+			if (this.methodObject == null) {
 				throw ex;
 			}
 		}
+
 		if (this.targetObject == null && !Modifier.isStatic(this.methodObject.getModifiers())) {
-			throw new IllegalArgumentException("Target method must not be static without a target");
+			throw new IllegalArgumentException("Target method must not be non-static without a target");
+		}
+	}
+
+	/**
+	 * Find a matching method with the specified name for the specified arguments.
+	 * @return a matching method, or <code>null</code> if none
+	 * @see #getTargetClass()
+	 * @see #getTargetMethod()
+	 * @see #getArguments()
+	 */
+	protected Method findMatchingMethod() {
+		Method[] candidates = getTargetClass().getMethods();
+		int argCount = getArguments().length;
+		Method matchingMethod = null;
+		int numberOfMatchingMethods = 0;
+
+		for (int i = 0; i < candidates.length; i++) {
+			// Check if the inspected method has the correct name and number of parameters.
+			if (candidates[i].getName().equals(getTargetMethod()) &&
+					candidates[i].getParameterTypes().length == argCount) {
+				matchingMethod = candidates[i];
+				numberOfMatchingMethods++;
+			}
+		}
+
+		// Only return matching method if exactly one found.
+		if (numberOfMatchingMethods == 1) {
+			return matchingMethod;
+		}
+		else {
+			return null;
 		}
 	}
 
@@ -204,21 +236,24 @@ public class MethodInvoker {
 	/**
 	 * Invoke the specified method.
 	 * The invoker needs to have been prepared before.
-	 * @return the object returned by the method invocation,
-	 * or VOID if the method returns void
+	 * @return the object (possibly null) returned by the method invocation,
+	 * or <code>null</code> if the method has a void return type
 	 * @see #prepare
-	 * @see #VOID
 	 */
 	public Object invoke() throws InvocationTargetException, IllegalAccessException {
-		// in the static case, target will just be null
-		Object result = this.methodObject.invoke(this.targetObject, this.arguments);
-		return (result == null ? VOID : result);
+		if (this.methodObject == null) {
+			throw new IllegalStateException("prepare() must be called prior to invoke() on MethodInvoker");
+		}
+		// In the static case, target will just be <code>null</code>.
+		return this.methodObject.invoke(this.targetObject, this.arguments);
 	}
 
 
 	/**
 	 * Special marker class used for a void return value,
 	 * differentiating void from a null value returned by the method.
+	 * This is not used any longer by MethodInvoker, only MethodInvokingFactoryBean, but
+	 * left here for backwards compatibility.
 	 */
 	public static class VoidType {
 	}

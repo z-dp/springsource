@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,19 +12,21 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.support;
 
 /**
  * Definition for sorting bean instances by a property.
+ *
  * @author Juergen Hoeller
  * @since 26.05.2003
  */
 public interface SortDefinition {
 
 	/**
-	 * Return the name of the property to sort by.
+	 * Return the name of the bean property to compare.
+	 * Can also be a nested bean property path.
 	 */
 	String getProperty();
 
@@ -34,7 +36,7 @@ public interface SortDefinition {
 	boolean isIgnoreCase();
 
 	/**
-	 * Return if ascending or descending.
+	 * Return whether to sort ascending (true) or descending (false).
 	 */
 	boolean isAscending();
 

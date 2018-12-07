@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,28 +12,32 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework.adapter;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.aopalliance.aop.Advice;
 import org.aopalliance.intercept.Interceptor;
+
 import org.springframework.aop.Advisor;
 import org.springframework.aop.support.DefaultPointcutAdvisor;
 
 /**
+ * Default implementation of the AdvisorAdapterRegistry interface.
+ * Supports Interceptor, BeforeAdvice, AfterReturningAdvice, ThrowsAdvice.
+ *
  * @author Rod Johnson
- * @version $Id: DefaultAdvisorAdapterRegistry.java,v 1.10 2004/03/19 16:54:41 johnsonr Exp $
+ * @author Rob Harrop
  */
 public class DefaultAdvisorAdapterRegistry implements AdvisorAdapterRegistry {
 	
-	private List adapters = new LinkedList();
+	private final List adapters = new ArrayList(3);
 	
 	public DefaultAdvisorAdapterRegistry() {
-		// register well-known adapters
+		// Register well-known adapters.
 		registerAdvisorAdapter(new BeforeAdviceAdapter());
 		registerAdvisorAdapter(new AfterReturningAdviceAdapter());
 		registerAdvisorAdapter(new ThrowsAdviceAdapter());
@@ -43,18 +47,16 @@ public class DefaultAdvisorAdapterRegistry implements AdvisorAdapterRegistry {
 		if (adviceObject instanceof Advisor) {
 			return (Advisor) adviceObject;
 		}
-		
 		if (!(adviceObject instanceof Advice)) {
 			throw new UnknownAdviceTypeException(adviceObject);
 		}
 		Advice advice = (Advice) adviceObject;
-		
 		if (advice instanceof Interceptor) {
-			// So well-known it doesn't even need an adapter
+			// So well-known it doesn't even need an adapter.
 			return new DefaultPointcutAdvisor(advice);
 		}
 		for (int i = 0; i < this.adapters.size(); i++) {
-			// Check that it is supported
+			// Check that it is supported.
 			AdvisorAdapter adapter = (AdvisorAdapter) this.adapters.get(i);
 			if (adapter.supportsAdvice(advice)) {
 				return new DefaultPointcutAdvisor(advice);
@@ -63,18 +65,22 @@ public class DefaultAdvisorAdapterRegistry implements AdvisorAdapterRegistry {
 		throw new UnknownAdviceTypeException(advice);
 	}
 
-	public Interceptor getInterceptor(Advisor advisor) throws UnknownAdviceTypeException {
+	public Interceptor[] getInterceptors(Advisor advisor) throws UnknownAdviceTypeException {
+		List interceptors = new ArrayList(3);
 		Advice advice = advisor.getAdvice();
 		if (advice instanceof Interceptor) {
-			return (Interceptor) advice;
+			interceptors.add(advice);
 		}
 		for (int i = 0; i < this.adapters.size(); i++) {
 			AdvisorAdapter adapter = (AdvisorAdapter) this.adapters.get(i);
 			if (adapter.supportsAdvice(advice)) {
-				return adapter.getInterceptor(advisor);
+				interceptors.add(adapter.getInterceptor(advisor));
 			}
 		}
-		throw new UnknownAdviceTypeException(advisor.getAdvice());
+		if (interceptors.isEmpty()) {
+			throw new UnknownAdviceTypeException(advisor.getAdvice());
+		}
+		return (Interceptor[]) interceptors.toArray(new Interceptor[interceptors.size()]);
 	}
 
 	public void registerAdvisorAdapter(AdvisorAdapter adapter) {

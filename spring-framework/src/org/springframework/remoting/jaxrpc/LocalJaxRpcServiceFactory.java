@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,11 +12,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.remoting.jaxrpc;
 
 import java.net.URL;
+import java.util.Properties;
 
 import javax.xml.namespace.QName;
 import javax.xml.rpc.Service;
@@ -31,6 +32,7 @@ import org.springframework.beans.BeanUtils;
 /**
  * Factory for locally defined JAX-RPC Service references.
  * Uses a JAX-RPC ServiceFactory underneath.
+ *
  * @author Juergen Hoeller
  * @since 15.12.2003
  * @see javax.xml.rpc.ServiceFactory
@@ -38,6 +40,7 @@ import org.springframework.beans.BeanUtils;
  */
 public class LocalJaxRpcServiceFactory {
 
+	/** Logger that is available to subclasses */
 	protected final Log logger = LogFactory.getLog(getClass());
 
 	private Class serviceFactoryClass;
@@ -47,6 +50,12 @@ public class LocalJaxRpcServiceFactory {
 	private String namespaceUri;
 
 	private String serviceName;
+
+	private Class jaxRpcServiceInterface;
+
+	private Properties jaxRpcServiceProperties;
+
+	private JaxRpcServicePostProcessor[] servicePostProcessors;
 
 
 	/**
@@ -58,13 +67,13 @@ public class LocalJaxRpcServiceFactory {
 	 */
 	public void setServiceFactoryClass(Class serviceFactoryClass) {
 		if (serviceFactoryClass != null && !ServiceFactory.class.isAssignableFrom(serviceFactoryClass)) {
-			throw new IllegalArgumentException("serviceFactoryClass must implement javax.xml.rpc.ServiceFactory");
+			throw new IllegalArgumentException("serviceFactoryClass must implement [javax.xml.rpc.ServiceFactory]");
 		}
 		this.serviceFactoryClass = serviceFactoryClass;
 	}
 
 	/**
-	 * Return the ServiceFactory class to use, or null if default.
+	 * Return the ServiceFactory class to use, or <code>null</code> if default.
 	 */
 	public Class getServiceFactoryClass() {
 		return serviceFactoryClass;
@@ -100,8 +109,11 @@ public class LocalJaxRpcServiceFactory {
 	}
 
 	/**
-	 * Set the name of the service.
+	 * Set the name of the service to look up.
 	 * Corresponds to the "wsdl:service" name.
+	 * @see javax.xml.rpc.ServiceFactory#createService(javax.xml.namespace.QName)
+	 * @see javax.xml.rpc.ServiceFactory#createService(java.net.URL, javax.xml.namespace.QName)
+	 * @see javax.xml.rpc.ServiceFactory#loadService(java.net.URL, javax.xml.namespace.QName, java.util.Properties)
 	 */
 	public void setServiceName(String serviceName) {
 		this.serviceName = serviceName;
@@ -114,24 +126,107 @@ public class LocalJaxRpcServiceFactory {
 		return serviceName;
 	}
 
+	/**
+	 * Set the JAX-RPC service interface to use for looking up the service.
+	 * If specified, this will override a "serviceName" setting.
+	 * <p>The specified interface will usually be a generated JAX-RPC service
+	 * interface that directly corresponds to the WSDL service declaration.
+	 * Note that this is not a port interface or the application-level service
+	 * interface to be exposed by a port proxy!
+	 * <p>Only supported by JAX-RPC 1.1 providers.
+	 * @see #setServiceName
+	 * @see javax.xml.rpc.ServiceFactory#loadService(Class)
+	 * @see javax.xml.rpc.ServiceFactory#loadService(java.net.URL, Class, java.util.Properties)
+	 */
+	public void setJaxRpcServiceInterface(Class jaxRpcServiceInterface) {
+		this.jaxRpcServiceInterface = jaxRpcServiceInterface;
+	}
 
 	/**
-	 * Return a QName for the given name,* relative to the namespace URI
+	 * Return the JAX-RPC service interface to use for looking up the service.
+	 */
+	public Class getJaxRpcServiceInterface() {
+		return jaxRpcServiceInterface;
+	}
+
+	/**
+	 * Set JAX-RPC service properties to be passed to the ServiceFactory, if any.
+	 * <p>Only supported by JAX-RPC 1.1 providers.
+	 * @see javax.xml.rpc.ServiceFactory#loadService(java.net.URL, javax.xml.namespace.QName, java.util.Properties)
+	 * @see javax.xml.rpc.ServiceFactory#loadService(java.net.URL, Class, java.util.Properties)
+	 */
+	public void setJaxRpcServiceProperties(Properties jaxRpcServiceProperties) {
+		this.jaxRpcServiceProperties = jaxRpcServiceProperties;
+	}
+
+	/**
+	 * Return JAX-RPC service properties to be passed to the ServiceFactory, if any.
+	 */
+	public Properties getJaxRpcServiceProperties() {
+		return jaxRpcServiceProperties;
+	}
+
+	/**
+	 * Set the JaxRpcServicePostProcessors to be applied to JAX-RPC Service
+	 * instances created by this factory.
+	 * <p>Such post-processors can, for example, register custom type mappings.
+	 * They are reusable across all pre-built subclasses of this factory:
+	 * LocalJaxRpcServiceFactoryBean, JaxRpcPortClientInterceptor,
+	 * JaxRpcPortProxyFactoryBean.
+	 * @see LocalJaxRpcServiceFactoryBean
+	 * @see JaxRpcPortClientInterceptor
+	 * @see JaxRpcPortProxyFactoryBean
+	 */
+	public void setServicePostProcessors(JaxRpcServicePostProcessor[] servicePostProcessors) {
+		this.servicePostProcessors = servicePostProcessors;
+	}
+
+	/**
+	 * Return the JaxRpcServicePostProcessors to be applied to JAX-RPC Service
+	 * instances created by this factory.
+	 */
+	public JaxRpcServicePostProcessor[] getServicePostProcessors() {
+		return servicePostProcessors;
+	}
+
+
+	/**
+	 * Create a JAX-RPC Service according to the parameters of this factory.
+	 * @see #setServiceName
+	 * @see #setWsdlDocumentUrl
+	 * @see #postProcessJaxRpcService
+	 */
+	public Service createJaxRpcService() throws ServiceException {
+		ServiceFactory serviceFactory = createServiceFactory();
+
+		// Create service based on this factory's settings.
+		Service service = createService(serviceFactory);
+
+		// Allow for custom post-processing in subclasses.
+		postProcessJaxRpcService(service);
+
+		return service;
+	}
+
+	/**
+	 * Return a QName for the given name, relative to the namespace URI
 	 * of this factory, if given.
 	 * @see #setNamespaceUri
 	 */
-	public QName getQName(String name) {
-		return (this.namespaceUri != null) ? new QName(this.namespaceUri, name) : new QName(this.serviceName);
+	protected QName getQName(String name) {
+		return (getNamespaceUri() != null) ? new QName(getNamespaceUri(), name) : new QName(name);
 	}
 
 	/**
 	 * Create a JAX-RPC ServiceFactory, either of the specified class
 	 * or the default.
+	 * @throws ServiceException if thrown by JAX-RPC methods
 	 * @see #setServiceFactoryClass
+	 * @see javax.xml.rpc.ServiceFactory#newInstance()
 	 */
-	public ServiceFactory createServiceFactory() throws ServiceException {
-		if (this.serviceFactoryClass != null) {
-			return (ServiceFactory) BeanUtils.instantiateClass(this.serviceFactoryClass);
+	protected ServiceFactory createServiceFactory() throws ServiceException {
+		if (getServiceFactoryClass() != null) {
+			return (ServiceFactory) BeanUtils.instantiateClass(getServiceFactoryClass());
 		}
 		else {
 			return ServiceFactory.newInstance();
@@ -139,19 +234,61 @@ public class LocalJaxRpcServiceFactory {
 	}
 
 	/**
-	 * Create a JAX-RPC Service according to the parameters of this factory.
-	 * @see #setServiceName
-	 * @see #setWsdlDocumentUrl
+	 * Actually create the JAX-RPC Service instance,
+	 * based on this factory's settings.
+	 * @param serviceFactory the JAX-RPC ServiceFactory to use
+	 * @return the newly created JAX-RPC Service
+	 * @throws ServiceException if thrown by JAX-RPC methods
+	 * @see javax.xml.rpc.ServiceFactory#createService
+	 * @see javax.xml.rpc.ServiceFactory#loadService
 	 */
-	public Service createJaxRpcService() throws ServiceException {
-		if (this.serviceName == null) {
-			throw new IllegalArgumentException("serviceName is required");
+	protected Service createService(ServiceFactory serviceFactory) throws ServiceException {
+		if (getServiceName() == null && getJaxRpcServiceInterface() == null) {
+			throw new IllegalArgumentException("serviceName or jaxRpcServiceInterface is required");
 		}
-		ServiceFactory serviceFactory = createServiceFactory();
-		QName serviceQName = getQName(this.serviceName);
-		return (this.wsdlDocumentUrl != null) ?
-				serviceFactory.createService(this.wsdlDocumentUrl, serviceQName) :
-				serviceFactory.createService(serviceQName);
+
+		if (getJaxRpcServiceInterface() != null) {
+			// Create service via generated JAX-RPC service interface.
+			// Only supported on JAX-RPC 1.1
+			if (getWsdlDocumentUrl() != null || getJaxRpcServiceProperties() != null) {
+				return serviceFactory.loadService(
+						getWsdlDocumentUrl(), getJaxRpcServiceInterface(), getJaxRpcServiceProperties());
+			}
+			return serviceFactory.loadService(getJaxRpcServiceInterface());
+		}
+
+		// Create service via specified JAX-RPC service name.
+		QName serviceQName = getQName(getServiceName());
+		if (getJaxRpcServiceProperties() != null) {
+			// Only supported on JAX-RPC 1.1
+			return serviceFactory.loadService(getWsdlDocumentUrl(), serviceQName, getJaxRpcServiceProperties());
+		}
+		if (getWsdlDocumentUrl() != null) {
+			return serviceFactory.createService(getWsdlDocumentUrl(), serviceQName);
+		}
+		return serviceFactory.createService(serviceQName);
+	}
+
+	/**
+	 * Post-process the given JAX-RPC Service.
+	 * Called by <code>createJaxRpcService</code>.
+	 * Useful, for example, to register custom type mappings.
+	 * <p>Default implementation delegates to all registered JaxRpcServicePostProcessors.
+	 * It is usually preferable to implement custom type mappings etc there rather than
+	 * in a subclass of this factory, to be able to reuse the post-processors.
+	 * @param service the current JAX-RPC Service
+	 * (can be cast to an implementation-specific class if necessary)
+	 * @see #createJaxRpcService
+	 * @see #setServicePostProcessors
+	 * @see javax.xml.rpc.Service#getTypeMappingRegistry
+	 */
+	protected void postProcessJaxRpcService(Service service) {
+		JaxRpcServicePostProcessor[] postProcessors = getServicePostProcessors();
+		if (postProcessors != null) {
+			for (int i = 0; i < postProcessors.length; i++) {
+				postProcessors[i].postProcessJaxRpcService(service);
+			}
+		}
 	}
 
 }

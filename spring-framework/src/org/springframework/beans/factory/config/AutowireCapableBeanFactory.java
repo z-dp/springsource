@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory.config;
 
@@ -21,23 +21,47 @@ import org.springframework.beans.factory.BeanFactory;
 
 /**
  * Extension of the BeanFactory interface to be implemented by bean
- * factories that are capable of autowiring and expose this functionality
- * for existing bean instances.
+ * factories that are capable of autowiring, provided that they want
+ * to expose this functionality for existing bean instances.
+ *
+ * <p>This subinterface of BeanFactory is not meant to be used in normal
+ * application code: stick to BeanFactory or ListableBeanFactory for
+ * typical use cases.
+ *
+ * <p>Integration code for other frameworks can leverage this interface to
+ * wire and populate existing bean instances that Spring does not control
+ * the lifecycle of. This is particularly useful for WebWork Actions or
+ * Tapestry Page objects, for example.
+ *
+ * <p>Note that this interface is not implemented by ApplicationContext
+ * facades, as it is hardly ever used by application code. It is available
+ * on the internal BeanFactory of a context, though, accessible through
+ * ConfigurableApplicationContext's <code>getBeanFactory</code> method.
+ *
+ * <p>To get access to an AutowireCapableBeanFactory, you can also
+ * implement the BeanFactoryAware interface, which exposes the internal
+ * BeanFactory even when running in an ApplicationContext. Simply cast
+ * the passed-in BeanFactory to AutowireCapableBeanFactory.
+ *
  * @author Juergen Hoeller
  * @since 04.12.2003
- * @version $Id: AutowireCapableBeanFactory.java,v 1.4 2004/03/18 02:46:07 trisberg Exp $
+ * @see org.springframework.beans.factory.BeanFactory
+ * @see org.springframework.beans.factory.ListableBeanFactory
+ * @see org.springframework.beans.factory.BeanFactoryAware
+ * @see org.springframework.beans.factory.config.ConfigurableListableBeanFactory
+ * @see org.springframework.context.ConfigurableApplicationContext#getBeanFactory
  */
 public interface AutowireCapableBeanFactory extends BeanFactory {
 
 	/**
-	 * Constant that indicates autowiring by name.
+	 * Constant that indicates autowiring bean properties by name.
 	 * @see #autowire
 	 * @see #autowireBeanProperties
 	 */
 	int AUTOWIRE_BY_NAME = 1;
 
 	/**
-	 * Constant that indicates autowiring by type.
+	 * Constant that indicates autowiring bean properties by type.
 	 * @see #autowire
 	 * @see #autowireBeanProperties
 	 */
@@ -65,7 +89,7 @@ public interface AutowireCapableBeanFactory extends BeanFactory {
 	 * @param dependencyCheck whether to perform a dependency check for objects
 	 * (not applicable to autowiring a constructor, thus ignored there)
 	 * @return the new bean instance
-	 * @throws BeansException if instantiation respectively wiring failed
+	 * @throws BeansException if instantiation or wiring failed
 	 * @see #AUTOWIRE_BY_NAME
 	 * @see #AUTOWIRE_BY_TYPE
 	 * @see #AUTOWIRE_CONSTRUCTOR
@@ -87,30 +111,47 @@ public interface AutowireCapableBeanFactory extends BeanFactory {
 			throws BeansException;
 
 	/**
+	 * Apply the property values of the bean definition with the given name
+	 * to the given bean instance. The bean definition can either define a
+	 * fully self-contained bean, reusing its property values, or just
+	 * property values meant to be used for existing bean instances.
+	 * <p>Note: This method does <i>not</i> autowire bean properties;
+	 * it just applies explicitly defined property values.
+	 * Use the <code>autowireBeanProperties</code> method to autowire
+	 * an existing bean instance.
+	 * @param existingBean the existing bean instance
+	 * @param beanName the name of the bean definition in the bean factory
+	 * @throws org.springframework.beans.factory.NoSuchBeanDefinitionException
+	 * if there is no bean with the given name
+	 * @throws BeansException if applying the property values failed
+	 * @see #autowireBeanProperties
+	 */
+	void applyBeanPropertyValues(Object existingBean, String beanName) throws BeansException;
+
+	/**
 	 * Apply BeanPostProcessors to the given existing bean instance,
-	 * invoking their postProcessBeforeInitialization methods.
+	 * invoking their <code>postProcessBeforeInitialization</code> methods.
 	 * The returned bean instance may be a wrapper around the original.
 	 * @param existingBean the new bean instance
-	 * @param name the name of the bean
+	 * @param beanName the name of the bean
 	 * @return the bean instance to use, either the original or a wrapped one
 	 * @throws BeansException if any post-processing failed
 	 * @see BeanPostProcessor#postProcessBeforeInitialization
 	 */
-	Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, String name)
+	Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, String beanName)
 			throws BeansException;
-
 
 	/**
 	 * Apply BeanPostProcessors to the given existing bean instance,
-	 * invoking their postProcessAfterInitialization methods.
+	 * invoking their <code>postProcessAfterInitialization</code> methods.
 	 * The returned bean instance may be a wrapper around the original.
 	 * @param existingBean the new bean instance
-	 * @param name the name of the bean
+	 * @param beanName the name of the bean
 	 * @return the bean instance to use, either the original or a wrapped one
 	 * @throws BeansException if any post-processing failed
 	 * @see BeanPostProcessor#postProcessAfterInitialization
 	 */
-	Object applyBeanPostProcessorsAfterInitialization(Object existingBean, String name)
+	Object applyBeanPostProcessorsAfterInitialization(Object existingBean, String beanName)
 			throws BeansException;
 
 }

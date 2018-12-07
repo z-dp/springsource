@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.support.lob;
 
@@ -30,17 +30,20 @@ import java.sql.SQLException;
  * thread-safe and needs to be instantiated for each statement execution or for
  * each transaction. Each LobCreator needs to be closed after completion.
  *
- * <p>According to the JDBC spec, one should be able to use setBytes/setBinaryStream
- * for any BLOB contents, analogously for CLOBs: Therefore, implementations should
- * use those direct setters if possible, for the sake of efficiency.
+ * <p>For convenient working with a PreparedStatement and a LobCreator, consider
+ * JdbcTemplate with a AbstractLobCreatingPreparedStatementCallback implementation.
+ * See the latter's javadoc for details.
  *
  * @author Juergen Hoeller
  * @since 04.12.2003
  * @see #close
  * @see LobHandler#getLobCreator
+ * @see org.springframework.jdbc.core.support.AbstractLobCreatingPreparedStatementCallback
  * @see DefaultLobHandler.DefaultLobCreator
  * @see OracleLobHandler.OracleLobCreator
  * @see java.sql.PreparedStatement#setBlob
+ * @see java.sql.PreparedStatement#setClob
+ * @see java.sql.PreparedStatement#setBytes
  * @see java.sql.PreparedStatement#setBinaryStream
  * @see java.sql.PreparedStatement#setString
  * @see java.sql.PreparedStatement#setAsciiStream
@@ -50,70 +53,70 @@ public interface LobCreator {
 
 	/**
 	 * Set the given content as bytes on the given statement, using the given
-	 * parameter index. Might simply invoke PreparedStatement.setBytes
+	 * parameter index. Might simply invoke <code>PreparedStatement.setBytes</code>
 	 * or create a Blob instance for it, depending on the database and driver.
 	 * @param ps the PreparedStatement to the set the content on
-	 * @param parameterIndex the parameter index to use
-	 * @param content the content as byte array
+	 * @param paramIndex the parameter index to use
+	 * @param content the content as byte array, or <code>null</code> for SQL NULL
 	 * @throws SQLException if thrown by JDBC methods
 	 * @see java.sql.PreparedStatement#setBytes
 	 */
-	void setBlobAsBytes(PreparedStatement ps, int parameterIndex, byte[] content)
+	void setBlobAsBytes(PreparedStatement ps, int paramIndex, byte[] content)
 	    throws SQLException;
 
 	/**
-	 * Set the given content as binary stream on the given statement, using the
-	 * given parameter index. Might simply invoke PreparedStatement.setBinaryStream
+	 * Set the given content as binary stream on the given statement, using the given
+	 * parameter index. Might simply invoke <code>PreparedStatement.setBinaryStream</code>
 	 * or create a Blob instance for it, depending on the database and driver.
 	 * @param ps the PreparedStatement to the set the content on
-	 * @param parameterIndex the parameter index to use
-	 * @param contentStream the content as InputStream
+	 * @param paramIndex the parameter index to use
+	 * @param contentStream the content as binary stream, or <code>null</code> for SQL NULL
 	 * @throws SQLException if thrown by JDBC methods
 	 * @see java.sql.PreparedStatement#setBinaryStream
 	 */
-	void setBlobAsBinaryStream(PreparedStatement ps, int parameterIndex, InputStream contentStream,
-	                           int contentLength)
+	void setBlobAsBinaryStream(
+			PreparedStatement ps, int paramIndex, InputStream contentStream, int contentLength)
 	    throws SQLException;
 
 	/**
 	 * Set the given content as String on the given statement, using the given
-	 * parameter index. Might simply invoke PreparedStatement.setString
+	 * parameter index. Might simply invoke <code>PreparedStatement.setString</code>
 	 * or create a Clob instance for it, depending on the database and driver.
 	 * @param ps the PreparedStatement to the set the content on
-	 * @param parameterIndex the parameter index to use
-	 * @param content the content as byte array
+	 * @param paramIndex the parameter index to use
+	 * @param content the content as String, or <code>null</code> for SQL NULL
 	 * @throws SQLException if thrown by JDBC methods
 	 * @see java.sql.PreparedStatement#setBytes
 	 */
-	void setClobAsString(PreparedStatement ps, int parameterIndex, String content)
+	void setClobAsString(PreparedStatement ps, int paramIndex, String content)
 	    throws SQLException;
 
 	/**
-	 * Set the given content as ASCII stream on the given statement, using the
-	 * given parameter index. Might simply invoke PreparedStatement.setAsciiStream
+	 * Set the given content as ASCII stream on the given statement, using the given
+	 * parameter index. Might simply invoke <code>PreparedStatement.setAsciiStream</code>
 	 * or create a Clob instance for it, depending on the database and driver.
 	 * @param ps the PreparedStatement to the set the content on
-	 * @param parameterIndex the parameter index to use
-	 * @param asciiStream the content as InputStream
+	 * @param paramIndex the parameter index to use
+	 * @param asciiStream the content as ASCII stream, or <code>null</code> for SQL NULL
 	 * @throws SQLException if thrown by JDBC methods
-	 * @see java.sql.PreparedStatement#setBinaryStream
+	 * @see java.sql.PreparedStatement#setAsciiStream
 	 */
-	void setClobAsAsciiStream(PreparedStatement ps, int parameterIndex, InputStream asciiStream,
-	                          int contentLength)
+	void setClobAsAsciiStream(
+			PreparedStatement ps, int paramIndex, InputStream asciiStream, int contentLength)
 	    throws SQLException;
 
 	/**
-	 * Set the given content as character stream on the given statement, using the
-	 * given parameter index. Might simply invoke PreparedStatement.setCharacterStream
+	 * Set the given content as character stream on the given statement, using the given
+	 * parameter index. Might simply invoke <code>PreparedStatement.setCharacterStream</code>
 	 * or create a Clob instance for it, depending on the database and driver.
 	 * @param ps the PreparedStatement to the set the content on
-	 * @param parameterIndex the parameter index to use
-	 * @param characterStream the content as InputStream
+	 * @param paramIndex the parameter index to use
+	 * @param characterStream the content as character stream, or <code>null</code> for SQL NULL
 	 * @throws SQLException if thrown by JDBC methods
-	 * @see java.sql.PreparedStatement#setBinaryStream
+	 * @see java.sql.PreparedStatement#setCharacterStream
 	 */
-	void setClobAsCharacterStream(PreparedStatement ps, int parameterIndex, Reader characterStream,
-	                              int contentLength)
+	void setClobAsCharacterStream(
+			PreparedStatement ps, int paramIndex, Reader characterStream, int contentLength)
 	    throws SQLException;
 
 	/**
@@ -121,7 +124,7 @@ public interface LobCreator {
 	 * Will not need to do anything if using PreparedStatement's standard methods,
 	 * but might be necessary to free database resources if using proprietary means.
 	 * <p><b>NOTE</b>: Needs to be invoked after the involved PreparedStatements have
-	 * been executed respectively the affected O/R mapping sessions have been flushed.
+	 * been executed or the affected O/R mapping sessions have been flushed.
 	 * Else, the database resources for the temporary BLOBs might stay allocated.
 	 */
 	void close();

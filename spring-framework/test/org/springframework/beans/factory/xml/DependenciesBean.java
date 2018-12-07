@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,71 +12,61 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory.xml;
 
 import org.springframework.beans.TestBean;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.BeanFactoryAware;
 
 /**
- * Simple bean used to check dependency checking
+ * Simple bean used to test dependency checking.
+ *
  * @author Rod Johnson
- * @since 04-Sep-2003
- * @version $Id: DependenciesBean.java,v 1.2 2004/03/18 03:01:16 trisberg Exp $
+ * @since 04.09.2003
  */
-public class DependenciesBean {
+public class DependenciesBean implements BeanFactoryAware {
 	
 	private int age;
 	
 	private String name;
 	
 	private TestBean spouse;
-	
-	//private Dependencies recursive;
 
-	/**
-	 * @return int
-	 */
-	public int getAge() {
-		return age;
-	}
+	private BeanFactory beanFactory;
 
-	/**
-	 * @return String
-	 */
-	public String getName() {
-		return name;
-	}
 
-	/**
-	 * @return TestBean
-	 */
-	public TestBean getSpouse() {
-		return spouse;
-	}
-
-	/**
-	 * Sets the age.
-	 * @param age The age to set
-	 */
 	public void setAge(int age) {
 		this.age = age;
 	}
 
-	/**
-	 * Sets the name.
-	 * @param name The name to set
-	 */
+	public int getAge() {
+		return age;
+	}
+
 	public void setName(String name) {
 		this.name = name;
 	}
 
-	/**
-	 * Sets the spouse.
-	 * @param spouse The spouse to set
-	 */
+	public String getName() {
+		return name;
+	}
+
 	public void setSpouse(TestBean spouse) {
 		this.spouse = spouse;
+	}
+
+	public TestBean getSpouse() {
+		return spouse;
+	}
+
+	public void setBeanFactory(BeanFactory beanFactory) {
+		this.beanFactory = beanFactory;
+	}
+
+	public BeanFactory getBeanFactory() {
+		return beanFactory;
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,22 +12,28 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.support;
 
+import java.io.Serializable;
 import java.lang.reflect.Method;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
- * Pointcut bean for simple method name matches,
- * as alternative to regexp patterns.
+ * Pointcut bean for simple method name matches, as alternative to regexp patterns.
+ * Does not handle overloaded methods: all methods *with a given name will be eligible.
+ *
  * @author Juergen Hoeller
+ * @author Rod Johnson
  * @since 11.02.2004
  * @see #isMatch
  */
-public class NameMatchMethodPointcut extends StaticMethodMatcherPointcut {
+public class NameMatchMethodPointcut extends StaticMethodMatcherPointcut implements Serializable {
 
-	private String[] mappedNames = new String[0];
+	private List mappedNames = new LinkedList();
+
 
 	/**
 	 * Convenience method when we have only a single method name
@@ -35,7 +41,7 @@ public class NameMatchMethodPointcut extends StaticMethodMatcherPointcut {
 	 * @see #setMappedNames
 	 */
 	public void setMappedName(String mappedName) {
-		this.mappedNames = new String[] {mappedName};
+		setMappedNames(new String[] { mappedName });
 	}
 
 	/**
@@ -44,13 +50,35 @@ public class NameMatchMethodPointcut extends StaticMethodMatcherPointcut {
 	 * the pointcut matches.
 	 */
 	public void setMappedNames(String[] mappedNames) {
-		this.mappedNames = mappedNames;
+		this.mappedNames = new LinkedList();
+		if (mappedNames != null) {
+			for (int i = 0; i < mappedNames.length; i++) {
+				this.mappedNames.add(mappedNames[i]);
+			}
+		}
 	}
 
-	public boolean matches(Method m, Class targetClass) {
-		for (int i = 0; i<this.mappedNames.length; i++) {
-			String mappedName = this.mappedNames[i];
-			if (mappedName.equals(m.getName()) || isMatch(m.getName(), mappedName)) {
+	/**
+	 * Add another eligible method name, in addition to those already named.
+	 * Like the set methods, this method is for use when configuring proxies,
+	 * before a proxy is used.
+	 * <p><b>NB:</b> This method does not work after the proxy is in
+	 * use, as advice chains will be cached.
+	 * @param name name of the additional method that will match
+	 * @return this pointcut to allow for multiple additions in one line
+	 */
+	public NameMatchMethodPointcut addMethodName(String name) {
+		// TODO in a future release, consider a way of letting proxies
+		// cause advice changed events.
+		this.mappedNames.add(name);
+		return this;
+	}
+
+
+	public boolean matches(Method method, Class targetClass) {
+		for (int i = 0; i < this.mappedNames.size(); i++) {
+			String mappedName = (String) this.mappedNames.get(i);
+			if (mappedName.equals(method.getName()) || isMatch(method.getName(), mappedName)) {
 				return true;
 			}
 		}

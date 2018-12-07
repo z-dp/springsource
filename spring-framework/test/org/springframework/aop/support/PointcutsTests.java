@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.support;
 
@@ -27,7 +27,6 @@ import junit.framework.TestCase;
 /**
  * 
  * @author Rod Johnson
- * @version $Id: PointcutsTests.java,v 1.5 2004/03/18 03:01:17 trisberg Exp $
  */
 public class PointcutsTests extends TestCase {
 	
@@ -39,9 +38,9 @@ public class PointcutsTests extends TestCase {
 	static {
 		try {
 			TEST_BEAN_SET_AGE = TestBean.class.getMethod("setAge", new Class[] { int.class });
-			TEST_BEAN_GET_AGE = TestBean.class.getMethod("getAge", null);
-			TEST_BEAN_GET_NAME = TestBean.class.getMethod("getName", null);
-			TEST_BEAN_ABSQUATULATE = TestBean.class.getMethod("absquatulate", null);
+			TEST_BEAN_GET_AGE = TestBean.class.getMethod("getAge", (Class[]) null);
+			TEST_BEAN_GET_NAME = TestBean.class.getMethod("getName", (Class[]) null);
+			TEST_BEAN_ABSQUATULATE = TestBean.class.getMethod("absquatulate", (Class[]) null);
 		}
 		catch (Exception ex) {
 			throw new RuntimeException("Shouldn't happen: error in test suite");
@@ -65,11 +64,7 @@ public class PointcutsTests extends TestCase {
 		}
 	};
 		
-	public static Pointcut allClassSetterPointcut = new StaticMethodMatcherPointcut() {
-		public boolean matches(Method m, Class targetClass) {
-			return m.getName().startsWith("set");
-		}
-	};
+	public static Pointcut allClassSetterPointcut = Pointcuts.SETTERS;
 	
 	// Subclass used for matching
 	public static class MyTestBean extends TestBean {
@@ -110,23 +105,11 @@ public class PointcutsTests extends TestCase {
 		}
 	};
 	
-	public static Pointcut allClassGetterPointcut = new StaticMethodMatcherPointcut() {
-		public boolean matches(Method m, Class targetClass) {
-			return m.getName().startsWith("get");
-		}
-	};
+	public static Pointcut allClassGetterPointcut = Pointcuts.GETTERS;
 	
-	public static Pointcut allClassGetAgePointcut = new StaticMethodMatcherPointcut() {
-		public boolean matches(Method m, Class targetClass) {
-			return m.getName().equals("getAge");
-		}
-	};
+	public static Pointcut allClassGetAgePointcut = new NameMatchMethodPointcut().addMethodName("getAge");
 	
-	public static Pointcut allClassGetNamePointcut = new StaticMethodMatcherPointcut() {
-		public boolean matches(Method m, Class targetClass) {
-			return m.getName().equals("getName");
-		}
-	};
+	public static Pointcut allClassGetNamePointcut = new NameMatchMethodPointcut().addMethodName("getName");
 	
 	
 	public PointcutsTests(String s) {

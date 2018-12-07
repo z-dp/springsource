@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,30 +12,31 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.target;
 
 /**
  * Statistics for a ThreadLocal TargetSource.
+ *
  * @author Rod Johnson
- * @version $Id: ThreadLocalTargetSourceStats.java,v 1.2 2004/03/18 02:46:13 trisberg Exp $
+ * @author Juergen Hoeller
  */
 public interface ThreadLocalTargetSourceStats {
 	
 	/**
-	 * @return all clients given one of us
+	 * Return the number of client invocations.
 	 */
-	int getInvocations();
+	int getInvocationCount();
 
 	/**
-	 * @return hits that were satisfied by a thread bound object
+	 * Return the number of hits that were satisfied by a thread-bound object.
 	 */
-	int getHits();
+	int getHitCount();
 
 	/**
-	 * @return thread bound objects created
+	 * Return the number of thread-bound objects created.
 	 */
-	int getObjects();
+	int getObjectCount();
 
 }

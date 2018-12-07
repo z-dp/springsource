@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,17 +12,18 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.jdo;
 
 import javax.jdo.PersistenceManager;
 
 import org.springframework.transaction.support.ResourceHolderSupport;
+import org.springframework.util.Assert;
 
 /**
  * Holder wrapping a JDO PersistenceManager.
- *JdoTransactionManager binds instances of this class
+ * JdoTransactionManager binds instances of this class
  * to the thread, for a given PersistenceManagerFactory.
  *
  * <p>Note: This is an SPI class, not intended to be used by applications.
@@ -34,14 +35,21 @@ import org.springframework.transaction.support.ResourceHolderSupport;
  */
 public class PersistenceManagerHolder extends ResourceHolderSupport {
 
-	private PersistenceManager persistenceManager;
+	private final PersistenceManager persistenceManager;
 
-	private boolean rollbackOnly;
 
+	/**
+	 * Create a new PersistenceManagerHolder for the given JDO PersistenceManager.
+	 * @param persistenceManager the JDO PersistenceManager
+	 */
 	public PersistenceManagerHolder(PersistenceManager persistenceManager) {
+		Assert.notNull(persistenceManager, "PersistenceManager must not be null");
 		this.persistenceManager = persistenceManager;
 	}
 
+	/**
+	 * Return this holder's JDO PersistenceManager.
+	 */
 	public PersistenceManager getPersistenceManager() {
 		return persistenceManager;
 	}

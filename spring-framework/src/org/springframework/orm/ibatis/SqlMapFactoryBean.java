@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.ibatis;
 
@@ -47,6 +47,7 @@ public class SqlMapFactoryBean implements FactoryBean, InitializingBean {
 
 	private SqlMap sqlMap;
 
+
 	/**
 	 * Set the location of the iBATIS SqlMap config file.
 	 * A typical value is "WEB-INF/sql-map-config.xml".
@@ -63,15 +64,19 @@ public class SqlMapFactoryBean implements FactoryBean, InitializingBean {
 		this.sqlMapProperties = sqlMapProperties;
 	}
 
+
 	public void afterPropertiesSet() throws IOException {
 		if (this.configLocation == null) {
-			throw new IllegalArgumentException("configLocation must be set");
+			throw new IllegalArgumentException("configLocation is required");
 		}
+
+		// build the SqlMap
 		InputStream is = this.configLocation.getInputStream();
 		this.sqlMap = (this.sqlMapProperties != null) ?
 				XmlSqlMapBuilder.buildSqlMap(new InputStreamReader(is), this.sqlMapProperties) :
 				XmlSqlMapBuilder.buildSqlMap(new InputStreamReader(is));
 	}
+
 
 	public Object getObject() {
 		return this.sqlMap;

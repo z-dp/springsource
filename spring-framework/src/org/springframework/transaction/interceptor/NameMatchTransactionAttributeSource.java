@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,10 +12,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.transaction.interceptor;
 
+import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -28,23 +29,47 @@ import org.apache.commons.logging.LogFactory;
 /**
  * Simple implementation of TransactionAttributeSource that
  * allows attributes to be matched by registered name.
+ *
  * @author Juergen Hoeller
  * @since 21.08.2003
  * @see #isMatch
+ * @see MethodMapTransactionAttributeSource
  */
-public class NameMatchTransactionAttributeSource implements TransactionAttributeSource {
+public class NameMatchTransactionAttributeSource implements TransactionAttributeSource, Serializable {
 
-	protected final Log logger = LogFactory.getLog(getClass());
+	/** Static for optimal serialization */
+	protected static final Log logger = LogFactory.getLog(NameMatchTransactionAttributeSource.class);
 
+	/** Keys are method names; values are TransactionAttributes */
 	private Map nameMap = new HashMap();
+
 
 	/**
 	 * Set a name/attribute map, consisting of method names
-	 * (e.g. "myMethod") and TransactionAttribute instances.
+	 * (e.g. "myMethod") and TransactionAttribute instances
+	 * (or Strings to be converted to TransactionAttribute instances).
 	 * @see TransactionAttribute
+	 * @see TransactionAttributeEditor
 	 */
 	public void setNameMap(Map nameMap) {
-		this.nameMap = nameMap;
+		Iterator it = nameMap.entrySet().iterator();
+		while (it.hasNext()) {
+			Map.Entry entry = (Map.Entry) it.next();
+			String name = (String) entry.getKey();
+
+			// Check whether we need to convert from String to TransactionAttribute.
+			TransactionAttribute attr = null;
+			if (entry.getValue() instanceof TransactionAttribute) {
+				attr = (TransactionAttribute) entry.getValue();
+			}
+			else {
+				TransactionAttributeEditor editor = new TransactionAttributeEditor();
+				editor.setAsText(entry.getValue().toString());
+				attr = (TransactionAttribute) editor.getValue();
+			}
+
+			addTransactionalMethod(name, attr);
+		}
 	}
 
 	/**
@@ -72,18 +97,20 @@ public class NameMatchTransactionAttributeSource implements TransactionAttribute
 	 * @param attr attribute associated with the method
 	 */
 	public void addTransactionalMethod(String methodName, TransactionAttribute attr) {
-		logger.debug("Adding transactional method [" + methodName + "] with attribute [" + attr + "]");
+		if (logger.isDebugEnabled()) {
+			logger.debug("Adding transactional method [" + methodName + "] with attribute [" + attr + "]");
+		}
 		this.nameMap.put(methodName, attr);
 	}
 
+
 	public TransactionAttribute getTransactionAttribute(Method method, Class targetClass) {
+		// look for direct name match
 		String methodName = method.getName();
 		TransactionAttribute attr = (TransactionAttribute) this.nameMap.get(methodName);
-		if (attr != null) {
-			return attr;
-		}
-		else {
-			// look up most specific name match
+
+		if (attr == null) {
+			// look for most specific name match
 			String bestNameMatch = null;
 			for (Iterator it = this.nameMap.keySet().iterator(); it.hasNext();) {
 				String mappedName = (String) it.next();
@@ -93,8 +120,9 @@ public class NameMatchTransactionAttributeSource implements TransactionAttribute
 					bestNameMatch = mappedName;
 				}
 			}
-			return attr;
 		}
+
+		return attr;
 	}
 
 	/**

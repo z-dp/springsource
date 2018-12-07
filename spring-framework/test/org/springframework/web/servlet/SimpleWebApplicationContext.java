@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet;
 
@@ -52,14 +52,16 @@ public class SimpleWebApplicationContext extends StaticWebApplicationContext {
 		pvs.addPropertyValue(new PropertyValue("formView", "form"));
 		registerSingleton("/form.do", SimpleFormController.class, pvs);
 
-		registerSingleton("/locale.do", LocaleChecker.class, null);
+		registerSingleton("/locale.do", LocaleChecker.class);
 
-		registerPrototype("/throwaway.do", TestThrowawayController.class, null);
+		registerPrototype("/throwaway.do", TestThrowawayController.class);
 
 		addMessage("test", Locale.ENGLISH, "test message");
 		addMessage("test", Locale.CANADA, "Canadian & test message");
+		addMessage("testArgs", Locale.ENGLISH, "test {0} message {1}");
+		addMessage("testArgsFormat", Locale.ENGLISH, "test {0} message {1,number,#.##} X");
 
-		registerSingleton(UiApplicationContextUtils.THEME_SOURCE_BEAN_NAME, DummyThemeSource.class, null);
+		registerSingleton(UiApplicationContextUtils.THEME_SOURCE_BEAN_NAME, DummyThemeSource.class);
 
 		super.refresh();
 	}
@@ -67,7 +69,8 @@ public class SimpleWebApplicationContext extends StaticWebApplicationContext {
 
 	public static class LocaleChecker implements Controller, LastModified {
 
-		public ModelAndView handleRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		public ModelAndView handleRequest(HttpServletRequest request, HttpServletResponse response)
+				throws ServletException, IOException {
 			if (!(RequestContextUtils.getWebApplicationContext(request) instanceof SimpleWebApplicationContext)) {
 				throw new ServletException("Incorrect WebApplicationContext");
 			}
@@ -91,13 +94,14 @@ public class SimpleWebApplicationContext extends StaticWebApplicationContext {
 		private StaticMessageSource messageSource;
 
 		public DummyThemeSource() {
-			messageSource = new StaticMessageSource();
-			messageSource.addMessage("themetest", Locale.ENGLISH, "theme test message");
+			this.messageSource = new StaticMessageSource();
+			this.messageSource.addMessage("themetest", Locale.ENGLISH, "theme test message");
+			this.messageSource.addMessage("themetestArgs", Locale.ENGLISH, "theme test message {0}");
 		}
 
 		public Theme getTheme(String themeName) {
 			if (AbstractThemeResolver.ORIGINAL_DEFAULT_THEME_NAME.equals(themeName)) {
-				return new SimpleTheme(AbstractThemeResolver.ORIGINAL_DEFAULT_THEME_NAME, messageSource);
+				return new SimpleTheme(AbstractThemeResolver.ORIGINAL_DEFAULT_THEME_NAME, this.messageSource);
 			}
 			else {
 				return null;
@@ -124,6 +128,5 @@ public class SimpleWebApplicationContext extends StaticWebApplicationContext {
 			return new ModelAndView("view" + this.myInt);
 		}
 	}
-
 
 }

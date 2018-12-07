@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.context.support;
 
@@ -27,8 +27,7 @@ import org.springframework.web.context.ServletContextAware;
 
 /**
  * BeanPostProcessor implementation that passes the ServletContext to
- * beans that implement the ApplicationContextAware or ResourceLoaderAware
- * interfaces. If both are implemented, the latter is satisfied first.
+ * beans that implement the ServletContextAware interface.
  *
  * <p>Web application contexts will automatically register this with their
  * underlying bean factory. Applications do not use this directly.
@@ -51,17 +50,21 @@ public class ServletContextAwareProcessor implements BeanPostProcessor {
 		this.servletContext = servletContext;
 	}
 
-	public Object postProcessBeforeInitialization(Object bean, String name) throws BeansException {
+	public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
 		if (bean instanceof ServletContextAware) {
+			if (this.servletContext == null) {
+				throw new IllegalStateException("Cannot satisfy ServletContextAware for bean '" +
+						beanName + "' without ServletContext");
+			}
 			if (logger.isDebugEnabled()) {
-				logger.debug("Invoking setServletContext on ServletContextAware bean '" + name + "'");
+				logger.debug("Invoking setServletContext on ServletContextAware bean '" + beanName + "'");
 			}
 			((ServletContextAware) bean).setServletContext(this.servletContext);
 		}
 		return bean;
 	}
 
-	public Object postProcessAfterInitialization(Object bean, String name) {
+	public Object postProcessAfterInitialization(Object bean, String beanName) {
 		return bean;
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,17 +12,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.view.document;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.Locale;
 import java.util.Map;
 
-import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -33,91 +29,92 @@ import org.apache.poi.hssf.usermodel.HSSFSheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.poifs.filesystem.POIFSFileSystem;
 
-import org.springframework.context.ApplicationContextException;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.LocalizedResourceHelper;
 import org.springframework.web.servlet.support.RequestContextUtils;
 import org.springframework.web.servlet.view.AbstractView;
 
 /**
- * Convenient superclass for Excel-document views.
- * Properties:
+ * Convenient superclass for Excel document views.
+ *
+ * <p>Properties:
+ * <ul>
  * <li>url (optional): The url of an existing Excel document to pick as a starting point.
- * It is done without localization part nor the .xls extension.
- * <br>The file will be searched with names in the following order:
- * <li>[url]_[language][country].xls
+ * It is done without localization part nor the ".xls" extension.
+ * </ul>
+ *
+ * <p>The file will be searched with locations in the following order:
+ * <ul>
+ * <li>[url]_[language]_[country].xls
  * <li>[url]_[language].xls
  * <li>[url].xls
- * <br>For work with th workBook in the subclass, see <a href="http://jakarta.apache.org/poi/index.html">Jakarta's POI site</a>
- * <br>As an example, you can try this snippet:<br>
- * <code>
- * <br>protected void buildExcelDocument(
- * <br>    Map model,
- * <br>    HSSFWorkbook wb,
- * <br>    HttpServletRequest request,
- * <br>    HttpServletResponse response )
- * <br>{
- * <br>    // AModel aModel = ( AModel ) model.get( "amodel" );
- * <br>
- * <br>    HSSFSheet sheet;
- * <br>    HSSFRow   sheetRow;
- * <br>    HSSFCell  cell;
- * <br>
- * <br>    // Go to the first sheet
- * <br>    // getSheetAt: only if wb is created from an existing document
- * <br>	   //sheet = wb.getSheetAt( 0 );
- * <br>	   sheet = wb.createSheet("Spring");
- * <br>	   sheet.setDefaultColumnWidth((short)12);
- * <br>
- * <br>    // write a text at A1
- * <br>    cell = getCell( sheet, 0, 0 );
- * <br>    setText(cell,"Spring POI test");
- * <br>
- * <br>    // Write the current date at A2
- * <br>    HSSFCellStyle dateStyle = wb.createCellStyle(  );
- * <br>    dateStyle.setDataFormat( HSSFDataFormat.getBuiltinFormat( "m/d/yy" ) );
- * <br>    cell = getCell( sheet, 1, 0 );
- * <br>    cell.setCellValue( new Date() );
- * <br>    cell.setCellStyle( dateStyle );
- * <br>
- * <br>    // Write a number at A3
- * <br>    getCell( sheet, 2, 0 ).setCellValue( 458 );
- * <br>
- * <br>    // Write a range of numbers
- * <br>    sheetRow = sheet.createRow( 3 );
- * <br>    for (short i = 0; i<10; i++) {
- * <br>        sheetRow.createCell(i).setCellValue( i*10 );
- * <br>    }
- * <br>}
- * <br>
- * </code>
- * <br>Don't forget to add on web.xml:
- * <code>
- * <br>&lt;servlet-mapping&gt;
- * <br>    &lt;servlet-name&gt;[your Spring servlet]&lt;/servlet-name&gt;
- * <br>    &lt;url-pattern&gt;*.xls&lt;/url-pattern&gt;
- * <br>&lt;/servlet-mapping&gt;
- * </code>
- * <br>The use of this view is close to the AbstractPdfView
+ * </ul>
+ *
+ * <p>For working with the workbook in the subclass, see
+ * <a href="http://jakarta.apache.org/poi/index.html">Jakarta's POI site</a>
+ *
+ * <p>As an example, you can try this snippet:
+ *
+ * <pre>
+ * protected void buildExcelDocument(
+ *     Map model, HSSFWorkbook workbook,
+ *     HttpServletRequest request, HttpServletResponse response) {
+ *
+ *   // Go to the first sheet.
+ *   // getSheetAt: only if workbook is created from an existing document
+ * 	 // HSSFSheet sheet = workbook.getSheetAt(0);
+ * 	 HSSFSheet sheet = workbook.createSheet("Spring");
+ * 	 sheet.setDefaultColumnWidth(12);
+ *
+ *   // Write a text at A1.
+ *   HSSFCell cell = getCell(sheet, 0, 0);
+ *   setText(cell, "Spring POI test");
+ *
+ *   // Write the current date at A2.
+ *   HSSFCellStyle dateStyle = workbook.createCellStyle();
+ *   dateStyle.setDataFormat(HSSFDataFormat.getBuiltinFormat("m/d/yy"));
+ *   cell = getCell(sheet, 1, 0);
+ *   cell.setCellValue(new Date());
+ *   cell.setCellStyle(dateStyle);
+ *
+ *   // Write a number at A3
+ *   getCell(sheet, 2, 0).setCellValue(458);
+ *
+ *   // Write a range of numbers.
+ *   HSSFRow sheetRow = sheet.createRow(3);
+ *   for (short i = 0; i < 10; i++) {
+ *     sheetRow.createCell(i).setCellValue(i * 10);
+ *   }
+ * }</pre>
+ *
+ * This class is similar to the AbstractPdfView class in usage style.
+ *
+ * @author Jean-Pierre Pawlak
+ * @author Juergen Hoeller
  * @see AbstractPdfView
- * @author <a href="mailto:jp.pawlak@tiscali.fr">Jean-Pierre Pawlak</a>
  */
 public abstract class AbstractExcelView extends AbstractView {
 
-	private static final String EXTENSION = ".xls";
+	/** The content type for an Excel response */
+	private static final String CONTENT_TYPE = "application/vnd.ms-excel";
 
-	private static final String SEPARATOR = "_";
+	/** The extension to look for existing templates */
+	private static final String EXTENSION = ".xls";
 
 
 	private String url;
 
-	private HSSFWorkbook wb;
 
-
+	/**
+	 * Default Constructor.
+	 * Sets the content type of the view to "application/vnd.ms-excel".
+	 */
 	public AbstractExcelView() {
-		setContentType("application/vnd.ms-excel");
+		setContentType(CONTENT_TYPE);
 	}
 
 	/**
-	 * Sets the url of the Excel workbook source without localization part nor extension.
+	 * Set the URL of the Excel workbook source, without localization part nor extension.
 	 */
 	public void setUrl(String url) {
 		this.url = url;
@@ -125,119 +122,79 @@ public abstract class AbstractExcelView extends AbstractView {
 
 
 	/**
-	 * Renders the view given the specified model.
+	 * Renders the Excel view, given the specified model.
 	 */
-	protected final void renderMergedOutputModel(Map model, HttpServletRequest request,
-	                                             HttpServletResponse response) throws Exception {
+	protected final void renderMergedOutputModel(
+			Map model, HttpServletRequest request, HttpServletResponse response) throws Exception {
+
+		HSSFWorkbook workbook;
 		if (this.url != null) {
-			this.wb = getTemplateSource(this.url, request);
+			workbook = getTemplateSource(this.url, request);
 		}
 		else {
-			this.wb = new HSSFWorkbook();
-			logger.info("Excel WorkBook created from scratch");
+			workbook = new HSSFWorkbook();
+			logger.debug("Created Excel Workbook from scratch");
 		}
 
-		buildExcelDocument(model, this.wb, request, response);
+		buildExcelDocument(model, workbook, request, response);
 
-		// response.setContentLength(wb.getBytes().length);
+		// response.setContentLength(workbook.getBytes().length);
 		response.setContentType(getContentType());
 		ServletOutputStream out = response.getOutputStream();
-		this.wb.write(out);
+		workbook.write(out);
 		out.flush();
 	}
 
 	/**
-	 * Creates the workBook from an existing .xls document.
-	 * @param url url of the Excle template without localization part nor extension
-	 * @param request
-	 * @return HSSFWorkbook
+	 * Creates the workbook from an existing XLS document.
+	 * @param url the URL of the Excel template without localization part nor extension
+	 * @param request current HTTP request
+	 * @return the HSSFWorkbook
+	 * @throws Exception in case of failure
 	 */
-	protected HSSFWorkbook getTemplateSource(String url, HttpServletRequest request) 
-		throws ServletException {
-
-		String source = null;
-		String realPath = null;
-		FileInputStream inputFile = null;
+	protected HSSFWorkbook getTemplateSource(String url, HttpServletRequest request) throws Exception {
+		LocalizedResourceHelper helper = new LocalizedResourceHelper(getApplicationContext());
 		Locale userLocale = RequestContextUtils.getLocale(request);
-		String lang = userLocale.getLanguage();
-		String country = userLocale.getCountry();
+		Resource inputFile = helper.findLocalizedResource(url, EXTENSION, userLocale);
 
-		// Check for document with language and country localisation
-		if (country.length() > 1) {
-			source = url + SEPARATOR + lang + country + EXTENSION;
-			realPath = getServletContext().getRealPath(source);
-			try {
-				inputFile = new FileInputStream(realPath);
-			}
-			catch (FileNotFoundException e) {
-				// Nothing: at this stage, it is acceptable
-			}
+		// Create the Excel document from the source.
+		if (logger.isDebugEnabled()) {
+			logger.debug("Loading Excel workbook from " + inputFile);
 		}
-		// Check for document with language localisation
-		if (lang.length() > 1 && null == inputFile) {
-			source = url + SEPARATOR + lang + EXTENSION;
-			realPath = getServletContext().getRealPath(source);
-			try {
-				inputFile = new FileInputStream(realPath);
-			}
-			catch (FileNotFoundException e) {
-				// Nothing: at this stage, it is acceptable
-			}
-		}
-		// Check for document without localisation
-		if (null == inputFile) {
-			source = url + EXTENSION;
-			realPath = getServletContext().getRealPath(source);
-			try {
-				inputFile = new FileInputStream(realPath);
-			}
-			catch (FileNotFoundException e) {
-				throw new ApplicationContextException(
-					"Can't resolve real path for EXCEL template at '"
-					+ source
-					+ "'; probably results from container restriction: override ExcelView.getTemplateSource() to use an alternative approach to getRealPath()");
-			}
-		}
-		// Create the Excel document from source
-		try {
-			POIFSFileSystem fs = new POIFSFileSystem(inputFile);
-			HSSFWorkbook workBook = new HSSFWorkbook(fs);
-			logger.info("Loaded Excel workBook " + source);
-			return workBook;
-		}
-		catch (IOException e) {
-			throw new ApplicationContextException("IOException with '" + source + "': " + e.getMessage());
-		}
+		POIFSFileSystem fs = new POIFSFileSystem(inputFile.getInputStream());
+		HSSFWorkbook workBook = new HSSFWorkbook(fs);
+		return workBook;
 	}
 
 	/**
 	 * Subclasses must implement this method to create an Excel HSSFWorkbook document,
 	 * given the model.
-	 * @param model
-	 * @param wb The Excel workBook to complete
-	 * @param request in case we need locale etc. Shouldn't look at attributes
+	 * @param model the model Map
+	 * @param workbook the Excel workbook to complete
+	 * @param request in case we need locale etc. Shouldn't look at attributes.
 	 * @param response in case we need to set cookies. Shouldn't write to it.
 	 */
-	protected abstract void buildExcelDocument(Map model,	HSSFWorkbook wb, HttpServletRequest request,
-																						 HttpServletResponse response) throws Exception;
+	protected abstract void buildExcelDocument(
+			Map model, HSSFWorkbook workbook, HttpServletRequest request, HttpServletResponse response)
+			throws Exception;
+
 
 	/**
-	 * Convenient method to obtain the cell in the given sheet, row and column
-	 * <br>Creating by the way the row and the cell if they still doesn't exist
-	 * <br>Thus, the column can be passed as an int, the method making the needed
-	 * downcasts.
-	 * @param sheet A sheet Object. The first sheet is usually obtained by wb.getSheetAt(0)
-	 * @param row
-	 * @param col
-	 * @return HSSFCell
+	 * Convenient method to obtain the cell in the given sheet, row and column.
+	 * <p>Creates the row and the cell if they still doesn't already exist.
+	 * Thus, the column can be passed as an int, the method making the needed downcasts.
+	 * @param sheet a sheet object. The first sheet is usually obtained by workbook.getSheetAt(0)
+	 * @param row thr row number
+	 * @param col the column number
+	 * @return the HSSFCell
 	 */
 	protected HSSFCell getCell(HSSFSheet sheet, int row, int col) {
 		HSSFRow sheetRow = sheet.getRow(row);
-		if (null == sheetRow) {
+		if (sheetRow == null) {
 			sheetRow = sheet.createRow(row);
 		}
 		HSSFCell cell = sheetRow.getCell((short) col);
-		if (null == cell) {
+		if (cell == null) {
 			cell = sheetRow.createCell((short) col);
 		}
 		return cell;
@@ -245,8 +202,8 @@ public abstract class AbstractExcelView extends AbstractView {
 
 	/**
 	 * Convenient method to set a String as text content in a cell.
-	 * @param cell The cell in which the text must be put
-	 * @param text The text to put in the cell
+	 * @param cell the cell in which the text must be put
+	 * @param text the text to put in the cell
 	 */
 	protected void setText(HSSFCell cell, String text) {
 		cell.setCellType(HSSFCell.CELL_TYPE_STRING);

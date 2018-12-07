@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,26 +12,28 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework.adapter;
 
 import org.aopalliance.aop.Advice;
 import org.aopalliance.intercept.Interceptor;
+
 import org.springframework.aop.Advisor;
 import org.springframework.aop.AfterReturningAdvice;
 
 /**
  * Adapter to enable AfterReturningAdvisor and MethodAfterReturningAdvice
  * to be used in the Spring AOP framework.
- * <br>This involves wrapping these advice types in interceptors.
+ *
+ * <p>This involves wrapping these advice types in interceptors.
+ * 
  * @author Rod Johnson
- * @version $Id: AfterReturningAdviceAdapter.java,v 1.7 2004/03/19 18:43:17 johnsonr Exp $
  */
 class AfterReturningAdviceAdapter implements AdvisorAdapter {
 
 	/**
-	 * @see org.springframework.aop.framework.adapter.AdvisorAdapter#supportsAdvice(java.lang.Object)
+	 * @see org.springframework.aop.framework.adapter.AdvisorAdapter#supportsAdvice
 	 */
 	public boolean supportsAdvice(Advice advice) {
 		return advice instanceof AfterReturningAdvice;
@@ -39,7 +41,7 @@ class AfterReturningAdviceAdapter implements AdvisorAdapter {
 
 
 	/**
-	 * @see org.springframework.aop.framework.adapter.AdvisorAdapter#getInterceptor(org.springframework.aop.Advisor)
+	 * @see org.springframework.aop.framework.adapter.AdvisorAdapter#getInterceptor
 	 */
 	public Interceptor getInterceptor(Advisor advisor) {
 		AfterReturningAdvice advice = (AfterReturningAdvice) advisor.getAdvice();

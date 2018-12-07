@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory;
 
@@ -22,9 +22,9 @@ import java.util.Set;
 
 /**
  * Bean exposing a map. Used for bean factory tests.
+ *
  * @author Rod Johnson
- * @since 05-Jun-2003
- * @version $Id: HasMap.java,v 1.3 2004/03/18 03:01:20 trisberg Exp $
+ * @since 05.06.2003
  */
 public class HasMap {
 	
@@ -39,6 +39,9 @@ public class HasMap {
 	private Class[] classArray;
 	
 	private Integer[] intArray;
+
+	private HasMap() {
+	}
 
 	public Map getMap() {
 		return map;
@@ -72,31 +75,18 @@ public class HasMap {
 		this.objectArray = objectArray;
 	}
 
-	/**
-	 * @return Class[]
-	 */
 	public Class[] getClassArray() {
 		return classArray;
 	}
 
-	/**
-	 * Sets the classArray.
-	 * @param classArray The classArray to set
-	 */
 	public void setClassArray(Class[] classArray) {
 		this.classArray = classArray;
 	}
 
-	/**
-	 * @return
-	 */
 	public Integer[] getIntegerArray() {
 		return intArray;
 	}
 
-	/**
-	 * @param is
-	 */
 	public void setIntegerArray(Integer[] is) {
 		intArray = is;
 	}

@@ -7,7 +7,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.propertyeditors.CustomDateEditor;
-import org.springframework.context.ApplicationContextException;
 import org.springframework.samples.petclinic.Clinic;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.ServletRequestDataBinder;
@@ -20,7 +19,7 @@ import org.springframework.web.servlet.mvc.SimpleFormController;
  *
  * @author Ken Krebs
  */
-abstract public class AbstractClinicForm extends SimpleFormController {
+public abstract class AbstractClinicForm extends SimpleFormController {
 
 	private Clinic clinic;
 
@@ -29,12 +28,13 @@ abstract public class AbstractClinicForm extends SimpleFormController {
 	}
 
 	protected Clinic getClinic() {
-		return this.clinic;
+		return clinic;
 	}
 
-	public void afterPropertiesSet() throws Exception {
-		if (clinic == null)
-			throw new ApplicationContextException("Must set clinic bean property on " + getClass());
+	public void afterPropertiesSet() {
+		if (this.clinic == null) {
+			throw new IllegalArgumentException("'clinic' is required");
+		}
 	}
 
 	/**
@@ -43,18 +43,19 @@ abstract public class AbstractClinicForm extends SimpleFormController {
 	protected void initBinder(HttpServletRequest request, ServletRequestDataBinder binder) {
 		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 		dateFormat.setLenient(false);
-		binder.registerCustomEditor(Date.class, null, new CustomDateEditor(dateFormat, false));
+		binder.registerCustomEditor(Date.class, new CustomDateEditor(dateFormat, false));
 	}
 
 	/**
 	 * Method disallows duplicate form submission.
-	 * Typically used to prevent duplicate insertion of <code>Entity</code>s
+	 * Typically used to prevent duplicate insertion of entities
 	 * into the datastore. Shows a new form with an error message.
 	 */
 	protected ModelAndView disallowDuplicateFormSubmission(HttpServletRequest request, HttpServletResponse response)
 			throws Exception {
-		BindException errors = new BindException(formBackingObject(request), getCommandName());
-		errors.reject("duplicateFormSubmission", null, "Duplicate form submission");
+
+		BindException errors = getErrorsForNewForm(request);
+		errors.reject("duplicateFormSubmission", "Duplicate form submission");
 		return showForm(request, response, errors);
 	}
 

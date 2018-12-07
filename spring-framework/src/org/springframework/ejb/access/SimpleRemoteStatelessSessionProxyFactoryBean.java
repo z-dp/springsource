@@ -1,20 +1,22 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.ejb.access;
+
+import javax.naming.NamingException;
 
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.beans.factory.FactoryBean;
@@ -22,33 +24,35 @@ import org.springframework.beans.factory.FactoryBean;
 /**
  * <p>Convenient factory for remote SLSB proxies.
  * If you want control over interceptor chaining, use an AOP ProxyFactoryBean
- * with SimpleRemoteSlsbInvokerInterceptor rather than rely on this class.
+ * with SimpleRemoteSlsbInvokerInterceptor rather than rely on this class.</p>
  * 
- * <p>See {@link org.springframework.jndi.AbstractJndiLocator} for info on
- * how to specify the JNDI location of the target EJB.
+ * <p>See {@link org.springframework.jndi.JndiObjectLocator} for info on
+ * how to specify the JNDI location of the target EJB.</p>
  * 
  * <p>In a bean container, this class is normally best used as a singleton. However,
  * if that bean container pre-instantiates singletons (as do the XML ApplicationContext
  * variants) you may have a problem if the bean container is loaded before the EJB
- * container loads the target EJB. That is because the JNDI lookup will be performed in
- * the init method of this class and cached, but the EJB will not have been bound at the
- * target location yet. The solution is to not pre-instantiate this factory object, but
- * allow it to be created on first use. In the XML containers, this is controlled via
- * the "lazy-init" attribute.
+ * container loads the target EJB. That is because by default the JNDI lookup will be
+ * performed in the init method of this class and cached, but the EJB will not have been
+ * bound at the target location yet. The best solution is to set the lookupHomeOnStartup
+ * property to false, in which case the home will be fetched on first access to the EJB.
+ * (This flag is only true by default for backwards compatibility reasons).</p>
  * 
  * <p>This proxy factory is typically used with an RMI business interface, which serves
  * as super-interface of the EJB component interface. Alternatively, this factory
  * can also proxy a remote SLSB with a matching non-RMI business interface, i.e. an
  * interface that mirrors the EJB business methods but does not declare RemoteExceptions.
  * In the latter case, RemoteExceptions thrown by the EJB stub will automatically get
- * converted to Spring's unchecked RemoteAccessException.
+ * converted to Spring's unchecked RemoteAccessException.</p>
  *
  * @author Rod Johnson
  * @author Colin Sampaleanu
  * @author Juergen Hoeller
- * @since 09-May-2003
- * @version $Id: SimpleRemoteStatelessSessionProxyFactoryBean.java,v 1.9 2004/03/18 02:46:14 trisberg Exp $
+ * @since 09.05.2003
  * @see org.springframework.remoting.RemoteAccessException
+ * @see AbstractSlsbInvokerInterceptor#setLookupHomeOnStartup
+ * @see AbstractSlsbInvokerInterceptor#setCacheHome
+ * @see AbstractRemoteSlsbInvokerInterceptor#setRefreshHomeOnConnectFailure
  */
 public class SimpleRemoteStatelessSessionProxyFactoryBean extends SimpleRemoteSlsbInvokerInterceptor
     implements FactoryBean {
@@ -65,6 +69,7 @@ public class SimpleRemoteStatelessSessionProxyFactoryBean extends SimpleRemoteSl
 
 	/** EJBObject */
 	private Object proxy;
+
 
 	/**
 	 * Set the business interface of the EJB we're proxying.
@@ -87,12 +92,14 @@ public class SimpleRemoteStatelessSessionProxyFactoryBean extends SimpleRemoteSl
 		return businessInterface;
 	}
 
-	public void afterLocated() {
+	public void afterPropertiesSet() throws NamingException {
+		super.afterPropertiesSet();
 		if (this.businessInterface == null) {
 			throw new IllegalArgumentException("businessInterface is required");
 		}
 		this.proxy = ProxyFactory.getProxy(this.businessInterface, this);
 	}
+
 
 	public Object getObject() {
 		return this.proxy;

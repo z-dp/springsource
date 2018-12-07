@@ -1,6 +1,6 @@
 
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.interceptor;
 
@@ -22,12 +22,10 @@ import org.aopalliance.intercept.MethodInvocation;
 
 /**
  * Trivial interceptor that can be introduced in a chain to display it.
- * 
- * (c) Rod Johnson, 2003
+ *
  * @author Rod Johnson
  */
 public class NopInterceptor implements MethodInterceptor {
-	
 	
 	private int count;
 
@@ -35,24 +33,26 @@ public class NopInterceptor implements MethodInterceptor {
 	 * @see org.aopalliance.intercept.MethodInterceptor#invoke(MethodInvocation)
 	 */
 	public Object invoke(MethodInvocation invocation) throws Throwable {
-		++count;
-		//System.out.println("Debug interceptor: count=" + count +
-		//	" invocation=[" + invocation + "]");
-		Object rval = invocation.proceed();
-		//System.out.println("Debug interceptor: next returned");
-		return rval;
+		increment();
+		return invocation.proceed();
 	}
 	
 	public int getCount() {
 		return this.count;
 	}
 	
+	protected void increment() {
+		++count;
+	}
+
 	public boolean equals(Object other) {
-		if (!(other instanceof NopInterceptor))
+		if (!(other instanceof NopInterceptor)) {
 			return false;
-		if (this == other)
+		}
+		if (this == other) {
 			return true;
-		return count == ((NopInterceptor) other).count;
+		}
+		return this.count == ((NopInterceptor) other).count;
 	}
 
 }

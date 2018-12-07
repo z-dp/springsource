@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.support.incrementer;
 
@@ -29,6 +29,7 @@ import org.springframework.jdbc.support.JdbcUtils;
 /**
  * Abstract base class for incrementers that use a database sequence.
  * Subclasses need to provide the database-specific SQL to use.
+ *
  * @author Juergen Hoeller
  * @since 26.02.2004
  * @see #getSequenceQuery
@@ -56,7 +57,7 @@ public abstract class AbstractSequenceMaxValueIncrementer extends AbstractDataFi
 		finally {
 			JdbcUtils.closeResultSet(rs);
 			JdbcUtils.closeStatement(stmt);
-			DataSourceUtils.closeConnectionIfNecessary(con, getDataSource());
+			DataSourceUtils.releaseConnection(con, getDataSource());
 		}
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.ibatis;
 
@@ -30,12 +30,13 @@ import com.ibatis.db.sqlmap.SqlMap;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.jdbc.support.JdbcAccessor;
+import org.springframework.util.Assert;
 
 /**
- * Helper class that simplifies data access via the MappedStatement API of the
- * iBATIS Database Layer, and converts checked SQLExceptions into unchecked
- * DataAccessExceptions, compatible to the org.springframework.dao exception
- * hierarchy. Uses the same SQLExceptionTranslator mechanism as JdbcTemplate.
+ * Helper class that simplifies data access via the MappedStatement API of iBATIS
+ * SQL Maps, and converts checked SQLExceptions into unchecked DataAccessExceptions,
+ * following the <code>org.springframework.dao</code> exception hierarchy.
+ * Uses the same SQLExceptionTranslator mechanism as JdbcTemplate.
  *
  * <p>The main method is execute, taking the name of a mapped statement defined
  * in the iBATIS SqlMap config file and a callback that implements a data access
@@ -59,6 +60,7 @@ public class SqlMapTemplate extends JdbcAccessor implements SqlMapOperations {
 
 	private SqlMap sqlMap;
 
+
 	/**
 	 * Create a new SqlMapTemplate.
 	 */
@@ -72,7 +74,8 @@ public class SqlMapTemplate extends JdbcAccessor implements SqlMapOperations {
 	 */
 	public SqlMapTemplate(DataSource dataSource, SqlMap sqlMap) {
 		setDataSource(dataSource);
-		this.sqlMap = sqlMap;
+		setSqlMap(sqlMap);
+		afterPropertiesSet();
 	}
 
 	/**
@@ -101,20 +104,21 @@ public class SqlMapTemplate extends JdbcAccessor implements SqlMapOperations {
 	 * Execute the given data access action on the given iBATIS mapped statement.
 	 * @param statementName name of the statement mapped in the iBATIS SqlMap config file
 	 * @param action callback object that specifies the data access action
-	 * @return a result object returned by the action, or null
+	 * @return a result object returned by the action, or <code>null</code>
 	 * @throws DataAccessException in case of SQL Maps errors
 	 */
 	public Object execute(String statementName, SqlMapCallback action) throws DataAccessException {
+		Assert.notNull(this.sqlMap, "No SqlMap specified");
 		MappedStatement stmt = this.sqlMap.getMappedStatement(statementName);
 		Connection con = DataSourceUtils.getConnection(getDataSource());
 		try {
 			return action.doInMappedStatement(stmt, con);
 		}
 		catch (SQLException ex) {
-			throw getExceptionTranslator().translate("SqlMapTemplate", "(mapped statement)", ex);
+			throw getExceptionTranslator().translate("SqlMap operation", null, ex);
 		}
 		finally {
-			DataSourceUtils.closeConnectionIfNecessary(con, getDataSource());
+			DataSourceUtils.releaseConnection(con, getDataSource());
 		}
 	}
 
@@ -154,8 +158,9 @@ public class SqlMapTemplate extends JdbcAccessor implements SqlMapOperations {
 		});
 	}
 
-	public Object executeQueryForObject(String statementName, final Object parameterObject,
-																			final Object resultObject) throws DataAccessException {
+	public Object executeQueryForObject(
+			String statementName, final Object parameterObject, final Object resultObject)
+			throws DataAccessException {
 		return execute(statementName, new SqlMapCallback() {
 			public Object doInMappedStatement(MappedStatement stmt, Connection con) throws SQLException {
 				return stmt.executeQueryForObject(con, parameterObject, resultObject);
@@ -172,8 +177,8 @@ public class SqlMapTemplate extends JdbcAccessor implements SqlMapOperations {
 		});
 	}
 
-	public List executeQueryForList(String statementName, final Object parameterObject,
-																	final int skipResults, final int maxResults)
+	public List executeQueryForList(
+			String statementName, final Object parameterObject, final int skipResults, final int maxResults)
 			throws DataAccessException {
 		return executeWithListResult(statementName, new SqlMapCallback() {
 			public Object doInMappedStatement(MappedStatement stmt, Connection con) throws SQLException {
@@ -182,8 +187,9 @@ public class SqlMapTemplate extends JdbcAccessor implements SqlMapOperations {
 		});
 	}
 
-	public Map executeQueryForMap(String statementName, final Object parameterObject,
-																final String keyProperty) throws DataAccessException {
+	public Map executeQueryForMap(
+			String statementName, final Object parameterObject, final String keyProperty)
+			throws DataAccessException {
 		return executeWithMapResult(statementName, new SqlMapCallback() {
 			public Object doInMappedStatement(MappedStatement stmt, Connection con) throws SQLException {
 				return stmt.executeQueryForMap(con, parameterObject, keyProperty);
@@ -191,8 +197,8 @@ public class SqlMapTemplate extends JdbcAccessor implements SqlMapOperations {
 		});
 	}
 
-	public Map executeQueryForMap(String statementName, final Object parameterObject,
-																final String keyProperty, final String valueProperty)
+	public Map executeQueryForMap(
+			String statementName, final Object parameterObject, final String keyProperty, final String valueProperty)
 			throws DataAccessException {
 		return executeWithMapResult(statementName, new SqlMapCallback() {
 			public Object doInMappedStatement(MappedStatement stmt, Connection con) throws SQLException {
@@ -201,8 +207,9 @@ public class SqlMapTemplate extends JdbcAccessor implements SqlMapOperations {
 		});
 	}
 
-	public void executeQueryWithRowHandler(String statementName, final Object parameterObject,
-																				 final RowHandler rowHandler) throws DataAccessException {
+	public void executeQueryWithRowHandler(
+			String statementName, final Object parameterObject, final RowHandler rowHandler)
+			throws DataAccessException {
 		execute(statementName, new SqlMapCallback() {
 			public Object doInMappedStatement(MappedStatement stmt, Connection con) throws SQLException {
 				stmt.executeQueryWithRowHandler(con, parameterObject, rowHandler);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.ibatis;
 
@@ -44,24 +44,24 @@ public interface SqlMapOperations {
 	Object executeQueryForObject(String statementName, Object parameterObject)
 			throws DataAccessException;
 
-	Object executeQueryForObject(String statementName, Object parameterObject,
-															 Object resultObject) throws DataAccessException;
+	Object executeQueryForObject(String statementName, Object parameterObject, Object resultObject)
+			throws DataAccessException;
 
 	List executeQueryForList(String statementName, Object parameterObject)
 			throws DataAccessException;
 
-	List executeQueryForList(String statementName, Object parameterObject,
-													 int skipResults, int maxResults)
+	List executeQueryForList(String statementName, Object parameterObject, int skipResults, int maxResults)
 			throws DataAccessException;
 
-	Map executeQueryForMap(String statementName, Object parameterObject,
-												 String keyProperty) throws DataAccessException;
+	Map executeQueryForMap(String statementName, Object parameterObject, String keyProperty)
+			throws DataAccessException;
 
-	Map executeQueryForMap(String statementName, Object parameterObject,
-												 String keyProperty, String valueProperty);
+	Map executeQueryForMap(String statementName, Object parameterObject, String keyProperty, String valueProperty)
+			throws DataAccessException;
 
-	void executeQueryWithRowHandler(String statementName, Object parameterObject,
-																	RowHandler rowHandler) throws DataAccessException;
+	void executeQueryWithRowHandler(
+			String statementName, Object parameterObject, RowHandler rowHandler)
+			throws DataAccessException;
 
 	int executeUpdate(String statementName, Object parameterObject)
 			throws DataAccessException;

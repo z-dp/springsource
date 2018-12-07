@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet;
 
@@ -52,7 +52,9 @@ public interface LocaleResolver {
    * Set the current locale to the given one.
    * @param request request to be used for locale modification
    * @param response response to be used for locale modification
-   * @param locale the new locale
+   * @param locale the new locale, or <code>null</code> to clear the locale
+	 * @throws UnsupportedOperationException if the LocaleResolver implementation
+	 * does not support dynamic changing of the theme
    */
 	void setLocale(HttpServletRequest request, HttpServletResponse response, Locale locale);
 

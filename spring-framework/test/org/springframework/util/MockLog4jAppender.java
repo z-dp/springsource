@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.util;
 
@@ -35,7 +35,7 @@ public class MockLog4jAppender extends AppenderSkeleton {
 	 * @see org.apache.log4j.AppenderSkeleton#append(org.apache.log4j.spi.LoggingEvent)
 	 */
 	protected void append(LoggingEvent evt) {
-		System.out.println("Adding " + evt.getMessage());
+		//System.out.println("Adding " + evt.getMessage());
 		loggingStrings.add(evt.getMessage());
 	}
 	

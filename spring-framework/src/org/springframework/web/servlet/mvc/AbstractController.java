@@ -1,6 +1,6 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.mvc;
 
@@ -22,6 +22,7 @@ import javax.servlet.http.HttpSession;
 
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.support.WebContentGenerator;
+import org.springframework.web.util.WebUtils;
 
 /**
  * <p>Convenient superclass for controller implementations, using the Template
@@ -43,7 +44,8 @@ import org.springframework.web.servlet.support.WebContentGenerator;
  *      is not support)</li>
  *  <li>If session is required, try to get it (ServletException if not found)</li>
  *  <li>Set caching headers if needed according to cacheSeconds propery</li>
- *  <li>Call abstract method {@link #handleRequestInternal(HttpServletRequest,HttpServletResponse) handleRequestInternal()},
+ *  <li>Call abstract method {@link #handleRequestInternal(HttpServletRequest,HttpServletResponse) handleRequestInternal()}
+ *      (optionally synchronizing around the call on the HttpSession),
  *      which should be implemented by extending classes to provide actual
  *      functionality to return {@link org.springframework.web.servlet.ModelAndView ModelAndView} objects.</li>
  * </ol>
@@ -64,7 +66,7 @@ import org.springframework.web.servlet.support.WebContentGenerator;
  *          such as GET, POST and PUT</td>
  *  </tr>
  *  <tr>
- *      <td>requiresSession</td>
+ *      <td>requireSession</td>
  *      <td>false</td>
  *      <td>whether a session should be required for requests to be able to
  *          be handled by this controller. This ensures, derived controller
@@ -81,6 +83,14 @@ import org.springframework.web.servlet.support.WebContentGenerator;
  *          <i>any headers</i> and any positive number will generate headers
  *          that state the amount indicated as seconds to cache the content</td>
  *  </tr>
+ *  <tr>
+ *      <td>synchronizeOnSession</td>
+ *      <td>false</td>
+ *      <td>whether the call to <code>handleRequestInternal</code> should be
+ *          synchronized around the HttpSession, to serialize invocations
+ *          from the same client. No effect if there is no HttpSession.
+ *      </td>
+ *  </tr>
  * </table>
  *
  * @author Rod Johnson
@@ -91,38 +101,61 @@ public abstract class AbstractController extends WebContentGenerator implements 
 
 	private boolean synchronizeOnSession = false;
 
+
 	/**
 	 * Set if controller execution should be synchronized on the session,
 	 * to serialize parallel invocations from the same client.
-	 * <p>More specifically, the execution of the handleRequestInternal
-	 * method will get synchronized if this flag is true.
+	 * <p>More specifically, the execution of the <code>handleRequestInternal</code>
+	 * method will get synchronized if this flag is "true". The best available
+	 * session mutex will be used for the synchronization; ideally, this will
+	 * be a mutex exposed by HttpSessionMutexListener.
+	 * <p>The session mutex is guaranteed to be the same object during
+	 * the entire lifetime of the session, available under the key defined
+	 * by the <code>SESSION_MUTEX_ATTRIBUTE</code> constant. It serves as a
+	 * safe reference to synchronize on for locking on the current session.
+	 * <p>In many cases, the HttpSession reference itself is a safe mutex
+	 * as well, since it will always be the same object reference for the
+	 * same active logical session. However, this is not guaranteed across
+	 * different servlet containers; the only 100% safe way is a session mutex.
 	 * @see org.springframework.web.servlet.mvc.AbstractController#handleRequestInternal
+	 * @see org.springframework.web.util.HttpSessionMutexListener
+	 * @see org.springframework.web.util.WebUtils#getSessionMutex(javax.servlet.http.HttpSession)
 	 */
 	public final void setSynchronizeOnSession(boolean synchronizeOnSession) {
 		this.synchronizeOnSession = synchronizeOnSession;
 	}
 
+	/**
+	 * Return whether controller execution should be synchronized on the session.
+	 */
+	public final boolean isSynchronizeOnSession() {
+		return synchronizeOnSession;
+	}
+
+
 	public final ModelAndView handleRequest(HttpServletRequest request, HttpServletResponse response)
 			throws Exception {
 
-		// delegate to WebContentGenerator for checking and preparing
+		// Delegate to WebContentGenerator for checking and preparing.
 		checkAndPrepare(request, response, this instanceof LastModified);
 
-		// execute in synchronized block if required
-		HttpSession session = request.getSession(false);
-		if (this.synchronizeOnSession && session != null) {
-			synchronized (session) {
-				return handleRequestInternal(request, response);
+		// Execute handleRequestInternal in synchronized block if required.
+		if (this.synchronizeOnSession) {
+			HttpSession session = request.getSession(false);
+			if (session != null) {
+				Object mutex = WebUtils.getSessionMutex(session);
+				synchronized (mutex) {
+					return handleRequestInternal(request, response);
+				}
 			}
 		}
-		else {
-			return handleRequestInternal(request, response);
-		}
+		
+		return handleRequestInternal(request, response);
 	}
 
 	/**
 	 * Template method. Subclasses must implement this.
-	 * The contract is the same as for handleRequest.
+	 * The contract is the same as for <code>handleRequest</code>.
 	 * @see #handleRequest
 	 */
 	protected abstract ModelAndView handleRequestInternal(HttpServletRequest request, HttpServletResponse response)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.support;
 
@@ -31,39 +31,48 @@ import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.ThemeResolver;
 
 /**
- * Utility class for easy access to various request-specific state,
- * set by the DispatcherServlet.
+ * Utility class for easy access to request-specific state
+ * which has been set by the DispatcherServlet.
+ *
+ * <p>Supports lookup of current WebApplicationContext, LocaleResolver,
+ * Locale, ThemeResolver, Theme, and MultipartResolver.
  *
  * @author Juergen Hoeller
  * @since 03.03.2003
+ * @see RequestContext
+ * @see org.springframework.web.servlet.DispatcherServlet
  */
 public abstract class RequestContextUtils {
 
 	/**
-	 * Look for the WebApplicationContext associated with the controller servlet that has
-	 * initiated request processing.
+	 * Look for the WebApplicationContext associated with the DispatcherServlet
+	 * that has initiated request processing.
 	 * @param request current HTTP request
 	 * @return the request-specific web application context
-	 * @throws IllegalStateException if neither a servlet-specific nor global context has been found
+	 * @throws IllegalStateException if no servlet-specific context has been found
 	 */
 	public static WebApplicationContext getWebApplicationContext(ServletRequest request)
 	    throws IllegalStateException {
+
 		return getWebApplicationContext(request, null);
 	}
 
 	/**
-	 * Look for the WebApplicationContext associated with the controller servlet that has
-	 * initiated request processing, and for the global context if none was found associated
-	 * with the current request. This method is useful to allow components outside our framework,
-	 * such as JSP tag handlers, to access the most specific application context available.
+	 * Look for the WebApplicationContext associated with the DispatcherServlet
+	 * that has initiated request processing, and for the global context if none
+	 * was found associated with the current request. This method is useful to
+	 * allow components outside the framework, such as JSP tag handlers,
+	 * to access the most specific application context available.
 	 * @param request current HTTP request
 	 * @param servletContext current servlet context
-	 * @return the request-specific or global web application context if no request-specific
-	 * context has been set
-	 * @throws IllegalStateException if neither a servlet-specific nor global context has been found
+	 * @return the request-specific WebApplicationContext, or the global one
+	 * if no request-specific context has been found
+	 * @throws IllegalStateException if neither a servlet-specific nor a
+	 * global context has been found
 	 */
-	public static WebApplicationContext getWebApplicationContext(ServletRequest request, ServletContext servletContext)
-	    throws IllegalStateException {
+	public static WebApplicationContext getWebApplicationContext(
+			ServletRequest request, ServletContext servletContext) throws IllegalStateException {
+
 		WebApplicationContext webApplicationContext = (WebApplicationContext) request.getAttribute(
 				DispatcherServlet.WEB_APPLICATION_CONTEXT_ATTRIBUTE);
 		if (webApplicationContext == null) {
@@ -79,13 +88,15 @@ public abstract class RequestContextUtils {
 	}
 
 	/**
-	 * Return the LocaleResolver that has been bound to the request by the DispatcherServlet.
+	 * Return the LocaleResolver that has been bound to the request by the
+	 * DispatcherServlet.
 	 * @param request current HTTP request
 	 * @return the current LocaleResolver
 	 * @throws IllegalStateException if no LocaleResolver has been found
 	 */
 	public static LocaleResolver getLocaleResolver(HttpServletRequest request) throws IllegalStateException {
-		LocaleResolver localeResolver = (LocaleResolver) request.getAttribute(DispatcherServlet.LOCALE_RESOLVER_ATTRIBUTE);
+		LocaleResolver localeResolver =
+				(LocaleResolver) request.getAttribute(DispatcherServlet.LOCALE_RESOLVER_ATTRIBUTE);
 		if (localeResolver == null) {
 			throw new IllegalStateException("No LocaleResolver found: not in a DispatcherServlet request?");
 		}
@@ -98,19 +109,22 @@ public abstract class RequestContextUtils {
 	 * @param request current HTTP request
 	 * @return the current locale
 	 * @throws IllegalStateException if no LocaleResolver has been found
+	 * @see #getLocaleResolver
 	 */
 	public static Locale getLocale(HttpServletRequest request) throws IllegalStateException {
 		return getLocaleResolver(request).resolveLocale(request);
 	}
 
 	/**
-	 * Return the ThemeResolver that has been bound to the request by the DispatcherServlet.
+	 * Return the ThemeResolver that has been bound to the request by the
+	 * DispatcherServlet.
 	 * @param request current HTTP request
 	 * @return the current ThemeResolver
 	 * @throws IllegalStateException if no ThemeResolver has been found
 	 */
 	public static ThemeResolver getThemeResolver(HttpServletRequest request) throws IllegalStateException {
-		ThemeResolver themeResolver = (ThemeResolver) request.getAttribute(DispatcherServlet.THEME_RESOLVER_ATTRIBUTE);
+		ThemeResolver themeResolver =
+				(ThemeResolver) request.getAttribute(DispatcherServlet.THEME_RESOLVER_ATTRIBUTE);
 		if (themeResolver == null) {
 			throw new IllegalStateException("No ThemeResolver found: not in a DispatcherServlet request?");
 		}
@@ -118,12 +132,12 @@ public abstract class RequestContextUtils {
 	}
 
 	/**
-	 * Retrieves the current theme from the given request,
-	 * using the ThemeResolver bound to the request by the DispatcherServlet,
-	 * and the current WebApplicationContext.
+	 * Retrieves the current theme from the given request, using the
+	 * ThemeResolver bound to the request by the DispatcherServlet.
 	 * @param request current HTTP request
 	 * @return the current theme
 	 * @throws IllegalStateException if no ThemeResolver has been found
+	 * @see #getThemeResolver
 	 */
 	public static Theme getTheme(HttpServletRequest request) throws IllegalStateException {
 		WebApplicationContext context = getWebApplicationContext(request);
@@ -132,11 +146,12 @@ public abstract class RequestContextUtils {
 	}
 
 	/**
-	 * Return the MultipartResolver that has been bound to the request by the DispatcherServlet.
+	 * Return the MultipartResolver that has been bound to the request by the
+	 * DispatcherServlet.
 	 * @param request current HTTP request
-	 * @return the current MultipartResolver, or null if not a multipart request
+	 * @return the current MultipartResolver, or <code>null</code> if not a multipart request
 	 */
-	public static MultipartResolver getMultipartResolver(HttpServletRequest request) {
+	public static MultipartResolver getMultipartResolver(ServletRequest request) {
 		return (MultipartResolver) request.getAttribute(DispatcherServlet.MULTIPART_RESOLVER_ATTRIBUTE);
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,24 +12,39 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.multipart;
 
-import javax.servlet.ServletException;
+import org.springframework.web.util.NestedServletException;
 
 /**
  * Exception thrown on multipart resolution.
+ *
+ * <p>Extends ServletException for convenient throwing in any Servlet resource
+ * (such as a Filter), and NestedServletException for proper root cause handling
+ * (as the plain ServletException doesn't expose its root cause at all).
+ *
  * @author Trevor D. Cook
- * @since 29-Sep-2003
+ * @since 29.09.2003
  * @see MultipartResolver#resolveMultipart
+ * @see org.springframework.web.multipart.support.MultipartFilter
  */
-public class MultipartException extends ServletException {
+public class MultipartException extends NestedServletException {
 
+	/**
+	 * Constructor for MultipartException.
+	 * @param msg the detail message
+	 */
 	public MultipartException(String msg) {
 		super(msg);
 	}
 
+	/**
+	 * Constructor for MultipartException.
+	 * @param msg the detail message
+	 * @param ex root cause from multipart parsing API in use
+	 */
 	public MultipartException(String msg, Throwable ex) {
 		super(msg, ex);
 	}

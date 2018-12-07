@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.ejb.access;
 
@@ -30,21 +30,12 @@ import org.easymock.MockControl;
 import org.springframework.jndi.JndiTemplate;
 
 /**
- * Tests Business Methods pattern
  * @author Rod Johnson
- * @since 21-May-2003
- * @version $Id: LocalStatelessSessionProxyFactoryBeanTests.java,v 1.10 2004/03/19 21:35:54 johnsonr Exp $
+ * @author Juergen Hoeller
+ * @since 21.05.2003
  */
 public class LocalStatelessSessionProxyFactoryBeanTests extends TestCase {
 
-	/**
-	 * Constructor for LocalStatelessSessionProxyFactoryBeanTests.
-	 * @param arg0
-	 */
-	public LocalStatelessSessionProxyFactoryBeanTests(String arg0) {
-		super(arg0);
-	}
-	
 	public void testInvokesMethod() throws Exception {
 		final int value = 11;
 		final String jndiName = "foo";
@@ -62,7 +53,7 @@ public class LocalStatelessSessionProxyFactoryBeanTests extends TestCase {
 		mc.replay();
 		
 		JndiTemplate jt = new JndiTemplate() {
-			public Object lookup(String name) throws NamingException {
+			public Object lookup(String name) {
 				// parameterize
 				assertTrue(name.equals("java:comp/env/" + jndiName));
 				return home;
@@ -97,7 +88,7 @@ public class LocalStatelessSessionProxyFactoryBeanTests extends TestCase {
 		mc.replay();
 	
 		JndiTemplate jt = new JndiTemplate() {
-			public Object lookup(String name) throws NamingException {
+			public Object lookup(String name) {
 				// parameterize
 				assertTrue(name.equals(jndiName));
 				return home;
@@ -110,21 +101,22 @@ public class LocalStatelessSessionProxyFactoryBeanTests extends TestCase {
 		fb.setBusinessInterface(MyBusinessMethods.class);
 		assertEquals(fb.getBusinessInterface(), MyBusinessMethods.class);
 		fb.setJndiTemplate(jt);
-	
+
 		// Need lifecycle methods
 		fb.afterPropertiesSet();
 
 		MyBusinessMethods mbm = (MyBusinessMethods) fb.getObject();
 		assertTrue(Proxy.isProxyClass(mbm.getClass()));
-		
+
 		try {
 			mbm.getValue();
 			fail("Should have failed to create EJB");
 		}
 		catch (AspectException ex) {
-			assertSame(cex, ex.getCause());
+			ex.printStackTrace();
+			assertTrue(ex.getMessage().indexOf(cex.toString()) != -1);
 		}
-		
+
 		mc.verify();	
 	}
 	
@@ -138,7 +130,7 @@ public class LocalStatelessSessionProxyFactoryBeanTests extends TestCase {
 		mc.replay();
 
 		JndiTemplate jt = new JndiTemplate() {
-			public Object lookup(String name) throws NamingException {
+			public Object lookup(String name) {
 				// parameterize
 				assertTrue(name.equals("java:comp/env/" + jndiName));
 				return home;

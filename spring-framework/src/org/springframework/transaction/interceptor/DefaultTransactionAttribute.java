@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.transaction.interceptor;
 
@@ -21,9 +21,9 @@ import org.springframework.transaction.support.DefaultTransactionDefinition;
 /**
  * Transaction attribute that takes the EJB approach to rolling
  * back on runtime, but not checked, exceptions.
+ *
  * @author Rod Johnson
- * @since 16-Mar-2003
- * @version $Id: DefaultTransactionAttribute.java,v 1.4 2004/03/18 02:46:05 trisberg Exp $
+ * @since 16.03.2003
  */
 public class DefaultTransactionAttribute extends DefaultTransactionDefinition implements TransactionAttribute {
 
@@ -33,12 +33,45 @@ public class DefaultTransactionAttribute extends DefaultTransactionDefinition im
 	/** Prefix for commit-on-exception rules in description strings */
 	public static final String COMMIT_RULE_PREFIX = "+";
 
+
+	/**
+	 * Create a new DefaultTransactionAttribute, with default settings.
+	 * Can be modified through bean property setters.
+	 * @see #setPropagationBehavior
+	 * @see #setIsolationLevel
+	 * @see #setTimeout
+	 * @see #setReadOnly
+	 * @see #setName
+	 */
 	public DefaultTransactionAttribute() {
+		super();
 	}
 
+	/**
+	 * Copy constructor. Definition can be modified through bean property setters.
+	 * @see #setPropagationBehavior
+	 * @see #setIsolationLevel
+	 * @see #setTimeout
+	 * @see #setReadOnly
+	 * @see #setName
+	 */
+	public DefaultTransactionAttribute(TransactionAttribute other) {
+		super(other);
+	}
+
+	/**
+	 * Create a new DefaultTransactionAttribute with the the given
+	 * propagation behavior. Can be modified through bean property setters.
+	 * @param propagationBehavior one of the propagation constants in the
+	 * TransactionDefinition interface
+	 * @see #setIsolationLevel
+	 * @see #setTimeout
+	 * @see #setReadOnly
+	 */
 	public DefaultTransactionAttribute(int propagationBehavior) {
 		super(propagationBehavior);
 	}
+
 
 	/**
 	 * Default behavior is as with EJB: rollback on unchecked exception.

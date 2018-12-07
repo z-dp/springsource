@@ -1,11 +1,5 @@
 /*
- * BeanWrapperTestSuite.java
- *
- * Created on 1 September 2001, 19:35
- */
-
-/*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory;
 
@@ -35,12 +29,9 @@ import org.springframework.beans.factory.support.AbstractBeanFactory;
 
 /**
  * Subclasses must implement setUp() to initialize bean factory
- * and any other variables they need
+ * and any other variables they need.
+ *
  * @author Rod Johnson
- * @version $RevisionId$
- * REQUIRES THE FOLLOWING BEAN DEFINITIONS:
- * see lbiinit
- * @version $Id: AbstractBeanFactoryTests.java,v 1.11 2004/03/18 03:01:20 trisberg Exp $
  */
 public abstract class AbstractBeanFactoryTests extends TestCase {
 
@@ -48,7 +39,7 @@ public abstract class AbstractBeanFactoryTests extends TestCase {
 
 	/**
 	 * Roderick beans inherits from rod,
-	 * overriding name only
+	 * overriding name only.
 	 */
 	public void testInheritance() {
 		assertTrue(getBeanFactory().containsBean("rod"));
@@ -62,12 +53,12 @@ public abstract class AbstractBeanFactoryTests extends TestCase {
 		assertTrue("roderick.age was inherited", roderick.getAge() == rod.getAge());
 	}
 	
-	public void testGetNull() {
+	public void testGetBeanWithNullArg() {
 		try {
 			getBeanFactory().getBean(null);
 			fail("Can't get null bean");
 		}
-		catch (NoSuchBeanDefinitionException ex) {
+		catch (IllegalArgumentException ex) {
 			// OK
 		}
 	}
@@ -91,7 +82,7 @@ public abstract class AbstractBeanFactoryTests extends TestCase {
 		LifecycleBean lb = (LifecycleBean) getBeanFactory().getBean("lifecycle");
 		assertEquals("lifecycle", lb.getBeanName());
 		// The dummy business method will throw an exception if the
-		// necessary callbacks weren't invoked in the right order
+		// necessary callbacks weren't invoked in the right order.
 		lb.businessMethod();
 		assertTrue("Not destroyed", !lb.isDestroyed());
 	}
@@ -131,7 +122,7 @@ public abstract class AbstractBeanFactoryTests extends TestCase {
 			assertTrue("Exception has correct bean name", ex.getBeanName().equals("rod"));
 			assertTrue("Exception requiredType must be BeanFactory.class", ex.getRequiredType().equals(BeanFactory.class));
 			assertTrue("Exception actualType as TestBean.class", TestBean.class.isAssignableFrom(ex.getActualType()));
-			assertTrue("Actual instance is correct", ex.getActualInstance() == getBeanFactory().getBean("rod"));
+			assertTrue("Actual type is correct", ex.getActualType() == getBeanFactory().getBean("rod").getClass());
 		}
 		catch (Exception ex) {
 			ex.printStackTrace();
@@ -186,7 +177,6 @@ public abstract class AbstractBeanFactoryTests extends TestCase {
 		}
 	}
 	
-	/*
 	public void testPrototypeInstancesAreIndependent() {
 		TestBean tb1 = (TestBean) getBeanFactory().getBean("kathy");
 		TestBean tb2 = (TestBean) getBeanFactory().getBean("kathy");
@@ -198,7 +188,6 @@ public abstract class AbstractBeanFactoryTests extends TestCase {
 		assertTrue("2 age independent = 2", tb2.getAge() == 2);
 		assertTrue("object equal now false", !tb1.equals(tb2));
 	}
-	*/
 
 	public void testNotThere() {
 		assertFalse(getBeanFactory().containsBean("Mr Squiggle"));
@@ -231,6 +220,7 @@ public abstract class AbstractBeanFactoryTests extends TestCase {
 			fail("Shouldn't succeed with type mismatch");
 		}
 		catch (BeanCreationException wex) {
+			assertEquals("typeMismatch", wex.getBeanName());
 			assertTrue(wex.getCause() instanceof PropertyAccessExceptionsException);
 			PropertyAccessExceptionsException ex = (PropertyAccessExceptionsException) wex.getCause();
 			// Further tests
@@ -334,8 +324,7 @@ public abstract class AbstractBeanFactoryTests extends TestCase {
 			// expected
 		}
 
-		// Check prototype support
-		// TODO
+		// TODO: check prototype support
 	}
 
 

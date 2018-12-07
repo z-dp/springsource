@@ -1,6 +1,6 @@
 
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,25 +13,25 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.context;
 
 import java.util.EventListener;
 
 /**
- * Interface to be implemented by event listeners.
- * Based on standard java.util base class for Observer
- * design pattern.
- * @author  Rod Johnson
+ * Interface to be implemented by application event listeners.
+ * Based on standard java.util base interface for Observer design pattern.
+ *
+ * @author Rod Johnson
+ * @see org.springframework.context.event.ApplicationEventMulticaster
  */
 public interface ApplicationListener extends EventListener {
 
 	/**
-	* Handle an application event
-	* @param e event to respond to
-	*/
-    void onApplicationEvent(ApplicationEvent e);
+	 * Handle an application event.
+	 * @param event the event to respond to
+	 */
+	void onApplicationEvent(ApplicationEvent event);
 
 }
-

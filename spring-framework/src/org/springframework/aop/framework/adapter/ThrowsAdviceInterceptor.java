@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework.adapter;
 
@@ -25,70 +25,87 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.aop.framework.AopConfigException;
 
 /**
  * Interceptor to wrap an after throwing advice.
- * The signatures on handler methods on the throwsAdvice constructor argument must be of form
- * void afterThrowing([Method], [args], [target], ThrowableSubclass);
+ *
+ * <p>The signatures on handler methods on the throwsAdvice constructor argument
+ * must be of form:<br>
+ * <code>void afterThrowing([Method], [args], [target], ThrowableSubclass);</code><br>
  * Only the last argument is required.
- * <br>This is a framework class that need not be used directly by Spring users.
+ *
+ * <p>This is a framework class that need not be used directly by Spring users.
  * 
+ * <p>You can, however, use this class to wrap Spring ThrowsAdvice implementations
+ * for use in other AOP frameworks supporting the AOP Alliance
+ * interfaces.
+ *
  * @author Rod Johnson
- * @version $Id: ThrowsAdviceInterceptor.java,v 1.2 2004/03/18 02:46:09 trisberg Exp $
  */
-final class ThrowsAdviceInterceptor implements MethodInterceptor {
+public final class ThrowsAdviceInterceptor implements MethodInterceptor {
+	
+	// TODO make serializable (methods are not serializable)
 	
 	private static final String AFTER_THROWING = "afterThrowing";
 	
-	private final Log logger = LogFactory.getLog(getClass());
+	private static final Log logger = LogFactory.getLog(ThrowsAdviceInterceptor.class);
 
-	private Object throwsAdvice;
+
+	private final Object throwsAdvice;
 
 	/** Methods on throws advice, keyed by exception class */
-	private Map exceptionHandlerHash;
+	private final Map exceptionHandlerMap = new HashMap();
 
+
+	/**
+	 * Create a new ThrowsAdviceInterceptor for the given ThrowsAdvice.
+	 * @param throwsAdvice the advice object that defines the exception
+	 * handler methods (usually a ThrowsAdvice implementation)
+	 * @see org.springframework.aop.ThrowsAdvice
+	 */
 	public ThrowsAdviceInterceptor(Object throwsAdvice) {
 		this.throwsAdvice = throwsAdvice;
 
 		Method[] methods = throwsAdvice.getClass().getMethods();
-		exceptionHandlerHash = new HashMap();
 		for (int i = 0; i < methods.length; i++) {
-			Method m = methods[i];
-			if (m.getName().equals(AFTER_THROWING) &&
+			Method method = methods[i];
+			if (method.getName().equals(AFTER_THROWING) &&
 					//m.getReturnType() == null &&
-					(m.getParameterTypes().length == 1 || m.getParameterTypes().length == 4) &&
-					Throwable.class.isAssignableFrom(m.getParameterTypes()[m.getParameterTypes().length - 1])
+					(method.getParameterTypes().length == 1 || method.getParameterTypes().length == 4) &&
+					Throwable.class.isAssignableFrom(method.getParameterTypes()[method.getParameterTypes().length - 1])
 				) {
 				// Have an exception handler
-				exceptionHandlerHash.put(m.getParameterTypes()[m.getParameterTypes().length - 1], m);
-				logger.info("Found exception handler method [" + m + "]");
+				this.exceptionHandlerMap.put(method.getParameterTypes()[method.getParameterTypes().length - 1], method);
+				if (logger.isDebugEnabled()) {
+					logger.debug("Found exception handler method: " + method);
+				}
 			}
 		}
 		
-		if (exceptionHandlerHash.isEmpty())
-			throw new AopConfigException("At least one handler method must be found in class " + throwsAdvice.getClass());
+		if (this.exceptionHandlerMap.isEmpty()) {
+			throw new IllegalArgumentException(
+					"At least one handler method must be found in class [" + throwsAdvice.getClass() + "]");
+		}
 	}
 	
 	public int getHandlerMethodCount() {
-		return exceptionHandlerHash.size();
+		return this.exceptionHandlerMap.size();
 	}
 
 	/**
-	 * Can return null if not found.
-	 * 
+	 * Determine the exception handle method. Can return null if not found.
+	 * @param exception the exception thrown
 	 * @return a handler for the given exception type
-	 * @param exception
-	 *            Won't be a ServletException or IOException
 	 */
 	private Method getExceptionHandler(Throwable exception) {
 		Class exceptionClass = exception.getClass();
-		logger.info("Trying to find handler for exception of " + exceptionClass);
-		Method handler = (Method) this.exceptionHandlerHash.get(exceptionClass);
+		if (logger.isDebugEnabled()) {
+			logger.debug("Trying to find handler for exception of type [" + exceptionClass.getName() + "]");
+		}
+		Method handler = (Method) this.exceptionHandlerMap.get(exceptionClass);
 		while (handler == null && !exceptionClass.equals(Throwable.class)) {
-			logger.info("Looking at superclass " + exceptionClass);
 			exceptionClass = exceptionClass.getSuperclass();
-			handler = (Method) this.exceptionHandlerHash.get(exceptionClass);
+			handler = (Method) this.exceptionHandlerMap.get(exceptionClass);
 		}
 		return handler;
 	}
@@ -100,34 +117,28 @@ final class ThrowsAdviceInterceptor implements MethodInterceptor {
 		try {
 			return mi.proceed();
 		}
-		catch (Throwable t) {
-			Method handlerMethod = getExceptionHandler(t);
+		catch (Throwable ex) {
+			Method handlerMethod = getExceptionHandler(ex);
 			if (handlerMethod != null) {
-				invokeHandlerMethod(mi, t, handlerMethod);
+				invokeHandlerMethod(mi, ex, handlerMethod);
 			}
-			throw t;
+			throw ex;
 		}
 	}
 	
-	private void invokeHandlerMethod(MethodInvocation mi, Throwable t, Method m) throws Throwable {
+	private void invokeHandlerMethod(MethodInvocation mi, Throwable ex, Method method) throws Throwable {
 		Object[] handlerArgs;
-		if (m.getParameterTypes().length == 1) {
-			handlerArgs = new Object[] { t };
+		if (method.getParameterTypes().length == 1) {
+			handlerArgs = new Object[] { ex };
 		}
 		else {
-			handlerArgs = new Object[] { mi.getMethod(), mi.getArguments(), mi.getThis(), t };
+			handlerArgs = new Object[] { mi.getMethod(), mi.getArguments(), mi.getThis(), ex };
 		}
 		try {
-			m.invoke(this.throwsAdvice, handlerArgs);
+			method.invoke(this.throwsAdvice, handlerArgs);
 		}
-		catch (IllegalArgumentException ex) {
-			throw new AopConfigException("Internal error", ex);
-		}
-		catch (IllegalAccessException ex) {
-			throw new AopConfigException("Internal error", ex);
-		}
-		catch (InvocationTargetException ex) {
-			throw ex.getTargetException();
+		catch (InvocationTargetException targetEx) {
+			throw targetEx.getTargetException();
 		}
 	}
 

@@ -62,21 +62,11 @@ public class Pet extends NamedEntity {
 	}
 
 	public List getVisits() {
-		try {
-			List sortedVisits = new ArrayList(getVisitsInternal());
-			PropertyComparator.sort(sortedVisits, new MutableSortDefinition("date", false, false));
-			return Collections.unmodifiableList(sortedVisits);
-		}
-		catch (RuntimeException ex) {
-			ex.printStackTrace();
-			throw ex;
-		}
+		List sortedVisits = new ArrayList(getVisitsInternal());
+		PropertyComparator.sort(sortedVisits, new MutableSortDefinition("date", false, false));
+		return Collections.unmodifiableList(sortedVisits);
 	}
 
-	/**
-	 * Method to add a visit to the List of visits.
-	 * @param visit New visit to be added to the List of visits
-	 */
 	public void addVisit(Visit visit) {
 		getVisitsInternal().add(visit);
 		visit.setPet(this);

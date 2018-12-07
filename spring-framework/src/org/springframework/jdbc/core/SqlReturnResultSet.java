@@ -1,74 +1,70 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.core;
 
 /**
- * Subclass of SqlParameter to represent a returned resultset from a
- * stored procedure call.
+ * Represents a returned {@link java.sql.ResultSet} from a stored procedure call.
  *
- * <p>Must declare a RowCallbackHandler to handle any returned rows.
- * No additional properties: instanceof will be used to check
- * for such types.
+ * <p>A {@link ResultSetExtractor}, {@link RowCallbackHandler} or {@link RowMapper}
+ * must be provided to handle any returned rows.
  *
- * <p>Output parameters - like all stored procedure parameters -
- * must have names.
+ * <p>Returned {@link java.sql.ResultSet ResultSets} - like all stored procedure
+ * parameters - <b>must</b> have names.
  *
  * @author Thomas Risberg
+ * @author Juergen Hoeller
  */
-public class SqlReturnResultSet extends SqlParameter {
+public class SqlReturnResultSet extends ResultSetSupportingSqlParameter {
 
-	private RowCallbackHandler rowCallbackHandler;
-
-	private RowMapper rowMapper = null;
-
-	private int rowsExpected = 0;
-
-	private boolean rowMapperSupported = false;
-
-	public SqlReturnResultSet(String name, RowCallbackHandler rch) {
-		super(name, 0);
-		this.rowCallbackHandler = rch;
-	}
-
-	public SqlReturnResultSet(String name, RowMapper rm, int rowsExpected) {
-		super(name, 0);
-		this.rowMapper = rm;
-		this.rowsExpected = rowsExpected;
-		this.rowMapperSupported = true;
-	}
-	
-	public SqlReturnResultSet(String name, RowMapper rm) {
-		this(name, rm, 0);
-	}
-		
-	public RowCallbackHandler getRowCallbackHandler() {
-		return rowCallbackHandler;
-	}
-
-	public boolean isRowMapperSupported() {
-		return rowMapperSupported;
-	}
-	
 	/**
-	 * Return new instance of the implementation of a ResultReader usable for returned resultsets. This implementation 
-	 * invokes the RowMapper's implementation of the mapRow() method.
+	 * Create a new instance of the {@link SqlReturnResultSet} class.
+	 * @param name name of the parameter, as used in input and output maps
+	 * @param extractor ResultSetExtractor to use for parsing the {@link java.sql.ResultSet}
 	 */
-	protected final ResultReader newResultReader() {
-		return new ResultReaderStoredProcImpl(rowsExpected, rowMapper);
+	public SqlReturnResultSet(String name, ResultSetExtractor extractor) {
+		super(name, 0, extractor);
+	}
+
+	/**
+	 * Create a new instance of the {@link SqlReturnResultSet} class.
+	 * @param name name of the parameter, as used in input and output maps
+	 * @param handler RowCallbackHandler to use for parsing the {@link java.sql.ResultSet}
+	 */
+	public SqlReturnResultSet(String name, RowCallbackHandler handler) {
+		super(name, 0, handler);
+	}
+
+	/**
+	 * Create a new instance of the {@link SqlReturnResultSet} class.
+	 * @param name name of the parameter, as used in input and output maps
+	 * @param mapper RowMapper to use for parsing the {@link java.sql.ResultSet}
+	 */
+	public SqlReturnResultSet(String name, RowMapper mapper) {
+		super(name, 0, mapper);
+	}
+
+	/**
+	 * Create a new SqlReturnResultSet.
+	 * @param name name of the parameter, as used in input and output maps
+	 * @param rm RowMapper to use for parsing the ResultSet
+	 * @param rowsExpected number of expected rows
+	 */
+	public SqlReturnResultSet(String name, RowMapper rm, int rowsExpected) {
+		super(name, 0, rm, rowsExpected);
 	}
 
 }

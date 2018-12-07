@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.context;
 
@@ -25,7 +25,7 @@ import org.springframework.beans.factory.LifecycleBean;
 
 /**
  * @author Rod Johnson
- * @version $RevisionId$
+ * @author Juergen Hoeller
  */
 public abstract class AbstractApplicationContextTests extends AbstractListableBeanFactoryTests {
 
@@ -44,6 +44,10 @@ public abstract class AbstractApplicationContextTests extends AbstractListableBe
 	}
 
 	protected BeanFactory getBeanFactory() {
+		return applicationContext;
+	}
+
+	protected ApplicationContext getApplicationContext() {
 		return applicationContext;
 	}
 
@@ -110,13 +114,14 @@ public abstract class AbstractApplicationContextTests extends AbstractListableBe
 	}
 
 	public void testMessageSource() throws NoSuchMessageException {
-		assertEquals(applicationContext.getMessage("code1", null, Locale.getDefault()), "message1");
-		assertEquals(applicationContext.getMessage("code2", null, Locale.getDefault()), "message2");
+		assertEquals("message1", applicationContext.getMessage("code1", null, Locale.getDefault()));
+		assertEquals("message2", applicationContext.getMessage("code2", null, Locale.getDefault()));
 
 		try {
 			applicationContext.getMessage("code0", null, Locale.getDefault());
 			fail("looking for code0 should throw a NoSuchMessageException");
-		} catch (NoSuchMessageException ex) {
+		}
+		catch (NoSuchMessageException ex) {
 			// that's how it should be
 		}
 	}
@@ -142,7 +147,7 @@ public abstract class AbstractApplicationContextTests extends AbstractListableBe
 	}
 
 
-	public class MyEvent extends ApplicationEvent {
+	public static class MyEvent extends ApplicationEvent {
 
 		public MyEvent(Object source) {
 			super(source);

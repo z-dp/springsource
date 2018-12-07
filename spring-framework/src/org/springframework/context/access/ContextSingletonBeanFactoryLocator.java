@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.context.access;
 
@@ -24,7 +24,9 @@ import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.access.BeanFactoryLocator;
 import org.springframework.beans.factory.access.SingletonBeanFactoryLocator;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.context.support.FileSystemXmlApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+import org.springframework.core.io.support.ResourcePatternResolver;
+import org.springframework.core.io.support.ResourcePatternUtils;
 
 /**
  * <p>Variant of SingletonBeanFactoryLocator which creates its internal bean
@@ -36,28 +38,26 @@ import org.springframework.context.support.FileSystemXmlApplicationContext;
  * ApplicationContext specific features are needed in the bean reference definition
  * itself.</p>
  *
- * <p><strong>Note: </strong>This class uses <strong>beanRefContext.xml</strong>
+ * <p><strong>Note:</strong> This class uses <strong>classpath*:beanRefContext.xml</strong>
  * as the default name for the bean factory reference definition. It is not possible
  * nor legal to share definitions with SingletonBeanFactoryLocator at the same time.
  * 
  * @author Colin Sampaleanu
- * @version $Revision: 1.4 $
  * @see org.springframework.context.access.DefaultLocatorFactory
- * @version $Id: ContextSingletonBeanFactoryLocator.java,v 1.4 2004/03/18 02:46:13 trisberg Exp $
  */
 public class ContextSingletonBeanFactoryLocator extends SingletonBeanFactoryLocator {
 
-	public static final String BEANS_REFS_XML_NAME = "beanRefContext.xml";
+	private static final String BEANS_REFS_XML_NAME = "classpath*:beanRefContext.xml";
 	
 	// the keyed singleton instances
-	private static Map instances = new HashMap();
+	private static final Map instances = new HashMap();
 
 
 	/**
-	 * Returns an instance which uses the default "beanRefContext.xml", as the name
-	 * of the definition file(s). All resources returned by the current thread's context
-	 * classloader's getResources() method with this name will be combined to create a
-	 * definition, which is just a BeanFactory.
+	 * Returns an instance which uses the default "classpath*:beanRefContext.xml", as
+	 * the name of the definition file(s). All resources returned by the current
+	 * thread's context classloader's getResources() method with this name will be
+	 * combined to create a definition, which is just a BeanFactory.
 	 */
 	public static BeanFactoryLocator getInstance() throws BeansException {
 		return getInstance(BEANS_REFS_XML_NAME);
@@ -65,17 +65,29 @@ public class ContextSingletonBeanFactoryLocator extends SingletonBeanFactoryLoca
 
 	/**
 	 * Returns an instance which uses the the specified selector, as the name of the
-	 * definition file(s). All resources returned by the current thread's context
-	 * classloader's getResources() method with this name will be combined to create a
-	 * definition, which is just a a BeanFactory.
+	 * definition file(s). In the case of a name with a Spring "classpath*:" prefix,
+	 * or with no prefix, which is treated the same, the current thread's context class
+	 * loader's <code>getResources</code> method will be called with this value to get
+	 * all resources having that name. These resources will then be combined to form a
+	 * definition. In the case where the name uses a Spring "classpath:" prefix, or
+	 * a standard URL prefix, then only one resource file will be loaded as the
+	 * definition.
 	 * @param selector the name of the resource(s) which will be read and combine to
-	 * form the definition for the SingletonBeanFactoryLocator instance
+	 * form the definition for the SingletonBeanFactoryLocator instance. The one file
+	 * or multiple fragments with this name must form a valid ApplicationContext
+	 * definition.
 	 */
 	public static BeanFactoryLocator getInstance(String selector) throws BeansException {
+		// For backwards compatibility, we prepend "classpath*:" to the selector name if there
+		// is no other prefix (i.e. "classpath*:", "classpath:", or some URL prefix).
+		if (!ResourcePatternUtils.isUrl(selector)) {
+			selector = ResourcePatternResolver.CLASSPATH_ALL_URL_PREFIX + selector;
+		}
+
 		synchronized (instances) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("ContextSingletonBeanFactoryLocator.getInstance(): instances.hashCode=" +
-				             instances.hashCode() + ", instances=" + instances);
+						instances.hashCode() + ", instances=" + instances);
 			}
 			BeanFactoryLocator bfl = (BeanFactoryLocator) instances.get(selector);
 			if (bfl == null) {
@@ -88,7 +100,7 @@ public class ContextSingletonBeanFactoryLocator extends SingletonBeanFactoryLoca
 
 
 	/**
-	 * Constructor which uses the default "bean-refs.xml", as the name of the
+	 * Constructor which uses the default "classpath*:beanRefContext.xml", as the name of the
 	 * definition file(s). All resources returned by the definition classloader's
 	 * getResources() method with this name will be combined to create a definition.
 	 */
@@ -110,23 +122,33 @@ public class ContextSingletonBeanFactoryLocator extends SingletonBeanFactoryLoca
 	 * instead of the default BeanFactory. This does not affect what can actually
 	 * be loaded by that definition.
 	 */
-	protected BeanFactory createDefinition(String[] resources) throws BeansException {
-		return new FileSystemXmlApplicationContext(resources);
+	protected BeanFactory createDefinition(String resourceName, String factoryKey) throws BeansException {
+		return new ClassPathXmlApplicationContext(new String[] { resourceName }, false);
+	}
+
+	/**
+	 * Overrides default method to initialize definition object, which this method
+	 * assumes is a ConfigurableApplicationContext. This implementation simply invokes
+	 * {@link ConfigurableApplicationContext#refresh ConfigurableApplicationContext.refresh()}.
+	 */
+	protected void initializeDefinition(BeanFactory groupDef) throws BeansException {
+		if (groupDef instanceof ConfigurableApplicationContext) {
+			((ConfigurableApplicationContext) groupDef).refresh();
+		}
 	}
 	
-    /**
-     * Overrides default method to work with ApplicationContext
-     */
+	/**
+	 * Overrides default method to work with ApplicationContext
+	 */
 	protected void destroyDefinition(BeanFactory groupDef, String resourceName) throws BeansException {
-
 		if (groupDef instanceof ConfigurableApplicationContext) {
 			// debugging trace only
 			if (logger.isDebugEnabled()) {
-				logger.debug("ContextSingletonBeanFactoryLocator group with resourceName '"
-						+ resourceName
-						+ "' being released, as no more references.");
+				logger.debug("ContextSingletonBeanFactoryLocator group with resourceName '" +
+						resourceName + "' being released, as there are no more references");
 			}
 			((ConfigurableApplicationContext) groupDef).close();
 		}
 	}
+
 }

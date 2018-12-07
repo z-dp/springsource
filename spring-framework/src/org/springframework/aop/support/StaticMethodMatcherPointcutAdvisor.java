@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,9 +12,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.support;
+
+import java.io.Serializable;
 
 import org.aopalliance.aop.Advice;
 
@@ -24,22 +26,25 @@ import org.springframework.core.Ordered;
 
 /**
  * Convenient superclass for Advisors that are also static pointcuts.
+ * Serializable if Advice and subclass are.
+ *
  * @author Rod Johnson
- * @version $Id: StaticMethodMatcherPointcutAdvisor.java,v 1.7 2004/03/23 14:29:45 jhoeller Exp $
  */
 public abstract class StaticMethodMatcherPointcutAdvisor extends StaticMethodMatcherPointcut
-		implements PointcutAdvisor, Ordered {
+		implements PointcutAdvisor, Ordered, Serializable {
 
 	private int order = Integer.MAX_VALUE;
 
 	private Advice advice;
-	
+
+
 	public StaticMethodMatcherPointcutAdvisor() {
 	}
 
 	public StaticMethodMatcherPointcutAdvisor(Advice advice) {
 		this.advice = advice;
 	}
+
 
 	public void setOrder(int order) {
 		this.order = order;
@@ -56,6 +61,7 @@ public abstract class StaticMethodMatcherPointcutAdvisor extends StaticMethodMat
 	public Advice getAdvice() {
 		return advice;
 	}
+
 
 	public Pointcut getPointcut() {
 		return this;

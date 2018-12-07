@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.multipart.support;
 
@@ -30,13 +30,20 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.springframework.web.multipart.MultipartResolver;
 
 /**
- * Servlet 2.3 Filter that resolves multipart requests via a MultipartResolver
- * in the root web application context. Supports a "multipartResolverBeanName"
- * filter init-param; the default bean name is "filterMultipartResolver".
+ * Servlet 2.3 Filter that resolves multipart requests via a MultipartResolver.
+ * in the root web application context.
  *
- * <p>MultipartResolver determination is customizable: Override this filter's
- * getMultipartResolver method to use a custom MultipartResolver instance,
- * for example if not using a Spring web application context.
+ * <p>Looks up the MultipartResolver in Spring's root web application context.
+ * Supports a "multipartResolverBeanName" filter init-param in <code>web.xml</code>;
+ * the default bean name is "filterMultipartResolver". Looks up the MultipartResolver
+ * on each request, to avoid initialization order issues (when using ContextLoaderServlet,
+ * the root application context will get initialized <i>after</i> this filter).
+ *
+ * <p>MultipartResolver lookup is customizable: Override this filter's
+ * <code>lookupMultipartResolver</code> method to use a custom MultipartResolver
+ * instance, for example if not using a Spring web application context.
+ * Note that the lookup method should not create a new MultipartResolver instance
+ * for each call but rather return a reference to a pre-built instance.
  *
  * <p>Note: This filter is an <b>alternative</b> to using DispatcherServlet's
  * MultipartResolver support, for example for web applications with custom
@@ -45,6 +52,8 @@ import org.springframework.web.multipart.MultipartResolver;
  *
  * @author Juergen Hoeller
  * @since 08.10.2003
+ * @see #setMultipartResolverBeanName
+ * @see #lookupMultipartResolver
  * @see org.springframework.web.multipart.MultipartResolver
  * @see org.springframework.web.servlet.DispatcherServlet
  */
@@ -54,7 +63,6 @@ public class MultipartFilter extends OncePerRequestFilter {
 
 	private String multipartResolverBeanName = DEFAULT_MULTIPART_RESOLVER_BEAN_NAME;
 
-	private MultipartResolver multipartResolver;
 
 	/**
 	 * Set the bean name of the MultipartResolver to fetch from Spring's
@@ -72,31 +80,6 @@ public class MultipartFilter extends OncePerRequestFilter {
 		return multipartResolverBeanName;
 	}
 
-	/**
-	 * Fetch a reference to the MultipartResolver via lookupMultipartResolver
-	 * and stores it for use in this filter.
-	 * @see #lookupMultipartResolver
-	 */
-	protected void initFilterBean() throws ServletException {
-		this.multipartResolver = lookupMultipartResolver();
-		if (this.multipartResolver == null) {
-			throw new ServletException("Could not determine MultipartResolver");
-		}
-	}
-
-	/**
-	 * Look for a MultipartResolver bean in the root web application context.
-	 * Supports a "multipartResolverBeanName" filter init param; the default
-	 * bean name is "filterMultipartResolver".
-	 * <p>This can be overridden to use a custom MultipartResolver instance,
-	 * for example if not using a Spring web application context.
-	 * @return the MultipartResolver instance, or null if none found
-	 */
-	protected MultipartResolver lookupMultipartResolver() {
-		logger.info("Using MultipartResolver '" + getMultipartResolverBeanName() + "' for MultipartFilter");
-		WebApplicationContext wac = WebApplicationContextUtils.getRequiredWebApplicationContext(getServletContext());
-		return (MultipartResolver) wac.getBean(getMultipartResolverBeanName());
-	}
 
 	/**
 	 * Check for a multipart request via this filter's MultipartResolver,
@@ -105,29 +88,63 @@ public class MultipartFilter extends OncePerRequestFilter {
 	 * from proper parameter extraction in the multipart case, and are able to cast to
 	 * MultipartHttpServletRequest if they need to.
 	 */
-	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-																	FilterChain filterChain) throws ServletException, IOException {
+	protected void doFilterInternal(
+			HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+			throws ServletException, IOException {
+
+		MultipartResolver multipartResolver = lookupMultipartResolver(request);
+
 		HttpServletRequest processedRequest = request;
-		if (this.multipartResolver.isMultipart(processedRequest)) {
+		if (multipartResolver.isMultipart(processedRequest)) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("Resolving multipart request [" + processedRequest.getRequestURI() +
-				             "] with MultipartFilter");
+						"] with MultipartFilter");
 			}
-			processedRequest = this.multipartResolver.resolveMultipart(processedRequest);
+			processedRequest = multipartResolver.resolveMultipart(processedRequest);
 		}
 		else {
 			if (logger.isDebugEnabled()) {
 				logger.debug("Request [" + processedRequest.getRequestURI() + "] is not a multipart request");
 			}
 		}
+		
 		try {
 			filterChain.doFilter(processedRequest, response);
 		}
 		finally {
 			if (processedRequest instanceof MultipartHttpServletRequest) {
-				this.multipartResolver.cleanupMultipart((MultipartHttpServletRequest) processedRequest);
+				multipartResolver.cleanupMultipart((MultipartHttpServletRequest) processedRequest);
 			}
 		}
+	}
+
+	/**
+	 * Look up the MultipartResolver that this filter should use,
+	 * taking the current HTTP request as argument.
+	 * <p>Default implementation delegates to the <code>lookupMultipartResolver</code>
+	 * without arguments.
+	 * @return the MultipartResolver to use
+	 * @see #lookupMultipartResolver()
+	 */
+	protected MultipartResolver lookupMultipartResolver(HttpServletRequest request) {
+		return lookupMultipartResolver();
+	}
+
+	/**
+	 * Look for a MultipartResolver bean in the root web application context.
+	 * Supports a "multipartResolverBeanName" filter init param; the default
+	 * bean name is "filterMultipartResolver".
+	 * <p>This can be overridden to use a custom MultipartResolver instance,
+	 * for example if not using a Spring web application context.
+	 * @return the MultipartResolver instance, or <code>null</code> if none found
+	 */
+	protected MultipartResolver lookupMultipartResolver() {
+		if (logger.isDebugEnabled()) {
+			logger.debug("Using MultipartResolver '" + getMultipartResolverBeanName() + "' for MultipartFilter");
+		}
+		WebApplicationContext wac =
+				WebApplicationContextUtils.getRequiredWebApplicationContext(getServletContext());
+		return (MultipartResolver) wac.getBean(getMultipartResolverBeanName(), MultipartResolver.class);
 	}
 
 }

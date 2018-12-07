@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework.autoproxy;
 
@@ -37,16 +37,17 @@ import org.springframework.beans.factory.ListableBeanFactory;
  * The separator (.) will also be used in this case.
  *
  * @author Rod Johnson
- * @version $Id: DefaultAdvisorAutoProxyCreator.java,v 1.1 2004/03/23 14:31:51 jhoeller Exp $
  */
 public class DefaultAdvisorAutoProxyCreator extends AbstractAdvisorAutoProxyCreator implements BeanNameAware {
 
 	/** Separator between prefix and remainder of bean name */
 	public final static String SEPARATOR = ".";
-	
+
+
 	private boolean usePrefix;
 
 	private String advisorBeanNamePrefix;
+
 
 	/**
 	 * Set whether to exclude advisors with a certain prefix
@@ -60,14 +61,14 @@ public class DefaultAdvisorAutoProxyCreator extends AbstractAdvisorAutoProxyCrea
 	 * Return whether to exclude advisors with a certain prefix
 	 * in the bean name.
 	 */
-	public boolean getUsePrefix() {
+	public boolean isUsePrefix() {
 		return this.usePrefix;
 	}
 
 	/**
-	 * Set the prefix for bean names that will cause them to be excluded for
-	 * autoproxying by this object. This prefix should be set to avoid
-	 * circular references. Default value is the bean name of this object.
+	 * Set the prefix for bean names that will cause them to be included for
+	 * auto-proxying by this object. This prefix should be set to avoid circular
+	 * references. Default value is the bean name of this object + a dot.
 	 * @param advisorBeanNamePrefix the exclusion prefix
 	 */
 	public void setAdvisorBeanNamePrefix(String advisorBeanNamePrefix) {
@@ -75,15 +76,15 @@ public class DefaultAdvisorAutoProxyCreator extends AbstractAdvisorAutoProxyCrea
 	}
 
 	/**
-	 * Return the prefix for bean names that will cause them not to
-	 * be considered for autoproxying by this object.
+	 * Return the prefix for bean names that will cause them to be included
+	 * for auto-proxying by this object.
 	 */
 	public String getAdvisorBeanNamePrefix() {
 		return this.advisorBeanNamePrefix;
 	}
 
 	public void setBeanName(String name) {
-		// if no infrastructure bean name prefix has been set, override it
+		// If no infrastructure bean name prefix has been set, override it.
 		if (this.advisorBeanNamePrefix == null) {
 			this.advisorBeanNamePrefix = name + SEPARATOR;
 		}
@@ -91,16 +92,20 @@ public class DefaultAdvisorAutoProxyCreator extends AbstractAdvisorAutoProxyCrea
 
 
 	/**
-	 * Find all candidate advices to use in auto proxying.
+	 * Find all candidate advices to use in auto-proxying.
 	 * @return list of Advice
 	 */
 	protected List findCandidateAdvisors() {
 		if (!(getBeanFactory() instanceof ListableBeanFactory)) {
-			throw new IllegalStateException("Cannot use DefaultAdvisorAutoProxyCreator without a ListableBeanFactory");
+			throw new IllegalStateException(
+					"Cannot use DefaultAdvisorAutoProxyCreator without a ListableBeanFactory");
 		}
 		ListableBeanFactory owningFactory = (ListableBeanFactory) getBeanFactory();
-		
-		String[] adviceNames = BeanFactoryUtils.beanNamesIncludingAncestors(owningFactory, Advisor.class);
+
+		// Do not initialize FactoryBeans here: We need to leave all regular beans
+		// uninitialized to let the auto-proxy creator apply to them!
+		String[] adviceNames =
+				BeanFactoryUtils.beanNamesForTypeIncludingAncestors(owningFactory, Advisor.class, true, false);
 		List candidateAdvisors = new LinkedList();
 		for (int i = 0; i < adviceNames.length; i++) {
 			String name = adviceNames[i];

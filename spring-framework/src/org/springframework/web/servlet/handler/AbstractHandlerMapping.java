@@ -1,25 +1,22 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.handler;
 
 import javax.servlet.http.HttpServletRequest;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 import org.springframework.core.Ordered;
 import org.springframework.web.context.support.WebApplicationObjectSupport;
@@ -28,17 +25,18 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.HandlerMapping;
 
 /**
- * Abstract base class for HandlerMapping implementations.
+ * Abstract base class for {@link HandlerMapping} implementations.
  * Supports ordering, a default handler, and handler interceptors.
+ *
  * @author Juergen Hoeller
  * @since 07.04.2003
  * @see #getHandlerInternal
+ * @see #setDefaultHandler
+ * @see #setInterceptors
  * @see org.springframework.web.servlet.HandlerInterceptor
  */
 public abstract class AbstractHandlerMapping extends WebApplicationObjectSupport
     implements HandlerMapping, Ordered {
-
-	protected final Log logger = LogFactory.getLog(getClass());
 
 	private int order = Integer.MAX_VALUE;  // default: same as non-Ordered
 
@@ -58,26 +56,28 @@ public abstract class AbstractHandlerMapping extends WebApplicationObjectSupport
 	/**
 	 * Set the default handler for this handler mapping.
 	 * This handler will be returned if no specific mapping was found.
-	 * Default is null.
-	 * @param defaultHandler default handler instance, or null if none
+	 * <p>Default is <code>null</code>, indicating no default handler.
+	 * @param defaultHandler default handler instance, or <code>null</code> if none
 	 */
 	public final void setDefaultHandler(Object defaultHandler) {
 		this.defaultHandler = defaultHandler;
-		logger.info("Default mapping to handler [" + this.defaultHandler + "]");
+		if (logger.isInfoEnabled()) {
+			logger.info("Default mapping to handler [" + this.defaultHandler + "]");
+		}
 	}
 
 	/**
 	 * Return the default handler for this handler mapping.
-	 * @return the default handler instance, or null if none
+	 * @return the default handler instance, or <code>null</code> if none
 	 */
-	protected final Object getDefaultHandler() {
+	public final Object getDefaultHandler() {
 		return defaultHandler;
 	}
 
 	/**
 	 * Set the handler interceptors to apply for all handlers mapped by
 	 * this handler mapping.
-	 * @param interceptors array of handler interceptors, or null if none
+	 * @param interceptors array of handler interceptors, or <code>null</code> if none
 	 */
 	public final void setInterceptors(HandlerInterceptor[] interceptors) {
 		this.interceptors = interceptors;
@@ -88,7 +88,7 @@ public abstract class AbstractHandlerMapping extends WebApplicationObjectSupport
 	 * Look up a handler for the given request, falling back to the default
 	 * handler if no specific one is found.
 	 * @param request current HTTP request
-	 * @return the looked up handler instance, or the default handler
+	 * @return the corresponding handler instance, or the default handler
 	 * @see #getHandlerInternal
 	 */
 	public final HandlerExecutionChain getHandler(HttpServletRequest request) throws Exception {
@@ -99,7 +99,7 @@ public abstract class AbstractHandlerMapping extends WebApplicationObjectSupport
 		if (handler == null) {
 			return null;
 		}
-		// bean name of resolved handler?
+		// Bean name or resolved handler?
 		if (handler instanceof String) {
 			String handlerName = (String) handler;
 			handler = getApplicationContext().getBean(handlerName);
@@ -108,11 +108,11 @@ public abstract class AbstractHandlerMapping extends WebApplicationObjectSupport
 	}
 
 	/**
-	 * Lookup a handler for the given request, returning null if no specific
-	 * one is found. This method is called by getHandler, a null return value
-	 * will lead to the default handler, if one is set.
+	 * Look up a handler for the given request, returning <code>null</code> if no
+	 * specific one is found. This method is called by <code>getHandler<code>;
+	 * a <code>null</code> return value will lead to the default handler, if one is set.
 	 * @param request current HTTP request
-	 * @return the looked up handler instance, or null
+	 * @return the corresponding handler instance, or <code>null</code> if none found
 	 * @throws Exception if there is an internal error
 	 */
 	protected abstract Object getHandlerInternal(HttpServletRequest request) throws Exception;

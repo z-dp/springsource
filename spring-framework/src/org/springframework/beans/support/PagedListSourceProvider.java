@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.support;
 
@@ -22,6 +22,7 @@ import java.util.Locale;
 /**
  * Callback that provides the source for a reloadable List.
  * Used by RefreshablePagedListHolder.
+ *
  * @author Jean-Pierre PAWLAK
  * @author Juergen Hoeller
  * @see org.springframework.beans.support.RefreshablePagedListHolder#setSourceProvider
@@ -34,9 +35,9 @@ public interface PagedListSourceProvider {
 	 * for easy data binding from a request. An instance will simply
 	 * get passed through to this callback method.
 	 * @param locale Locale that the List should be loaded for,
-	 * or null if not locale-specific
+	 * or <code>null</code> if not locale-specific
 	 * @param filter object representing filter settings,
-	 * or null if no filter options are used
+	 * or <code>null</code> if no filter options are used
 	 * @return the loaded List
 	 * @see org.springframework.beans.support.RefreshablePagedListHolder#setLocale
 	 * @see org.springframework.beans.support.RefreshablePagedListHolder#setFilter

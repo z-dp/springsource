@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.view.velocity;
 
@@ -20,11 +20,11 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.mockobjects.servlet.MockHttpServletResponse;
 import junit.framework.TestCase;
 import org.apache.velocity.Template;
 import org.apache.velocity.app.VelocityEngine;
@@ -33,18 +33,26 @@ import org.apache.velocity.context.Context;
 import org.apache.velocity.exception.ParseErrorException;
 import org.apache.velocity.exception.ResourceNotFoundException;
 import org.apache.velocity.tools.generic.DateTool;
+import org.apache.velocity.tools.generic.MathTool;
 import org.apache.velocity.tools.generic.NumberTool;
+import org.apache.velocity.tools.view.context.ChainedContext;
+import org.apache.velocity.tools.view.tools.LinkTool;
 import org.easymock.MockControl;
 
 import org.springframework.context.ApplicationContextException;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockServletContext;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.StaticWebApplicationContext;
 import org.springframework.web.servlet.DispatcherServlet;
+import org.springframework.web.servlet.View;
 import org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver;
+import org.springframework.web.servlet.view.InternalResourceView;
+import org.springframework.web.servlet.view.RedirectView;
 
 /**
  * @author Rod Johnson
- * @version $Id: VelocityViewTests.java,v 1.16 2004/03/18 03:01:21 trisberg Exp $
  */
 public class VelocityViewTests extends TestCase {
 
@@ -52,7 +60,7 @@ public class VelocityViewTests extends TestCase {
 		VelocityView vv = new VelocityView();
 		MockControl wmc = MockControl.createControl(WebApplicationContext.class);
 		WebApplicationContext wac = (WebApplicationContext) wmc.getMock();
-		wac.getBeansOfType(VelocityConfig.class, true, true);
+		wac.getBeansOfType(VelocityConfig.class, true, false);
 		wmc.setReturnValue(new HashMap());
 		wac.getParentBeanFactory();
 		wmc.setReturnValue(null);
@@ -73,21 +81,14 @@ public class VelocityViewTests extends TestCase {
 
 	public void testNoTemplateName() throws Exception {
 		VelocityView vv = new VelocityView();
-		MockControl wmc = MockControl.createControl(WebApplicationContext.class);
-		WebApplicationContext wac = (WebApplicationContext) wmc.getMock();
-		// Expect no calls
-		wmc.replay();
-
 		try {
-			vv.setApplicationContext(wac);
-			fail();
+			vv.afterPropertiesSet();
+			fail("Should have thrown IllegalArgumentException");
 		}
 		catch (IllegalArgumentException ex) {
 			// Check there's a helpful error message
 			assertTrue(ex.getMessage().indexOf("url") != -1);
 		}
-
-		wmc.verify();
 	}
 
 	public void testCannotResolveTemplateNameResourceNotFoundException() throws Exception {
@@ -103,7 +104,7 @@ public class VelocityViewTests extends TestCase {
 	}
 
 	/**
-	 * Check for failure to lookup a template for a range of reasons
+	 * Check for failure to lookup a template for a range of reasons.
 	 */
 	private void testCannotResolveTemplateName(final Exception templateLookupException) throws Exception {
 		final String templateName = "test.vm";
@@ -123,7 +124,7 @@ public class VelocityViewTests extends TestCase {
 				};
 			}
 		};
-		wac.getBeansOfType(VelocityConfig.class, true, true);
+		wac.getBeansOfType(VelocityConfig.class, true, false);
 		Map configurers = new HashMap();
 		configurers.put("velocityConfigurer", vc);
 		wmc.setReturnValue(configurers);
@@ -181,7 +182,7 @@ public class VelocityViewTests extends TestCase {
 				return new TestVelocityEngine(templateName, expectedTemplate);
 			}
 		};
-		wac.getBeansOfType(VelocityConfig.class, true, true);
+		wac.getBeansOfType(VelocityConfig.class, true, false);
 		Map configurers = new HashMap();
 		configurers.put("velocityConfigurer", vc);
 		wmc.setReturnValue(configurers);
@@ -235,13 +236,13 @@ public class VelocityViewTests extends TestCase {
 				return new TestVelocityEngine(templateName, expectedTemplate);
 			}
 		};
-		wac.getBeansOfType(VelocityConfig.class, true, true);
+		wac.getBeansOfType(VelocityConfig.class, true, false);
 		Map configurers = new HashMap();
 		configurers.put("velocityConfigurer", vc);
 		wmc.setReturnValue(configurers);
 		wmc.replay();
 
-		// Let it ask for locale
+		// let it ask for locale
 		MockControl reqControl = MockControl.createControl(HttpServletRequest.class);
 		HttpServletRequest req = (HttpServletRequest) reqControl.getMock();
 		req.getAttribute(DispatcherServlet.LOCALE_RESOLVER_ATTRIBUTE);
@@ -256,8 +257,10 @@ public class VelocityViewTests extends TestCase {
 			protected void mergeTemplate(Template template, Context context, HttpServletResponse response) throws Exception {
 				assertTrue(template == expectedTemplate);
 				assertTrue(response == expectedResponse);
+
 				assertEquals("myValue", context.get("myHelper"));
 				assertTrue(context.get("velocityFormatter") instanceof VelocityFormatter);
+				assertTrue(context.get("math") instanceof MathTool);
 
 				assertTrue(context.get("dateTool") instanceof DateTool);
 				DateTool dateTool = (DateTool) context.get("dateTool");
@@ -267,12 +270,17 @@ public class VelocityViewTests extends TestCase {
 				NumberTool numberTool = (NumberTool) context.get("numberTool");
 				assertTrue(numberTool.getLocale().equals(Locale.CANADA));
 			}
-			protected void exposeHelpers(Context vContext, HttpServletRequest request) throws Exception {
-				vContext.put("myHelper", "myValue");
+
+			protected void exposeHelpers(Map model, HttpServletRequest request) throws Exception {
+				model.put("myHelper", "myValue");
 			}
 		};
+		
 		vv.setUrl(templateName);
 		vv.setApplicationContext(wac);
+		Properties toolAttributes = new Properties();
+		toolAttributes.setProperty("math", MathTool.class.getName());
+		vv.setToolAttributes(toolAttributes);
 		vv.setVelocityFormatterAttribute("velocityFormatter");
 		vv.setDateToolAttribute("dateTool");
 		vv.setNumberToolAttribute("numberTool");
@@ -282,31 +290,158 @@ public class VelocityViewTests extends TestCase {
 		reqControl.verify();
 	}
 
-	public void testVelocityViewResolver() {
-		VelocityViewResolver resolver = new VelocityViewResolver();
-		resolver.setPrefix("prefix_");
-		resolver.setSuffix("_suffix");
-		resolver.setApplicationContext(new StaticWebApplicationContext());
-		VelocityView view = (VelocityView) resolver.loadView("test", Locale.CANADA);
-		assertEquals("test", view.getBeanName());
-		assertEquals("prefix_test_suffix", view.getUrl());
+	public void testVelocityToolboxView() throws Exception {
+		final String templateName = "test.vm";
+
+		StaticWebApplicationContext wac = new StaticWebApplicationContext();
+		wac.setServletContext(new MockServletContext());
+		final Template expectedTemplate = new Template();
+		VelocityConfig vc = new VelocityConfig() {
+			public VelocityEngine getVelocityEngine() {
+				return new TestVelocityEngine(templateName, expectedTemplate);
+			}
+		};
+		wac.getDefaultListableBeanFactory().registerSingleton("velocityConfigurer", vc);
+
+		final HttpServletRequest expectedRequest = new MockHttpServletRequest();
+		final HttpServletResponse expectedResponse = new MockHttpServletResponse();
+
+		VelocityToolboxView vv = new VelocityToolboxView() {
+			protected void mergeTemplate(Template template, Context context, HttpServletResponse response) throws Exception {
+				assertTrue(template == expectedTemplate);
+				assertTrue(response == expectedResponse);
+				assertTrue(context instanceof ChainedContext);
+
+				assertEquals("this is foo.", context.get("foo"));
+				assertTrue(context.get("map") instanceof HashMap);
+				assertTrue(context.get("date") instanceof DateTool);
+				assertTrue(context.get("math") instanceof MathTool);
+
+				assertTrue(context.get("link") instanceof LinkTool);
+				LinkTool linkTool = (LinkTool) context.get("link");
+				assertNotNull(linkTool.getContextURL());
+
+				assertTrue(context.get("link2") instanceof LinkTool);
+				LinkTool linkTool2 = (LinkTool) context.get("link2");
+				assertNotNull(linkTool2.getContextURL());
+			}
+		};
+
+		vv.setUrl(templateName);
+		vv.setApplicationContext(wac);
+		Properties toolAttributes = new Properties();
+		toolAttributes.setProperty("math", MathTool.class.getName());
+		toolAttributes.setProperty("link2", LinkTool.class.getName());
+		vv.setToolAttributes(toolAttributes);
+		vv.setToolboxConfigLocation("org/springframework/web/servlet/view/velocity/toolbox.xml");
+		vv.render(new HashMap(), expectedRequest, expectedResponse);
 	}
 
+	public void testVelocityViewResolver() throws Exception {
+		VelocityConfig vc = new VelocityConfig() {
+			public VelocityEngine getVelocityEngine() {
+				return new TestVelocityEngine("prefix_test_suffix", new Template());
+			}
+		};
 
-	//	Damn thing is a class so we can't mock it
-	private class TestVelocityEngine extends VelocityEngine {
-		private Template t;
-		private String expectedName;
+		StaticWebApplicationContext wac = new StaticWebApplicationContext();
+		wac.getBeanFactory().registerSingleton("configurer", vc);
 
-		public TestVelocityEngine(String expectedName, Template t) {
-			this.t = t;
-			this.expectedName = expectedName;
-		}
+		VelocityViewResolver vr = new VelocityViewResolver();
+		vr.setPrefix("prefix_");
+		vr.setSuffix("_suffix");
+		vr.setApplicationContext(wac);
 
-		public Template getTemplate(String arg0) throws ResourceNotFoundException, ParseErrorException, Exception {
-			assertEquals(arg0, expectedName);
-			return t;
-		}
+		View view = vr.resolveViewName("test", Locale.CANADA);
+		assertEquals("Correct view class", VelocityView.class, view.getClass());
+		assertEquals("Correct URL", "prefix_test_suffix", ((VelocityView) view).getUrl());
+
+		view = vr.resolveViewName("redirect:myUrl", Locale.getDefault());
+		assertEquals("Correct view class", RedirectView.class, view.getClass());
+		assertEquals("Correct URL", "myUrl", ((RedirectView) view).getUrl());
+
+		view = vr.resolveViewName("forward:myUrl", Locale.getDefault());
+		assertEquals("Correct view class", InternalResourceView.class, view.getClass());
+		assertEquals("Correct URL", "myUrl", ((InternalResourceView) view).getUrl());
+	}
+
+	public void testVelocityViewResolverWithToolbox() throws Exception {
+		VelocityConfig vc = new VelocityConfig() {
+			public VelocityEngine getVelocityEngine() {
+				return new TestVelocityEngine("prefix_test_suffix", new Template());
+			}
+		};
+
+		StaticWebApplicationContext wac = new StaticWebApplicationContext();
+		wac.getBeanFactory().registerSingleton("configurer", vc);
+
+		String toolbox = "org/springframework/web/servlet/view/velocity/toolbox.xml";
+
+		VelocityViewResolver vr = new VelocityViewResolver();
+		vr.setPrefix("prefix_");
+		vr.setSuffix("_suffix");
+		vr.setToolboxConfigLocation(toolbox);
+		vr.setApplicationContext(wac);
+
+		View view = vr.resolveViewName("test", Locale.CANADA);
+		assertEquals("Correct view class", VelocityToolboxView.class, view.getClass());
+		assertEquals("Correct URL", "prefix_test_suffix", ((VelocityView) view).getUrl());
+		assertEquals("Correct toolbox", toolbox, ((VelocityToolboxView) view).getToolboxConfigLocation());
+	}
+
+	public void testVelocityViewResolverWithToolboxSubclass() throws Exception {
+		VelocityConfig vc = new VelocityConfig() {
+			public VelocityEngine getVelocityEngine() {
+				TestVelocityEngine ve = new TestVelocityEngine();
+				ve.addTemplate("prefix_test_suffix", new Template());
+				ve.addTemplate(VelocityLayoutView.DEFAULT_LAYOUT_URL, new Template());
+				return ve;
+			}
+		};
+
+		StaticWebApplicationContext wac = new StaticWebApplicationContext();
+		wac.getBeanFactory().registerSingleton("configurer", vc);
+
+		String toolbox = "org/springframework/web/servlet/view/velocity/toolbox.xml";
+
+		VelocityViewResolver vr = new VelocityViewResolver();
+		vr.setViewClass(VelocityLayoutView.class);
+		vr.setPrefix("prefix_");
+		vr.setSuffix("_suffix");
+		vr.setToolboxConfigLocation(toolbox);
+		vr.setApplicationContext(wac);
+
+		View view = vr.resolveViewName("test", Locale.CANADA);
+		assertEquals("Correct view class", VelocityLayoutView.class, view.getClass());
+		assertEquals("Correct URL", "prefix_test_suffix", ((VelocityView) view).getUrl());
+		assertEquals("Correct toolbox", toolbox, ((VelocityToolboxView) view).getToolboxConfigLocation());
+	}
+
+	public void testVelocityLayoutViewResolver() throws Exception {
+		VelocityConfig vc = new VelocityConfig() {
+			public VelocityEngine getVelocityEngine() {
+				TestVelocityEngine ve = new TestVelocityEngine();
+				ve.addTemplate("prefix_test_suffix", new Template());
+				ve.addTemplate("myLayoutUrl", new Template());
+				return ve;
+			}
+		};
+
+		StaticWebApplicationContext wac = new StaticWebApplicationContext();
+		wac.getBeanFactory().registerSingleton("configurer", vc);
+
+		VelocityLayoutViewResolver vr = new VelocityLayoutViewResolver();
+		vr.setPrefix("prefix_");
+		vr.setSuffix("_suffix");
+		vr.setLayoutUrl("myLayoutUrl");
+		vr.setLayoutKey("myLayoutKey");
+		vr.setScreenContentKey("myScreenContentKey");
+		vr.setApplicationContext(wac);
+
+		View view = vr.resolveViewName("test", Locale.CANADA);
+		assertEquals("Correct view class", VelocityLayoutView.class, view.getClass());
+		assertEquals("Correct URL", "prefix_test_suffix", ((VelocityView) view).getUrl());
+		// TODO: Need to test actual VelocityLayoutView properties and their functionality!
 	}
 
 }

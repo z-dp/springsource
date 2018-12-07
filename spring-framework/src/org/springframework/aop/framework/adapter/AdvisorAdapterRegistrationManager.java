@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,43 +12,49 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework.adapter;
 
-import org.springframework.aop.framework.adapter.AdvisorAdapter;
-import org.springframework.aop.framework.adapter.GlobalAdvisorAdapterRegistry;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 
 /**
- * BeanPostProcessor implementation that "registers" instances of any non-default AdvisorAdapters
- * with GlobalAdvisorAdapterRegistry.
- * <p>
- * The only requirement for it to work is that it needs to be defined in application context
- * along with any arbitrary "non-native" Spring AdvisorAdapters that need to be "recognized" by
- * SpringAOP module.
+ * BeanPostProcessor implementation that "registers" instances of any
+ * non-default AdvisorAdapters with GlobalAdvisorAdapterRegistry.
+ *
+ * <p>The only requirement for it to work is that it needs to be defined
+ * in application context along with any arbitrary "non-native" Spring
+ * AdvisorAdapters that need to be "recognized" by Spring's AOP framework.
  * 
  * @author Dmitriy Kopylenko
- * @version $Id: AdvisorAdapterRegistrationManager.java,v 1.2 2004/03/18 02:46:09 trisberg Exp $
+ * @since 27.02.2004
+ * @see AdvisorAdapter
+ * @see AdvisorAdapterRegistry
+ * @see GlobalAdvisorAdapterRegistry
  */
 public class AdvisorAdapterRegistrationManager implements BeanPostProcessor {
 
+	private AdvisorAdapterRegistry advisorAdapterRegistry = GlobalAdvisorAdapterRegistry.getInstance();
+
 	/**
-	 * @see org.springframework.beans.factory.config.BeanPostProcessor#postProcessBeforeInitialization(java.lang.Object, java.lang.String)
+	 * Specify the AdvisorAdapterRegistry to use.
+	 * Default is the global AdvisorAdapterRegistry.
+	 * @see org.springframework.aop.framework.adapter.GlobalAdvisorAdapterRegistry
 	 */
-	public Object postProcessBeforeInitialization(Object bean, String name) throws BeansException {
+	public void setAdvisorAdapterRegistry(AdvisorAdapterRegistry advisorAdapterRegistry) {
+		this.advisorAdapterRegistry = advisorAdapterRegistry;
+	}
+
+	public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
 		return bean;
 	}
 
-	/**
-	 * @see org.springframework.beans.factory.config.BeanPostProcessor#postProcessAfterInitialization(java.lang.Object, java.lang.String)
-	 */
-	public Object postProcessAfterInitialization(Object bean, String name) throws BeansException {
-		if(bean instanceof AdvisorAdapter){
-			GlobalAdvisorAdapterRegistry.getInstance().registerAdvisorAdapter((AdvisorAdapter)bean);
+	public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+		if (bean instanceof AdvisorAdapter){
+			this.advisorAdapterRegistry.registerAdvisorAdapter((AdvisorAdapter) bean);
 		}
-		
 		return bean;
 	}
+
 }

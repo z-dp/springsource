@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,42 +12,65 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.support;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.beans.BeansException;
+import org.springframework.util.StringUtils;
 
 /**
  * PropertyComparator performs a comparison of two beans,
- * using the specified bean property via a BeanWrapper.
+ * evaluating the specified bean property via a BeanWrapper.
+ *
  * @author Juergen Hoeller
  * @author Jean-Pierre Pawlak
  * @since 19.05.2003
+ * @see org.springframework.beans.BeanWrapper
  */
 public class PropertyComparator implements Comparator {
 
 	protected final Log logger = LogFactory.getLog(getClass());
 
-	private SortDefinition sortDefinition;
+	private final SortDefinition sortDefinition;
 
-	private Map cachedBeanWrappers = new HashMap();
+	private final BeanWrapperImpl beanWrapper = new BeanWrapperImpl(false);
 
+
+	/**
+	 * Create a new PropertyComparator for the given SortDefinition.
+	 * @see MutableSortDefinition
+	 */
 	public PropertyComparator(SortDefinition sortDefinition) {
 		this.sortDefinition = sortDefinition;
 	}
+
+	/**
+	 * Create a PropertyComparator for the given settings.
+	 * @param property the property to compare
+	 * @param ignoreCase whether upper and lower case in String values should be ignored
+	 * @param ascending whether to sort ascending (true) or descending (false)
+	 */
+	public PropertyComparator(String property, boolean ignoreCase, boolean ascending) {
+		this.sortDefinition = new MutableSortDefinition(property, ignoreCase, ascending);
+	}
+
+	/**
+	 * Return the SortDefinition that this comparator uses.
+	 */
+	public final SortDefinition getSortDefinition() {
+		return sortDefinition;
+	}
+
 
 	public int compare(Object o1, Object o2) {
 		Object v1 = getPropertyValue(o1);
@@ -56,38 +79,50 @@ public class PropertyComparator implements Comparator {
 			v1 = ((String) v1).toLowerCase();
 			v2 = ((String) v2).toLowerCase();
 		}
+
 		int result;
+		
+		// Put an object with null property at the end of the sort result.
 		try {
 			if (v1 != null) {
-				result = ((Comparable) v1).compareTo(v2);
+				result = (v2 != null ? ((Comparable) v1).compareTo(v2) : -1);
 			}
 			else {
-				if (v2 != null) {
-					result = - ((Comparable) v2).compareTo(v1);
-				} else {
-					return 0;
-				}
+				result = (v2 != null ? 1 : 0);
 			}
 		}
 		catch (RuntimeException ex) {
-			logger.warn("Could not sort objects [" + o1 + "] and [" + o2 + "]", ex);
+			if (logger.isWarnEnabled()) {
+				logger.warn("Could not sort objects [" + o1 + "] and [" + o2 + "]", ex);
+			}
 			return 0;
 		}
+
 		return (this.sortDefinition.isAscending() ? result : -result);
 	}
 
-	private Object getPropertyValue(Object o) throws BeansException {
-		BeanWrapper bw = (BeanWrapper) this.cachedBeanWrappers.get(o);
-		if (bw == null) {
-			bw = new BeanWrapperImpl(o);
-			this.cachedBeanWrappers.put(o, bw);
+	/**
+	 * Get the SortDefinition's property value for the given object.
+	 * @param obj the object to get the property value for
+	 * @return the property value
+	 */
+	private Object getPropertyValue(Object obj) {
+		// If a nested property cannot be read, simply return null
+		// (similar to JSTL EL). If the property doesn't exist in the
+		// first place, let the exception through.
+		try {
+			this.beanWrapper.setWrappedInstance(obj);
+			return this.beanWrapper.getPropertyValue(this.sortDefinition.getProperty());
 		}
-		return bw.getPropertyValue(this.sortDefinition.getProperty());
+		catch (BeansException ex) {
+			logger.info("PropertyComparator could not access property - treating as null for sorting", ex);
+			return null;
+		}
 	}
 
 
 	/**
-	 * Sorts the given List according to the given sort definition.
+	 * Sort the given List according to the given sort definition.
 	 * <p>Note: Contained objects have to provide the given property
 	 * in the form of a bean property, i.e. a getXXX method.
 	 * @param source the input List
@@ -95,11 +130,13 @@ public class PropertyComparator implements Comparator {
 	 * @throws java.lang.IllegalArgumentException in case of a missing propertyName
 	 */
 	public static void sort(List source, SortDefinition sortDefinition) throws BeansException {
-		Collections.sort(source, new PropertyComparator(sortDefinition));
+		if (StringUtils.hasText(sortDefinition.getProperty())) {
+			Collections.sort(source, new PropertyComparator(sortDefinition));
+		}
 	}
 
 	/**
-	 * Sorts the given source according to the given sort definition.
+	 * Sort the given source according to the given sort definition.
 	 * <p>Note: Contained objects have to provide the given property
 	 * in the form of a bean property, i.e. a getXXX method.
 	 * @param source input source
@@ -107,7 +144,9 @@ public class PropertyComparator implements Comparator {
 	 * @throws java.lang.IllegalArgumentException in case of a missing propertyName
 	 */
 	public static void sort(Object[] source, SortDefinition sortDefinition) throws BeansException {
-		Arrays.sort(source, new PropertyComparator(sortDefinition));
+		if (StringUtils.hasText(sortDefinition.getProperty())) {
+			Arrays.sort(source, new PropertyComparator(sortDefinition));
+		}
 	}
 
 }

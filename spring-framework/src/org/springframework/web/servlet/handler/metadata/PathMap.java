@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,37 +12,42 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.handler.metadata;
 
 /**
- * Attribute to be used on Controller classes to allow for automatic
- * URL mapping without web controllers being defined as beans in an 
- * XML bean definition file. The path map should be the path in the current
- * application, such as /foo.cgi. If there is no leading /, one will be
- * prepended.
- * Application code must use the Commons Attributes indexer
- * tool to use this option.
+ * Attribute to be used on Controller classes to allow for automatic URL mapping
+ * without web controllers being defined as beans in an XML bean definition file.
+ *
+ * <p>The path map should be the path in the current application, such as /foo.cgi.
+ * If there is no leading "/", one will be prepended.
+ *
+ * <p>Application code must use the Commons Attributes indexer tool to use this option.
+ *
  * @author Rod Johnson
- * @version $Id: PathMap.java,v 1.3 2004/03/18 02:46:17 trisberg Exp $
- * 
  * @@org.apache.commons.attributes.Indexed()
  */
 public class PathMap {
 	
-	/**
-	 * NB: The Indexed attribute on this class is required. Thus the Spring
-	 * Jar must be built including a Commons Attributes attribute compilation step
+	/*
+	 * NB: The Indexed attribute on this class is required. Thus the Spring jar
+	 * must be built including a Commons Attributes attribute compilation step
 	 * for this class.
 	 */
 	
 	private final String url;
-	
+
+	/**
+	 * Create a new PathMap attribute for the given URL.
+	 */
 	public PathMap(String url) {
 		this.url = url;
 	}
-	
+
+	/**
+	 * Return the URL that this attribute indicates.
+	 */
 	public String getUrl() {
 		return url;
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,22 +12,23 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.transaction.interceptor;
 
-import javax.ejb.EJBException;
 import javax.servlet.ServletException;
 
 import junit.framework.TestCase;
 
+import org.springframework.mail.MailSendException;
 import org.springframework.transaction.TransactionDefinition;
 
 /**
- * Tests to check conversion from String to TransactionAttribute
- * @since 26-Apr-2003
- * @version $Id: TransactionAttributeEditorTests.java,v 1.4 2004/03/18 03:01:17 trisberg Exp $
+ * Tests to check conversion from String to TransactionAttribute.
+ *
  * @author Rod Johnson
+ * @author Juergen Hoeller
+ * @since 26.04.2003
  */
 public class TransactionAttributeEditorTests extends TestCase {
 	
@@ -45,9 +46,6 @@ public class TransactionAttributeEditorTests extends TestCase {
 		assertTrue(ta == null);
 	}
 	
-	/**
-	 * Format is PROPAGATION
-	 */
 	public void testValidPropagationCodeOnly() {
 		TransactionAttributeEditor pe = new TransactionAttributeEditor();
 		pe.setAsText("PROPAGATION_REQUIRED");
@@ -71,7 +69,7 @@ public class TransactionAttributeEditorTests extends TestCase {
 	
 	public void testValidPropagationCodeAndIsolationCode() {
 		TransactionAttributeEditor pe = new TransactionAttributeEditor();
-		pe.setAsText("PROPAGATION_REQUIRED,ISOLATION_READ_UNCOMMITTED");
+		pe.setAsText("PROPAGATION_REQUIRED, ISOLATION_READ_UNCOMMITTED");
 		TransactionAttribute ta = (TransactionAttribute) pe.getValue();
 		assertTrue(ta != null);
 		assertTrue(ta.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRED);
@@ -91,7 +89,7 @@ public class TransactionAttributeEditorTests extends TestCase {
 	
 	public void testValidPropagationCodeAndIsolationCodeAndRollbackRules1() {
 		TransactionAttributeEditor pe = new TransactionAttributeEditor();
-		pe.setAsText("PROPAGATION_MANDATORY,ISOLATION_REPEATABLE_READ,timeout_10,-ServletException,+EJBException");
+		pe.setAsText("PROPAGATION_MANDATORY,ISOLATION_REPEATABLE_READ,timeout_10,-ServletException,+MailSendException");
 		TransactionAttribute ta = (TransactionAttribute) pe.getValue();
 		assertNotNull(ta);
 		assertEquals(ta.getPropagationBehavior(), TransactionDefinition.PROPAGATION_MANDATORY);
@@ -102,12 +100,12 @@ public class TransactionAttributeEditorTests extends TestCase {
 		assertFalse(ta.rollbackOn(new Exception()));
 		// Check for our bizarre customized rollback rules
 		assertTrue(ta.rollbackOn(new ServletException()));
-		assertTrue(!ta.rollbackOn(new EJBException()));
+		assertTrue(!ta.rollbackOn(new MailSendException("")));
 	}
 
 	public void testValidPropagationCodeAndIsolationCodeAndRollbackRules2() {
 		TransactionAttributeEditor pe = new TransactionAttributeEditor();
-		pe.setAsText("+ServletException,readOnly,ISOLATION_READ_COMMITTED,-EJBException,PROPAGATION_SUPPORTS");
+		pe.setAsText("+ServletException,readOnly,ISOLATION_READ_COMMITTED,-MailSendException,PROPAGATION_SUPPORTS");
 		TransactionAttribute ta = (TransactionAttribute) pe.getValue();
 		assertNotNull(ta);
 		assertEquals(ta.getPropagationBehavior(), TransactionDefinition.PROPAGATION_SUPPORTS);
@@ -118,7 +116,7 @@ public class TransactionAttributeEditorTests extends TestCase {
 		assertFalse(ta.rollbackOn(new Exception()));
 		// Check for our bizarre customized rollback rules
 		assertFalse(ta.rollbackOn(new ServletException()));
-		assertTrue(ta.rollbackOn(new EJBException()));
+		assertTrue(ta.rollbackOn(new MailSendException("")));
 	}
 
 	public void testDefaultTransactionAttributeToString() {

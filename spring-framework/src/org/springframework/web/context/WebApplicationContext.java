@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.context;
 
@@ -40,7 +40,6 @@ import org.springframework.ui.context.ThemeSource;
  * @author Rod Johnson
  * @author Juergen Hoeller
  * @since January 19, 2001
- * @version $Revision: 1.11 $
  * @see ServletContextAware#setServletContext
  */
 public interface WebApplicationContext extends ApplicationContext, ThemeSource {

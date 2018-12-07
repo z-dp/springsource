@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,9 +12,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans;
+
+import java.io.Serializable;
+
+import org.springframework.util.ObjectUtils;
 
 /**
  * Class to hold information and value for an individual property.
@@ -28,18 +32,18 @@ package org.springframework.beans;
  *
  * @author Rod Johnson
  * @since 13 May 2001
- * @version $Id: PropertyValue.java,v 1.3 2004/03/18 02:46:12 trisberg Exp $
+ * @see PropertyValues
+ * @see BeanWrapper
  */
-public class PropertyValue {
+public class PropertyValue implements Serializable {
 
-	/** Property name */
-	private String name;
+	private final String name;
 
-	/** Value of the property */
-	private Object value;
+	private final Object value;
+
 
 	/**
-	 * Creates new PropertyValue.
+	 * Create a new PropertyValue instance.
 	 * @param name name of the property
 	 * @param value value of the property (possibly before type conversion)
 	 */
@@ -51,9 +55,9 @@ public class PropertyValue {
 		this.value = value;
 	}
 
+
 	/**
 	 * Return the name of the property.
-	 * @return the name of the property
 	 */
 	public String getName() {
 		return name;
@@ -64,15 +68,11 @@ public class PropertyValue {
 	 * <p>Note that type conversion will <i>not</i> have occurred here.
 	 * It is the responsibility of the BeanWrapper implementation to
 	 * perform type conversion.
-	 * @return the value of the property
 	 */
 	public Object getValue() {
 		return value;
 	}
 
-	public String toString() {
-		return "PropertyValue: name='" + name + "'; value=[" + value + "]";
-	}
 
 	public boolean equals(Object other) {
 		if (this == other) {
@@ -82,12 +82,15 @@ public class PropertyValue {
 			return false;
 		}
 		PropertyValue otherPv = (PropertyValue) other;
-		return (this.name.equals(otherPv.name) &&
-				((this.value == null && otherPv.value == null) || this.value.equals(otherPv.value)));
+		return (this.name.equals(otherPv.name) && ObjectUtils.nullSafeEquals(this.value, otherPv.value));
 	}
 
 	public int hashCode() {
-		return this.name.hashCode() * 29 + (this.value != null ? this.value.hashCode() : 0);
+		return this.name.hashCode() * 29 + (this.value == null ? 0 : this.value.hashCode());
+	}
+
+	public String toString() {
+		return "PropertyValue: name='" + this.name + "', value=[" + this.value + "]";
 	}
 
 }

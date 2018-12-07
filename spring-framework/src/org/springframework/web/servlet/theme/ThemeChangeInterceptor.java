@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.theme;
 
@@ -27,15 +27,20 @@ import org.springframework.web.servlet.support.RequestContextUtils;
 /**
  * Interceptor that allows for changing the current theme on every request,
  * via a configurable request parameter.
+ *
  * @author Juergen Hoeller
  * @since 20.06.2003
  * @see org.springframework.web.servlet.ThemeResolver
  */
 public class ThemeChangeInterceptor extends HandlerInterceptorAdapter {
 
+	/**
+	 * Default name of the theme specification parameter: "theme".
+	 */
 	public static final String DEFAULT_PARAM_NAME = "theme";
 
 	private String paramName = DEFAULT_PARAM_NAME;
+
 
 	/**
 	 * Set the name of the parameter that contains a theme specification
@@ -45,14 +50,16 @@ public class ThemeChangeInterceptor extends HandlerInterceptorAdapter {
 		this.paramName = paramName;
 	}
 
+
 	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
 			throws ServletException {
+
 		ThemeResolver themeResolver = RequestContextUtils.getThemeResolver(request);
 		String newTheme = request.getParameter(this.paramName);
 		if (newTheme != null) {
 			themeResolver.setThemeName(request, response, newTheme);
 		}
-		// proceed in any case
+		// Proceed in any case.
 		return true;
 	}
 

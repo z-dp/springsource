@@ -1,102 +1,86 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2005 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.validation;
 
 /**
- * Encapsulates a field error, i.e. a reason for rejecting a
- * specific field value.
+ * Class that encapsulates a field error, i.e. a reason for rejecting
+ * a specific field value.
  *
- * <p>A field error gets created with a single code but uses
- * 3 codes for message resolution, in the following order:
- * <ul>
- * <li>first: code + "." + object name + "." + field;
- * <li>then: code + "." + field;
- * <li>finally: code.
- * </ul>
- *
- * <p>E.g.: code "typeMismatch", field "age", object name "user":
- * <ul>
- * <li>1. try "typeMismatch.user.age";
- * <li>2. try "typeMismatch.age";
- * <li>3. try "typeMismatch".
- * </ul>
- *
- * <p>Thus, this resolution algorithm can be leveraged for example
- * to show specific messages for binding errors like "required"
- * and "typeMismatch":
- * <ul>
- * <li>at the object + field level ("age" field, but only on "user");
- * <li>field level (all "age" fields, no matter which object name);
- * <li>or general level (all fields, on any object).
- * </ul>
+ * <p>See DefaultMessageCodesResolver javadoc for details on how a message
+ * code list is built for a FieldError.
  *
  * @author Rod Johnson
  * @author Juergen Hoeller
+ * @since 10.03.2003
+ * @see DefaultMessageCodesResolver
  */
 public class FieldError extends ObjectError {
-
-	public static final String CODE_SEPARATOR = ".";
 
 	private final String field;
 
 	private final Object rejectedValue;
 
-	private boolean bindingFailure;
+	private final boolean bindingFailure;
 
 	/**
-	 * Create a new FieldError instance, using a default code.
+	 * Create a new FieldError instance.
+	 * @param objectName the name of the affected object
+	 * @param field the affected field of the object
+	 * @param rejectedValue the rejected field value
+	 * @param bindingFailure whether this error represents a binding failure
+	 * (like a type mismatch); else, it is a validation failure
+	 * @param codes the codes to be used to resolve this message
+	 * @param arguments the array of arguments to be used to resolve this message
+	 * @param defaultMessage the default message to be used to resolve this message
 	 */
-	public FieldError(String objectName, String field, Object rejectedValue, boolean bindingFailure,
-	                  String code, Object[] args, String defaultMessage) {
-		this(objectName, field, rejectedValue, bindingFailure,
-		     new String[] {code + CODE_SEPARATOR + objectName + CODE_SEPARATOR + field,
-		                   code + CODE_SEPARATOR + field,
-		                   code},
-		     args, defaultMessage);
-	}
-
-	/**
-	 * Create a new FieldError instance, using multiple codes.
-	 * <p>This is only meant to be used by subclasses.
-	 * @see org.springframework.context.MessageSourceResolvable#getCodes
-	 */
-	protected FieldError(String objectName, String field, Object rejectedValue, boolean bindingFailure,
-	                     String[] codes, Object[] args, String defaultMessage) {
-		super(objectName, codes, args, defaultMessage);
+	public FieldError(
+			String objectName, String field, Object rejectedValue, boolean bindingFailure,
+			String[] codes, Object[] arguments, String defaultMessage) {
+		super(objectName, codes, arguments, defaultMessage);
 		this.field = field;
 		this.rejectedValue = rejectedValue;
 		this.bindingFailure = bindingFailure;
 	}
 
+	/**
+	 * Return the affected field of the object.
+	 */
 	public String getField() {
 		return field;
 	}
 
+	/**
+	 * Return the rejected field value.
+	 */
 	public Object getRejectedValue() {
 		return rejectedValue;
 	}
 
+	/**
+	 * Return whether this error represents a binding failure
+	 * (like a type mismatch); else, it is a validation failure.
+	 */
 	public boolean isBindingFailure() {
 		return bindingFailure;
 	}
 
 	public String toString() {
-		return "FieldError occurred in object [" + getObjectName() + "] on [" +
-				this.field + "]: rejectedValue [" + this.rejectedValue + "]; " + resolvableToString();
+		return "Field error in object '" + getObjectName() + "' on field '" + this.field +
+				"': rejected value [" + this.rejectedValue + "]; " + resolvableToString();
 	}
 
 }

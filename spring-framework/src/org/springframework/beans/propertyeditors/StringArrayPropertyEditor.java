@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.propertyeditors;
 
@@ -21,21 +21,49 @@ import java.beans.PropertyEditorSupport;
 import org.springframework.util.StringUtils;
 
 /**
- * Properties editor for String[] type. Strings must be in CSV format.
- * This property editor is automatically registered by BeanWrapperImpl.
+ * Editor for String arrays. Strings must be in CSV format,
+ * with customizable separator.
+ *
  * @author Rod Johnson
- * @see org.springframework.beans.BeanWrapperImpl
+ * @author Juergen Hoeller
+ * @see org.springframework.util.StringUtils#delimitedListToStringArray
+ * @see org.springframework.util.StringUtils#arrayToDelimitedString
  */
 public class StringArrayPropertyEditor extends PropertyEditorSupport {
 
-	public void setAsText(String s) throws IllegalArgumentException {
-		String[] sa = StringUtils.commaDelimitedListToStringArray(s);
-		setValue(sa);
+	/**
+	 * Default separator for splitting a String: a comma (",")
+	 */
+	public static final String DEFAULT_SEPARATOR = ",";
+
+	private final String separator;
+
+
+	/**
+	 * Create a new StringArrayPropertyEditor with the default separator:
+	 * a comma (",")
+	 */
+	public StringArrayPropertyEditor() {
+		this.separator = DEFAULT_SEPARATOR;
+	}
+
+	/**
+	 * Create a new StringArrayPropertyEditor with the given separator.
+	 * @param separator the separator to use for splitting a String
+	 */
+	public StringArrayPropertyEditor(String separator) {
+		this.separator = separator;
+	}
+
+
+	public void setAsText(String text) throws IllegalArgumentException {
+		String[] array = StringUtils.delimitedListToStringArray(text, this.separator);
+		setValue(array);
 	}
 
 	public String getAsText() {
 		String[] array = (String[]) this.getValue();
-		return StringUtils.arrayToCommaDelimitedString(array);
+		return StringUtils.arrayToDelimitedString(array, this.separator);
 	}
 
 }

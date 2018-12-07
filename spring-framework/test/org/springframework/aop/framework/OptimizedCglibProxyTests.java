@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,15 +12,15 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework;
 
-
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-import org.springframework.aop.framework.support.AopUtils;
+import org.springframework.aop.interceptor.ExposeInvocationInterceptor;
 import org.springframework.aop.interceptor.NopInterceptor;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.aop.target.HotSwappableTargetSource;
 import org.springframework.beans.ITestBean;
 import org.springframework.beans.TestBean;
@@ -28,19 +28,12 @@ import org.springframework.beans.TestBean;
 /**
  * We have to override some methods here, as the superclass ones use dynamic
  * TargetSources or do other things that this proxy can't do.
+ *
  * @author Rod Johnson
- * @since 13-Mar-2003
- * @version $Id: OptimizedCglibProxyTests.java,v 1.4 2004/03/18 03:01:14 trisberg Exp $
+ * @since 13.03.2003
  */
 public class OptimizedCglibProxyTests extends CglibProxyTests {
 	
-	public OptimizedCglibProxyTests(String arg0) {
-		super(arg0);
-	}
-	
-	/**
-	 * @see org.springframework.aop.framework.AbstractAopProxyTests#setInMode(org.springframework.aop.framework.AdvisedSupport)
-	 */
 	protected Object createProxy(AdvisedSupport as) {
 		as.setProxyTargetClass(true);
 		as.setOptimize(true);
@@ -58,7 +51,6 @@ public class OptimizedCglibProxyTests extends CglibProxyTests {
 	protected boolean requiresTarget() {
 		return true;
 	}
-	
 	
 	/**
 	 * Inherited version checks identity with original object. We change that,
@@ -85,6 +77,17 @@ public class OptimizedCglibProxyTests extends CglibProxyTests {
 		// Just not relevant here so we optimize it to get the suite to pass
 	}
 	
+	public void testProxyIsBoundBeforeTargetSourceInvoked() {
+		// Override, can't test this with an optimized proxy
+		try {
+			super.testProxyIsBoundBeforeTargetSourceInvoked();
+			fail("Shouldn't be able to change TargetSource on optimized proxy");
+		}
+		catch (AopConfigException ex) {
+			// OK
+		}
+	}
+	
 	/**
 	 * We override this to get rid of the dynamic TargetSource
 	 * @see org.springframework.aop.framework.AbstractAopProxyTests#testDeclaredException()
@@ -98,8 +101,8 @@ public class OptimizedCglibProxyTests extends CglibProxyTests {
 			}
 		};
 		AdvisedSupport pc = new AdvisedSupport(new Class[] { ITestBean.class });
-		pc.addInterceptor(ExposeInvocationInterceptor.INSTANCE);
-		pc.addInterceptor(mi);
+		pc.addAdvice(ExposeInvocationInterceptor.INSTANCE);
+		pc.addAdvice(mi);
 	
 		// We don't care about the object
 		pc.setTarget(new Object());
@@ -153,7 +156,7 @@ public class OptimizedCglibProxyTests extends CglibProxyTests {
 
 		ProxyFactory pc = new ProxyFactory(tb1);
 		NopInterceptor nop = new NopInterceptor();
-		pc.addInterceptor(nop);
+		pc.addAdvice(nop);
 		ITestBean proxy = (ITestBean) createProxy(pc);
 		assertEquals(nop.getCount(), 0);
 		assertEquals(tb1.getAge(), proxy.getAge());
@@ -192,7 +195,7 @@ public class OptimizedCglibProxyTests extends CglibProxyTests {
 		pf1.setExposeProxy(true);
 		assertTrue(pf1.getExposeProxy());
 
-		pf1.addInterceptor(di);
+		pf1.addAdvice(di);
 		INeedsToSeeProxy proxied = (INeedsToSeeProxy) createProxy(pf1);
 		assertEquals(0, di.getCount());
 		

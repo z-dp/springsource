@@ -1,6 +1,6 @@
 package org.springframework.samples.petclinic.web;
 
-import java.util.List;
+import java.util.Collection;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -20,6 +20,7 @@ public class FindOwnersForm	extends AbstractClinicForm {
 
 	/** Creates a new instance of FindOwnersForm */
 	public FindOwnersForm() {
+		setCommandName("owner");
 		// OK to start with a blank command object
 		setCommandClass(Owner.class);
 	}
@@ -32,19 +33,23 @@ public class FindOwnersForm	extends AbstractClinicForm {
 	}
 
 	protected void initApplicationContext() {
+		super.initApplicationContext();
 		if (this.selectView == null) {
 			throw new IllegalArgumentException("selectView isn't set");
 		}
 	}
 
-	/** Method used to search for owners renders View depending on how many are found */
-	protected ModelAndView onSubmit(HttpServletRequest request, HttpServletResponse response,
-																	Object command, BindException errors) throws Exception {
+	/**
+	 * Method used to search for owners renders View depending on how many are found.
+	 */
+	protected ModelAndView onSubmit(
+			HttpServletRequest request, HttpServletResponse response, Object command, BindException errors)
+			throws Exception {
 
 		Owner owner = (Owner) command;
 
 		// find owners by last name
-		List results = getClinic().findOwners(owner.getLastName());
+		Collection results = getClinic().findOwners(owner.getLastName());
 
 		if (results.size() < 1) {
 			// no owners found
@@ -58,8 +63,8 @@ public class FindOwnersForm	extends AbstractClinicForm {
 		}
 
 		// 1 owner found
-		owner = (Owner) results.get(0);
-		return new ModelAndView(getSuccessView(), "ownerId", Long.toString(owner.getId()));
+		owner = (Owner) results.iterator().next();
+		return new ModelAndView(getSuccessView(), "ownerId", owner.getId());
 	}
 
 }

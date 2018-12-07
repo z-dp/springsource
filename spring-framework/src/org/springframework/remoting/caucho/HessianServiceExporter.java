@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,10 +12,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.remoting.caucho;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 
 import javax.servlet.ServletException;
@@ -26,9 +27,12 @@ import com.caucho.hessian.io.HessianInput;
 import com.caucho.hessian.io.HessianOutput;
 import com.caucho.hessian.server.HessianSkeleton;
 
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.remoting.support.RemoteExporter;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.Controller;
+import org.springframework.web.servlet.support.WebContentGenerator;
+import org.springframework.web.util.NestedServletException;
 
 /**
  * Web controller that exports the specified service bean as Hessian service
@@ -46,22 +50,26 @@ import org.springframework.web.servlet.mvc.Controller;
  *
  * @author Juergen Hoeller
  * @since 13.05.2003
+ * @see HessianClientInterceptor
  * @see HessianProxyFactoryBean
+ * @see org.springframework.remoting.caucho.BurlapServiceExporter
+ * @see org.springframework.remoting.httpinvoker.HttpInvokerServiceExporter
+ * @see org.springframework.remoting.rmi.RmiServiceExporter
  */
-public class HessianServiceExporter extends RemoteExporter implements Controller {
+public class HessianServiceExporter extends RemoteExporter implements Controller, InitializingBean {
 
 	private HessianSkeleton skeleton;
 
 	public void afterPropertiesSet() throws Exception {
-		super.afterPropertiesSet();
 		try {
-			// try Hessian 3.x (with service interface argument)
+			// Try Hessian 3.x (with service interface argument).
 			Constructor ctor = HessianSkeleton.class.getConstructor(new Class[] {Object.class, Class.class});
-			this.skeleton = (HessianSkeleton) ctor.newInstance(new Object[] {getService(), getServiceInterface()});
-			logger.info("Created Hessian 2.x skeleton");
+			checkService();
+			checkServiceInterface();
+			this.skeleton = (HessianSkeleton) ctor.newInstance(new Object[] {getProxyForService(), getServiceInterface()});
 		}
 		catch (NoSuchMethodException ex) {
-			// fall back to Hessian 2.x (without service interface argument)
+			// Fall back to Hessian 2.x (without service interface argument).
 			Constructor ctor = HessianSkeleton.class.getConstructor(new Class[] {Object.class});
 			this.skeleton = (HessianSkeleton) ctor.newInstance(new Object[] {getProxyForService()});
 		}
@@ -70,22 +78,22 @@ public class HessianServiceExporter extends RemoteExporter implements Controller
 	/**
 	 * Process the incoming Hessian request and create a Hessian response.
 	 */
-	public ModelAndView handleRequest(HttpServletRequest request, HttpServletResponse response) throws Exception {
+	public ModelAndView handleRequest(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+		
+		if (!WebContentGenerator.METHOD_POST.equals(request.getMethod())) {
+			throw new ServletException("HessianServiceExporter only supports POST requests");
+		}
+
 		HessianInput in = new HessianInput(request.getInputStream());
 		HessianOutput out = new HessianOutput(response.getOutputStream());
 		try {
 		  this.skeleton.invoke(in, out);
-		}
-		catch (Exception ex) {
-			throw ex;
-		}
-		catch (Error ex) {
-			throw ex;
+			return null;
 		}
 		catch (Throwable ex) {
-		  throw new ServletException(ex);
+		  throw new NestedServletException("Hessian skeleton invocation failed", ex);
 		}
-		return null;
 	}
 
 }

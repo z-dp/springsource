@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,14 +12,16 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.easymock.MockControl;
-import org.springframework.aop.framework.support.AopUtils;
+
+import org.springframework.aop.interceptor.ExposeInvocationInterceptor;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.IOther;
 import org.springframework.beans.ITestBean;
 import org.springframework.beans.TestBean;
@@ -27,21 +29,12 @@ import org.springframework.beans.TestBean;
 /**
  * @author Rod Johnson
  * @author Juergen Hoeller
- * @since 13-Mar-2003
- * @version $Id: JdkDynamicProxyTests.java,v 1.3 2004/03/18 03:01:14 trisberg Exp $
+ * @since 13.03.2003
  */
 public class JdkDynamicProxyTests extends AbstractAopProxyTests {
 
-	public JdkDynamicProxyTests(String arg0) {
-		super(arg0);
-	}
-	
-	/**
-	 * @see org.springframework.aop.framework.AbstractAopProxyTests#setInMode(org.springframework.aop.framework.AdvisedSupport)
-	 */
 	protected Object createProxy(AdvisedSupport as) {
-		// It's default
-		assertFalse("Not forcible CGLIB", as.getProxyTargetClass());
+		assertFalse("Not forcible CGLIB", as.isProxyTargetClass());
 		Object proxy = as.createAopProxy().getProxy();
 		assertTrue("Should be a JDK proxy: " + proxy.getClass(), AopUtils.isJdkDynamicProxy(proxy));
 		return proxy;
@@ -62,7 +55,6 @@ public class JdkDynamicProxyTests extends AbstractAopProxyTests {
 		}
 	}
 
-	
 	public void testProxyIsJustInterface() throws Throwable {
 		TestBean raw = new TestBean();
 		raw.setAge(32);
@@ -82,7 +74,7 @@ public class JdkDynamicProxyTests extends AbstractAopProxyTests {
 		MethodInterceptor mi = (MethodInterceptor) miControl.getMock();
 
 		AdvisedSupport pc = new AdvisedSupport(new Class[] { ITestBean.class });
-		pc.addInterceptor(mi);
+		pc.addAdvice(mi);
 		AopProxy aop = createAopProxy(pc);
 
 		// Really would like to permit null arg:can't get exact mi
@@ -102,37 +94,72 @@ public class JdkDynamicProxyTests extends AbstractAopProxyTests {
 	}
 	
 	public void testTargetCanGetInvocationWithPrivateClass() throws Throwable {
-			final ContextTestBean expectedTarget = new ContextTestBean() {
-				protected void assertions(MethodInvocation invocation) {
-					assertTrue(invocation.getThis() == this);
-					assertTrue("Invocation should be on ITestBean: " + invocation.getMethod(), 
-						invocation.getMethod().getDeclaringClass() == ITestBean.class);
-				}
-			};
-		
-			AdvisedSupport pc = new AdvisedSupport(new Class[] { ITestBean.class, IOther.class });
-			pc.addInterceptor(ExposeInvocationInterceptor.INSTANCE);
-			TrapTargetInterceptor tii = new TrapTargetInterceptor() {
-				public Object invoke(MethodInvocation invocation) throws Throwable {
-					// Assert that target matches BEFORE invocation returns
-					assertEquals("Target is correct", expectedTarget, invocation.getThis());
-					return super.invoke(invocation);
-				}
-			};
-			pc.addInterceptor(tii);
-			pc.setTarget(expectedTarget);
-			AopProxy aop = createAopProxy(pc);
+		final ExposedInvocationTestBean expectedTarget = new ExposedInvocationTestBean() {
+			protected void assertions(MethodInvocation invocation) {
+				assertTrue(invocation.getThis() == this);
+				assertTrue("Invocation should be on ITestBean: " + invocation.getMethod(), 
+					invocation.getMethod().getDeclaringClass() == ITestBean.class);
+			}
+		};
+	
+		AdvisedSupport pc = new AdvisedSupport(new Class[] { ITestBean.class, IOther.class });
+		pc.addAdvice(ExposeInvocationInterceptor.INSTANCE);
+		TrapTargetInterceptor tii = new TrapTargetInterceptor() {
+			public Object invoke(MethodInvocation invocation) throws Throwable {
+				// Assert that target matches BEFORE invocation returns
+				assertEquals("Target is correct", expectedTarget, invocation.getThis());
+				return super.invoke(invocation);
+			}
+		};
+		pc.addAdvice(tii);
+		pc.setTarget(expectedTarget);
+		AopProxy aop = createAopProxy(pc);
 
-			ITestBean tb = (ITestBean) aop.getProxy();
-			tb.getName();
-			// Not safe to trap invocation
-			//assertTrue(tii.invocation == target.invocation);
-		
-			//assertTrue(target.invocation.getProxy() == tb);
+		ITestBean tb = (ITestBean) aop.getProxy();
+		tb.getName();
+		// Not safe to trap invocation
+		//assertTrue(tii.invocation == target.invocation);
+	
+		//assertTrue(target.invocation.getProxy() == tb);
 
 		//	((IOther) tb).absquatulate();
-			//MethodInvocation minv =  tii.invocation;
-			//assertTrue("invoked on iother, not " + minv.getMethod().getDeclaringClass(), minv.getMethod().getDeclaringClass() == IOther.class);
-			//assertTrue(target.invocation == tii.invocation);
+		//MethodInvocation minv =  tii.invocation;
+		//assertTrue("invoked on iother, not " + minv.getMethod().getDeclaringClass(), minv.getMethod().getDeclaringClass() == IOther.class);
+		//assertTrue(target.invocation == tii.invocation);
+	}
+
+	public void testProxyNotWrappedIfIncompatible() {
+		FooBar bean = new FooBar();
+
+		AdvisedSupport as = new AdvisedSupport(new Class[]{Foo.class});
+		as.setTarget(bean);
+
+		Foo proxy = (Foo)createProxy(as);
+
+		assertSame("Target should be returned when return types are incompatible", bean, proxy.getBarThis());
+		assertSame("Proxy should be returned when return types are compatible", proxy, proxy.getFooThis());
+
+	}
+
+	public static interface Foo {
+		Bar getBarThis();
+		Foo getFooThis();
+	}
+
+	public static interface Bar {
+
+	}
+
+	public static class FooBar implements Foo, Bar {
+
+		public Bar getBarThis() {
+			return this;
 		}
+
+		public Foo getFooThis() {
+			return this;
+		}
+	}
+
+
 }

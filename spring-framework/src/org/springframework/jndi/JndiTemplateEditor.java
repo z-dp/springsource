@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jndi;
 
@@ -24,9 +24,9 @@ import org.springframework.beans.propertyeditors.PropertiesEditor;
 /**
  * Properties editor for JndiTemplate objects. Allows properties of type
  * JndiTemplate to be populated with a properties-format string.
+ *
  * @author Rod Johnson
- * @since 09-May-2003
- * @version $Id: JndiTemplateEditor.java,v 1.3 2004/03/18 02:46:17 trisberg Exp $
+ * @since 09.05.2003
  */
 public class JndiTemplateEditor extends PropertyEditorSupport {
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@ import org.apache.struts.tiles.Controller;
 import org.apache.struts.tiles.DefinitionsFactory;
 import org.apache.struts.tiles.TilesUtilImpl;
 
-import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ApplicationContextException;
 import org.springframework.web.servlet.view.InternalResourceView;
 
@@ -81,8 +80,8 @@ public class TilesView extends InternalResourceView {
 		super.initApplicationContext();
 
 		// get definitions factory
-		this.definitionsFactory = (DefinitionsFactory)
-		    getWebApplicationContext().getServletContext().getAttribute(TilesUtilImpl.DEFINITIONS_FACTORY);
+		this.definitionsFactory =
+				(DefinitionsFactory) getServletContext().getAttribute(TilesUtilImpl.DEFINITIONS_FACTORY);
 		if (this.definitionsFactory == null) {
 			throw new ApplicationContextException("Tiles definitions factory not found: TilesConfigurer not defined?");
 		}
@@ -93,7 +92,7 @@ public class TilesView extends InternalResourceView {
 	 * component controller if any, and determine the request dispatcher path.
 	 */
 	protected String prepareForRendering(HttpServletRequest request, HttpServletResponse response)
-	    throws Exception {
+			throws Exception {
 
 		// get component definition
 		ComponentDefinition definition = getComponentDefinition(this.definitionsFactory, request);
@@ -116,8 +115,8 @@ public class TilesView extends InternalResourceView {
 		// determine the path of the definition
 		String path = getDispatcherPath(definition, request);
 		if (path == null) {
-			throw new ServletException("Could not determine a path for Tiles definition '" +
-			                           definition.getName() + "'");
+			throw new ServletException(
+					"Could not determine a path for Tiles definition '" + definition.getName() + "'");
 		}
 
 		return path;
@@ -160,16 +159,12 @@ public class TilesView extends InternalResourceView {
 	 * given Tiles definition, if any.
 	 * @param definition the Tiles definition to render
 	 * @param request current HTTP request
-	 * @return the component controller to execute, or null if none
+	 * @return the component controller to execute, or <code>null</code> if none
 	 * @throws Exception if preparations failed
 	 */
 	protected Controller getController(ComponentDefinition definition, HttpServletRequest request)
 			throws Exception {
-		Controller controller = definition.getOrCreateController();
-		if (controller instanceof ApplicationContextAware) {
-			((ApplicationContextAware) controller).setApplicationContext(getApplicationContext());
-		}
-		return controller;
+		return definition.getOrCreateController();
 	}
 
 	/**
@@ -180,8 +175,8 @@ public class TilesView extends InternalResourceView {
 	 * @param response current HTTP response
 	 * @throws Exception if controller execution failed
 	 */
-	protected void executeController(Controller controller, ComponentContext context,
-	                                 HttpServletRequest request, HttpServletResponse response)
+	protected void executeController(
+			Controller controller, ComponentContext context, HttpServletRequest request, HttpServletResponse response)
 	    throws Exception {
 		controller.perform(context, request, response, getServletContext());
 	}

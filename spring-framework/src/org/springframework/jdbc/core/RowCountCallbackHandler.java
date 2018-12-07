@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.core;
 
@@ -29,9 +29,17 @@ import java.sql.SQLException;
  * for callback handlers that actually do something, and will benefit
  * from the dimension information it provides.
  *
+ * <p>A usage example with JdbcTemplate:
+ *
+ * <pre>
+ * JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);  // reusable object
+ * 
+ * RowCountCallbackHandler countCallback = new RowCountCallbackHandler();  // not reusable
+ * jdbcTemplate.query("select * from user", countCallback);
+ * int rowCount = countCallback.getRowCount();</pre>
+ *
  * @author Rod Johnson
  * @since May 3, 2001
- * @version $Id: RowCountCallbackHandler.java,v 1.3 2004/03/18 02:46:08 trisberg Exp $
  */
 public class RowCountCallbackHandler implements RowCallbackHandler {
 

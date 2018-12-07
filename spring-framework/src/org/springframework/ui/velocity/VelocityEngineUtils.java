@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.ui.velocity;
 
@@ -29,12 +29,14 @@ import org.apache.velocity.exception.VelocityException;
 /**
  * Utility class for working with a VelocityEngine.
  * Provides convenience methods to merge a Velocity template with a model.
+ *
  * @author Juergen Hoeller
  * @since 22.01.2004
  */
 public abstract class VelocityEngineUtils {
 
 	private static final Log logger = LogFactory.getLog(VelocityEngineUtils.class);
+
 
 	/**
 	 * Merge the specified Velocity template with the given model and write
@@ -47,8 +49,10 @@ public abstract class VelocityEngineUtils {
 	 * @param writer the Writer to write the result to
 	 * @throws VelocityException if the template wasn't found or rendering failed
 	 */
-	public static void mergeTemplate(VelocityEngine velocityEngine, String templateLocation, Map model,
-	                                 Writer writer) throws VelocityException {
+	public static void mergeTemplate(
+			VelocityEngine velocityEngine, String templateLocation, Map model, Writer writer)
+			throws VelocityException {
+
 		try {
 			VelocityContext velocityContext = new VelocityContext(model);
 			velocityEngine.mergeTemplate(templateLocation, velocityContext, writer);
@@ -61,7 +65,7 @@ public abstract class VelocityEngineUtils {
 		}
 		catch (Exception ex) {
 			logger.error("Why does VelocityEngine throw a generic checked exception, after all?", ex);
-			throw new VelocityException(ex.getMessage());
+			throw new VelocityException(ex.toString());
 		}
 	}
 
@@ -77,8 +81,10 @@ public abstract class VelocityEngineUtils {
 	 * @param writer the Writer to write the result to
 	 * @throws VelocityException if the template wasn't found or rendering failed
 	 */
-	public static void mergeTemplate(VelocityEngine velocityEngine, String templateLocation, String encoding,
-																	 Map model, Writer writer) throws VelocityException {
+	public static void mergeTemplate(
+			VelocityEngine velocityEngine, String templateLocation, String encoding, Map model, Writer writer)
+			throws VelocityException {
+
 		try {
 			VelocityContext velocityContext = new VelocityContext(model);
 			velocityEngine.mergeTemplate(templateLocation, encoding, velocityContext, writer);
@@ -91,12 +97,14 @@ public abstract class VelocityEngineUtils {
 		}
 		catch (Exception ex) {
 			logger.error("Why does VelocityEngine throw a generic checked exception, after all?", ex);
-			throw new VelocityException(ex.getMessage());
+			throw new VelocityException(ex.toString());
 		}
 	}
 
 	/**
 	 * Merge the specified Velocity template with the given model into a String.
+	 * <p>When using this method to prepare a text for a mail to be sent with Spring's
+	 * mail support, consider wrapping VelocityException in MailPreparationException.
 	 * @param velocityEngine VelocityEngine to work with
 	 * @param templateLocation the location of template, relative to Velocity's
 	 * resource loader path
@@ -104,9 +112,12 @@ public abstract class VelocityEngineUtils {
 	 * as values
 	 * @return the result as String
 	 * @throws VelocityException if the template wasn't found or rendering failed
+	 * @see org.springframework.mail.MailPreparationException
 	 */
-	public static String mergeTemplateIntoString(VelocityEngine velocityEngine, String templateLocation,
-																							 Map model) throws VelocityException {
+	public static String mergeTemplateIntoString(
+			VelocityEngine velocityEngine, String templateLocation, Map model)
+			throws VelocityException {
+
 		StringWriter result = new StringWriter();
 		mergeTemplate(velocityEngine, templateLocation, model, result);
 		return result.toString();
@@ -114,6 +125,8 @@ public abstract class VelocityEngineUtils {
 
 	/**
 	 * Merge the specified Velocity template with the given model into a String.
+	 * <p>When using this method to prepare a text for a mail to be sent with Spring's
+	 * mail support, consider wrapping VelocityException in MailPreparationException.
 	 * @param velocityEngine VelocityEngine to work with
 	 * @param templateLocation the location of template, relative to Velocity's
 	 * resource loader path
@@ -122,9 +135,12 @@ public abstract class VelocityEngineUtils {
 	 * as values
 	 * @return the result as String
 	 * @throws VelocityException if the template wasn't found or rendering failed
+	 * @see org.springframework.mail.MailPreparationException
 	 */
-	public static String mergeTemplateIntoString(VelocityEngine velocityEngine, String templateLocation,
-																							 String encoding, Map model) throws VelocityException {
+	public static String mergeTemplateIntoString(
+			VelocityEngine velocityEngine, String templateLocation, String encoding, Map model)
+			throws VelocityException {
+
 		StringWriter result = new StringWriter();
 		mergeTemplate(velocityEngine, templateLocation, encoding, model, result);
 		return result.toString();

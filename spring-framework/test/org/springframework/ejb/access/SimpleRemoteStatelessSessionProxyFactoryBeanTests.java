@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.ejb.access;
 
@@ -24,19 +24,29 @@ import javax.ejb.EJBHome;
 import javax.ejb.EJBObject;
 import javax.naming.NamingException;
 
-import junit.framework.TestCase;
 import org.easymock.MockControl;
 
 import org.springframework.jndi.JndiTemplate;
 import org.springframework.remoting.RemoteAccessException;
 
 /**
- * Tests Business Methods pattern
+ * Tests Business Methods pattern.
+ *
  * @author Rod Johnson
- * @since 21-May-2003
- * @version $Id: SimpleRemoteStatelessSessionProxyFactoryBeanTests.java,v 1.8 2004/03/18 03:01:14 trisberg Exp $
+ * @since 21.05.2003
  */
-public class SimpleRemoteStatelessSessionProxyFactoryBeanTests extends TestCase {
+public class SimpleRemoteStatelessSessionProxyFactoryBeanTests extends SimpleRemoteSlsbInvokerInterceptorTests {
+
+	protected SimpleRemoteSlsbInvokerInterceptor createInterceptor() {
+		return new SimpleRemoteStatelessSessionProxyFactoryBean();
+	}
+
+	protected Object configuredProxy(SimpleRemoteSlsbInvokerInterceptor si, Class ifc) throws NamingException {
+		SimpleRemoteStatelessSessionProxyFactoryBean fb = (SimpleRemoteStatelessSessionProxyFactoryBean) si;
+		fb.setBusinessInterface(ifc);
+		fb.afterPropertiesSet();
+		return fb.getObject();
+	}
 
 	public void testInvokesMethod() throws Exception {
 		final int value = 11;
@@ -46,6 +56,8 @@ public class SimpleRemoteStatelessSessionProxyFactoryBeanTests extends TestCase 
 		MyEjb myEjb = (MyEjb) ec.getMock();
 		myEjb.getValue();
 		ec.setReturnValue(value, 1);
+		myEjb.remove();
+		ec.setVoidCallable(1);
 		ec.replay();
 		
 		MockControl mc = MockControl.createControl(MyHome.class);
@@ -55,7 +67,7 @@ public class SimpleRemoteStatelessSessionProxyFactoryBeanTests extends TestCase 
 		mc.replay();
 		
 		JndiTemplate jt = new JndiTemplate() {
-			public Object lookup(String name) throws NamingException {
+			public Object lookup(String name) {
 				// parameterize
 				assertTrue(name.equals("java:comp/env/" + jndiName));
 				return home;
@@ -73,7 +85,7 @@ public class SimpleRemoteStatelessSessionProxyFactoryBeanTests extends TestCase 
 
 		MyBusinessMethods mbm = (MyBusinessMethods) fb.getObject();
 		assertTrue(Proxy.isProxyClass(mbm.getClass()));
-		assertTrue(mbm.getValue() == value);
+		assertEquals("Returns expected value", value, mbm.getValue());
 		mc.verify();	
 		ec.verify();	
 	}
@@ -86,6 +98,10 @@ public class SimpleRemoteStatelessSessionProxyFactoryBeanTests extends TestCase 
 		MyEjb myEjb = (MyEjb) ec.getMock();
 		myEjb.getValue();
 		ec.setThrowable(rex);
+		// TODO might want to control this behaviour...
+		// Do we really want to call remove after a remote exception?
+		myEjb.remove();
+		ec.setVoidCallable(1);
 		ec.replay();
 	
 		MockControl mc = MockControl.createControl(MyHome.class);
@@ -95,7 +111,7 @@ public class SimpleRemoteStatelessSessionProxyFactoryBeanTests extends TestCase 
 		mc.replay();
 	
 		JndiTemplate jt = new JndiTemplate() {
-			public Object lookup(String name) throws NamingException {
+			public Object lookup(String name) {
 				// parameterize
 				assertTrue(name.equals("java:comp/env/" + jndiName));
 				return home;
@@ -118,7 +134,7 @@ public class SimpleRemoteStatelessSessionProxyFactoryBeanTests extends TestCase 
 			fail("Should've thrown remote exception");
 		}
 		catch (RemoteException ex) {
-			assertTrue(ex == rex);
+			assertSame("Threw expected RemoteException", rex, ex);
 		}
 		mc.verify();	
 		ec.verify();	
@@ -135,7 +151,7 @@ public class SimpleRemoteStatelessSessionProxyFactoryBeanTests extends TestCase 
 		mc.replay();
 	
 		JndiTemplate jt = new JndiTemplate() {
-			public Object lookup(String name) throws NamingException {
+			public Object lookup(String name) {
 				// parameterize
 				assertTrue(name.equals(jndiName));
 				return home;
@@ -160,7 +176,7 @@ public class SimpleRemoteStatelessSessionProxyFactoryBeanTests extends TestCase 
 			fail("Should have failed to create EJB");
 		}
 		catch (RemoteException ex) {
-			assertTrue(ex.getCause() == cex);
+			// expected
 		}
 		
 		mc.verify();	
@@ -177,7 +193,7 @@ public class SimpleRemoteStatelessSessionProxyFactoryBeanTests extends TestCase 
 		mc.replay();
 
 		JndiTemplate jt = new JndiTemplate() {
-			public Object lookup(String name) throws NamingException {
+			public Object lookup(String name) {
 				// parameterize
 				assertTrue(name.equals(jndiName));
 				return home;

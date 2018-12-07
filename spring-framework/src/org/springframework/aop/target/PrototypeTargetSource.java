@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,24 +12,22 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.target;
+
+import org.springframework.beans.BeansException;
 
 /**
  * TargetSource that creates a new instance of the target bean for each request.
  * Can only be used in a bean factory.
+ *
  * @author Rod Johnson
- * @version $Id: PrototypeTargetSource.java,v 1.5 2004/03/18 02:46:13 trisberg Exp $
  */
-public final class PrototypeTargetSource extends AbstractPrototypeTargetSource {
+public final class PrototypeTargetSource extends AbstractPrototypeBasedTargetSource {
 
-	public Object getTarget() {
+	public Object getTarget() throws BeansException {
 		return newPrototypeInstance();
-	}
-	
-	public void releaseTarget(Object target) {
-		// Do nothing
 	}
 
 }

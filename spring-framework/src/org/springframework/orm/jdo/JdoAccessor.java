@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.jdo;
 
@@ -28,15 +28,16 @@ import org.springframework.dao.DataAccessException;
 
 /**
  * Base class for JdoTemplate and JdoInterceptor, defining common
- * properties like flushing behavior.
+ * properties like PersistenceManagerFactory and flushing behavior.
  *
  * <p>Note: With JDO, modifications to persistent objects are just possible
  * within a transaction (in contrast to Hibernate). Therefore, eager flushing
- * will just get applied when in a transaction. Furthermore, there is explicit
- * notion of flushing never, as this would not imply a performance gain due to
- * JDO's field interception mechanism that doesn't involve snapshot comparison.
+ * will just get applied when in a transaction. Furthermore, there is no
+ * explicit notion of flushing never, as this would not imply a performance
+ * gain due to JDO's field interception mechanism that doesn't involve
+ * the overhead of snapshot comparisons.
  *
- * <p>Eager flushing is just available for specific JDO implementations.
+ * <p>Eager flushing is just available for specific JDO providers.
  * You need to a corresponding JdoDialect to make eager flushing work.
  *
  * <p>Not intended to be used directly. See JdoTemplate and JdoInterceptor.
@@ -47,7 +48,7 @@ import org.springframework.dao.DataAccessException;
  * @see JdoInterceptor
  * @see #setFlushEager
  */
-public class JdoAccessor implements InitializingBean {
+public abstract class JdoAccessor implements InitializingBean {
 
 	protected final Log logger = LogFactory.getLog(getClass());
 
@@ -56,6 +57,7 @@ public class JdoAccessor implements InitializingBean {
 	private JdoDialect jdoDialect;
 
 	private boolean flushEager = false;
+
 
 	/**
 	 * Set the JDO PersistenceManagerFactory that should be used to create
@@ -76,7 +78,7 @@ public class JdoAccessor implements InitializingBean {
 	/**
 	 * Set the JDO dialect to use for this accessor.
 	 * <p>The dialect object can be used to retrieve the underlying JDBC
-	 * connection or to eagerly flush changes to the database.
+	 * connection and to eagerly flush changes to the database.
 	 */
 	public void setJdoDialect(JdoDialect jdoDialect) {
 		this.jdoDialect = jdoDialect;
@@ -84,9 +86,13 @@ public class JdoAccessor implements InitializingBean {
 
 	/**
 	 * Return the JDO dialect to use for this accessor.
+	 * <p>Creates a default one for the specified PersistenceManagerFactory if none set.
 	 */
 	public JdoDialect getJdoDialect() {
-		return jdoDialect;
+		if (this.jdoDialect == null) {
+			this.jdoDialect = new DefaultJdoDialect(getPersistenceManagerFactory());
+		}
+		return this.jdoDialect;
 	}
 
 	/**
@@ -99,7 +105,7 @@ public class JdoAccessor implements InitializingBean {
 	 * <ul>
 	 * <li>additional communication roundtrips with the database, instead of a
 	 * single batch at transaction commit;
-	 * <li>the fact that an actual database rollback is needed if the Hibernate
+	 * <li>the fact that an actual database rollback is needed if the JDO
 	 * transaction rolls back (due to already submitted SQL statements).
 	 * </ul>
 	 */
@@ -114,45 +120,43 @@ public class JdoAccessor implements InitializingBean {
 		return flushEager;
 	}
 
+	/**
+	 * Eagerly initialize the JDO dialect, creating a default one
+	 * for the specified PersistenceManagerFactory if none set.
+	 */
 	public void afterPropertiesSet() {
-		if (this.persistenceManagerFactory == null) {
+		if (getPersistenceManagerFactory() == null) {
 			throw new IllegalArgumentException("persistenceManagerFactory is required");
 		}
-		if (this.flushEager && this.jdoDialect == null) {
-			throw new IllegalArgumentException("Cannot flush eagerly without a jdoDialect setting");
-		}
+		getJdoDialect();
 	}
+
 
 	/**
 	 * Flush the given JDO persistence manager if necessary.
-	 * @param pm the current JDO PersistenceManage
+	 * @param pm the current JDO PersistenceManager
 	 * @param existingTransaction if executing within an existing transaction
+	 * (within an existing JDO PersistenceManager that won't be closed immediately)
 	 * @throws JDOException in case of JDO flushing errors
 	 */
 	public void flushIfNecessary(PersistenceManager pm, boolean existingTransaction) throws JDOException {
-		if (this.flushEager && this.jdoDialect != null) {
+		if (isFlushEager()) {
 			logger.debug("Eagerly flushing JDO persistence manager");
-			this.jdoDialect.flush(pm);
+			getJdoDialect().flush(pm);
 		}
 	}
 
 	/**
 	 * Convert the given JDOException to an appropriate exception from the
-	 * org.springframework.dao hierarchy. Delegates to the JdoDialect if set, falls
-	 * back to PersistenceManagerFactoryUtils' standard exception translation else.
+	 * <code>org.springframework.dao</code> hierarchy.
+	 * <p>Default implementation delegates to the JdoDialect.
 	 * May be overridden in subclasses.
 	 * @param ex JDOException that occured
 	 * @return the corresponding DataAccessException instance
 	 * @see JdoDialect#translateException
-	 * @see PersistenceManagerFactoryUtils#convertJdoAccessException
 	 */
 	public DataAccessException convertJdoAccessException(JDOException ex) {
-		if (getJdoDialect() != null) {
-			return getJdoDialect().translateException(ex);
-		}
-		else {
-			return PersistenceManagerFactoryUtils.convertJdoAccessException(ex);
-		}
+		return getJdoDialect().translateException(ex);
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,53 +12,60 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework.adapter;
 
 import org.aopalliance.intercept.Interceptor;
+
 import org.springframework.aop.Advisor;
+
 
 /**
  * Interface for registries of AdvisorAdapters.
- * <br><i>This is an SPI interface, that should not need to be implemented
+ *
+ * <p><i>This is an SPI interface, that should not need to be implemented
  * by any Spring user.</i>
+ *
  * @author Rod Johnson
- * @version $Id: AdvisorAdapterRegistry.java,v 1.3 2004/03/18 02:46:09 trisberg Exp $
+ * @author Rob Harrop
  */
 public interface AdvisorAdapterRegistry {
 	
 	/**
-	 * Return an Advisor wrapping the given advice
-	 * @param advice object that should be an advice, such as
-	 * BeforeAdvice or ThrowsAdvice.
-	 * @return an Advisor wrapping the given advice. Never
-	 * returns null. If the advice parameter is an Advisor, return
-	 * it.
+	 * Return an Advisor wrapping the given advice.
+	 * <p>Should by default at least support Interceptor,
+	 * BeforeAdvice, AfterReturningAdvice, ThrowsAdvice.
+	 * @param advice object that should be an advice
+	 * @return an Advisor wrapping the given advice. Never returns null.
+	 * If the advice parameter is an Advisor, return it.
 	 * @throws UnknownAdviceTypeException if no registered AdvisorAdapter
 	 * can wrap the supposed advice
+	 * @see org.aopalliance.intercept.Interceptor
+	 * @see org.springframework.aop.BeforeAdvice
+	 * @see org.springframework.aop.AfterReturningAdvice
+	 * @see org.springframework.aop.ThrowsAdvice
 	 */
 	Advisor wrap(Object advice) throws UnknownAdviceTypeException;
 	
 	/**
-	 * Return an AOP Alliance Interceptor to allow use of the given
+	 * Return an array of AOP Alliance Interceptors to allow use of the given
 	 * Advisor in an interception-based framework. 
-	 * Don't worry about the pointcut associated with the Advisor,
-	 * if it's a PointcutAdvisor: just return an interceptor
+	 * <p>Don't worry about the pointcut associated with the Advisor,
+	 * if it's a PointcutAdvisor: just return an interceptor.
 	 * @param advisor Advisor to find an interceptor for
-	 * @return an Interceptor to expose this Advisor's behaviour
+	 * @return an array of Interceptors to expose this Advisor's behavior
 	 * @throws UnknownAdviceTypeException if the Advisor type is
 	 * not understood by any registered AdvisorAdapter.
 	 */
-	Interceptor getInterceptor(Advisor advisor) throws UnknownAdviceTypeException;
+	Interceptor[] getInterceptors(Advisor advisor) throws UnknownAdviceTypeException;
 	
 	/**
 	 * Register the given AdvisorAdapter. Note that it is not necessary to register
-	 * adapters for InterceptionAroundAdvice or AOP Alliance Interceptors:
-	 * these must be automatically recognized by an AdvisorAdapterRegistry
-	 * implementation.
-	 * @param adapter AdvisorAdapter that understands particular Advisor
-	 * and Advice types. 
+	 * adapters for an AOP Alliance Interceptors or Spring Advices: these must be
+	 * automatically recognized by an AdvisorAdapterRegistry implementation.
+	 * @param adapter AdvisorAdapter that understands a particular Advisor
+	 * or Advice types
 	 */
 	void registerAdvisorAdapter(AdvisorAdapter adapter);
 

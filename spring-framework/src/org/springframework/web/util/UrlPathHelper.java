@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.util;
 
@@ -24,27 +24,34 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import org.springframework.core.JdkVersion;
+import org.springframework.util.StringUtils;
+
 /**
  * Helper class for URL path matching. Provides support for URL paths
- * in ServletDispatcher includes, and support for URL decoding.
+ * in RequestDispatcher includes, and support for URL decoding.
  *
- * <p>Used by AbstractUrlHandlerMapping and AbstractMethodNameResolver.
+ * <p>Used by AbstractUrlHandlerMapping, AbstractUrlMethodNameResolver
+ * and RequestContext for path matching and/or URI determination.
  *
  * @author Juergen Hoeller
+ * @author Rob Harrop
  * @since 14.01.2004
  * @see org.springframework.web.servlet.handler.AbstractUrlHandlerMapping
  * @see org.springframework.web.servlet.mvc.multiaction.AbstractUrlMethodNameResolver
+ * @see org.springframework.web.servlet.support.RequestContext
  */
 public class UrlPathHelper {
 
 	/**
-	 * Standard servlet spec request attributes for include URI and paths.
+	 * Standard Servlet spec request attributes for include URI and paths.
 	 * <p>If included via a RequestDispatcher, the current resource will see the
 	 * original request. Its own URI and paths are exposed as request attributes.
 	 */
 	public static final String INCLUDE_URI_REQUEST_ATTRIBUTE = "javax.servlet.include.request_uri";
 	public static final String INCLUDE_CONTEXT_PATH_REQUEST_ATTRIBUTE = "javax.servlet.include.context_path";
 	public static final String INCLUDE_SERVLET_PATH_REQUEST_ATTRIBUTE = "javax.servlet.include.servlet_path";
+
 
 	private final Log logger = LogFactory.getLog(getClass());
 
@@ -59,7 +66,7 @@ public class UrlPathHelper {
 	 * Set if URL lookup should always use full path within current servlet
 	 * context. Else, the path within the current servlet mapping is used
 	 * if applicable (i.e. in the case of a ".../*" servlet mapping in web.xml).
-	 * Default is false.
+	 * Default is "false".
 	 */
 	public void setAlwaysUseFullPath(boolean alwaysUseFullPath) {
 		this.alwaysUseFullPath = alwaysUseFullPath;
@@ -71,14 +78,16 @@ public class UrlPathHelper {
 	 * in contrast to the servlet path.
 	 * <p>Uses either the request encoding or the default encoding according
 	 * to the Servlet spec (ISO-8859-1).
-	 * <p>Note: Setting this to true requires J2SE 1.4, as J2SE 1.3's
-	 * URLDecoder class does not offer a way to specify the encoding.
+	 * <p>Note: Setting this to "true" requires JDK 1.4 if the encoding differs
+	 * from the VM's platform default encoding, as JDK 1.3's URLDecoder class
+	 * does not offer a way to specify the encoding.
 	 * @see #getServletPath
 	 * @see #getContextPath
 	 * @see #getRequestUri
 	 * @see WebUtils#DEFAULT_CHARACTER_ENCODING
 	 * @see javax.servlet.ServletRequest#getCharacterEncoding
 	 * @see java.net.URLDecoder#decode(String, String)
+	 * @see java.net.URLDecoder#decode(String)
 	 */
 	public void setUrlDecode(boolean urlDecode) {
 		this.urlDecode = urlDecode;
@@ -119,11 +128,11 @@ public class UrlPathHelper {
 	 * @see #getPathWithinServletMapping
 	 */
 	public String getLookupPathForRequest(HttpServletRequest request) {
-		// always use full path within current servlet context?
+		// Always use full path within current servlet context?
 		if (this.alwaysUseFullPath) {
 			return getPathWithinApplication(request);
 		}
-		// else use path within current servlet mapping if applicable
+		// Else, use path within current servlet mapping if applicable
 		String rest = getPathWithinServletMapping(request);
 		if (!"".equals(rest)) {
 			return rest;
@@ -145,7 +154,18 @@ public class UrlPathHelper {
 	 * @return the path within the servlet mapping, or ""
 	 */
 	public String getPathWithinServletMapping(HttpServletRequest request) {
-		return getPathWithinApplication(request).substring(getServletPath(request).length());
+		String pathWithinApp = getPathWithinApplication(request);
+		String servletPath = getServletPath(request);
+		if (pathWithinApp.startsWith(servletPath)) {
+			// Normal case: URI contains servlet path.
+			return pathWithinApp.substring(servletPath.length());
+		}
+		else {
+			// Special case: URI is different from servlet path.
+			// Can happen e.g. with index page: URI="/", servletPath="/index.html"
+			// Use servlet path in this case, as it indicates the actual target path.
+			return servletPath;
+		}
 	}
 
 	/**
@@ -155,7 +175,17 @@ public class UrlPathHelper {
 	 * @return the path within the web application
 	 */
 	public String getPathWithinApplication(HttpServletRequest request) {
-		return getRequestUri(request).substring(getContextPath(request).length());
+		String contextPath = getContextPath(request);
+		String requestUri = getRequestUri(request);
+		if (StringUtils.startsWithIgnoreCase(requestUri, contextPath)) {
+			// Normal case: URI contains context path.
+			String path = requestUri.substring(contextPath.length());
+			return StringUtils.hasText(path) ? path : "/";
+		}
+		else {
+			// Special case: rather unusual.
+			return requestUri;
+		}
 	}
 
 	/**
@@ -212,24 +242,33 @@ public class UrlPathHelper {
 	}
 
 	/**
-	 * Decode the given source string with a URLEncoder. The encoding will be taken
+	 * Decode the given source string with a URLDecoder. The encoding will be taken
 	 * from the request, falling back to the default "ISO-8859-1".
+	 * <p>Default implementation uses <code>URLDecoder.decode(input, enc)</code>
+	 * on JDK 1.4+, falling back to <code>URLDecoder.decode(input)</code>
+	 * (which uses the platform default encoding) on JDK 1.3.
 	 * @param request current HTTP request
 	 * @param source the String to decode
 	 * @return the decoded String
 	 * @see WebUtils#DEFAULT_CHARACTER_ENCODING
 	 * @see javax.servlet.ServletRequest#getCharacterEncoding
-	 * @see java.net.URLDecoder
+	 * @see java.net.URLDecoder#decode(String, String)
+	 * @see java.net.URLDecoder#decode(String)
 	 */
 	public String decodeRequestString(HttpServletRequest request, String source) {
 		if (this.urlDecode) {
 			String enc = determineEncoding(request);
 			try {
+				if (JdkVersion.getMajorJavaVersion() < JdkVersion.JAVA_14) {
+					throw new UnsupportedEncodingException("JDK 1.3 URLDecoder does not support custom encoding");
+				}
 				return URLDecoder.decode(source, enc);
 			}
 			catch (UnsupportedEncodingException ex) {
-				logger.warn("Could not decode request string [" + source +
-				            "] with encoding '" + enc + "': using platform default");
+				if (logger.isWarnEnabled()) {
+					logger.warn("Could not decode request string [" + source + "] with encoding '" + enc +
+							"': falling back to platform default encoding; exception message: " + ex.getMessage());
+				}
 				return URLDecoder.decode(source);
 			}
 		}
@@ -242,14 +281,14 @@ public class UrlPathHelper {
 	 * <p>The default implementation checks the request encoding,
 	 * falling back to the default encoding specified for this resolver.
 	 * @param request current HTTP request
-	 * @return the encoding for the request (never null)
+	 * @return the encoding for the request (never <code>null</code>)
 	 * @see javax.servlet.ServletRequest#getCharacterEncoding
 	 * @see #setDefaultEncoding
 	 */
 	protected String determineEncoding(HttpServletRequest request) {
 		String enc = request.getCharacterEncoding();
 		if (enc == null) {
-			enc = this.defaultEncoding;
+			enc = getDefaultEncoding();
 		}
 		return enc;
 	}

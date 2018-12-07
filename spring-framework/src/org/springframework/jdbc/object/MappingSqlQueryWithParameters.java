@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.object;
 
@@ -68,6 +68,7 @@ public abstract class MappingSqlQueryWithParameters extends SqlQuery {
 		super(ds, sql);
 	}
 
+
 	/**
 	 * Implementation of protected abstract method. This invokes the subclass's
 	 * implementation of the mapRow() method.
@@ -83,9 +84,9 @@ public abstract class MappingSqlQueryWithParameters extends SqlQuery {
 	 * @param rowNum row number (from 0) we're up to
 	 * @param parameters to the query (passed to the execute() method).
 	 * Subclasses are rarely interested in these.
-	 * It can be null if there are no parameters.
+	 * It can be <code>null</code> if there are no parameters.
 	 * @param context passed to the execute() method.
-	 * It can be null if no contextual information is need.
+	 * It can be <code>null</code> if no contextual information is need.
 	 * @return an object of the result type
 	 * @throws SQLException if there's an error extracting data.
 	 * Subclasses can simply not catch SQLExceptions, relying on the
@@ -97,16 +98,16 @@ public abstract class MappingSqlQueryWithParameters extends SqlQuery {
 
 	/**
 	 * Implementation of ResultReader that calls the enclosing
-	 * class's mapRow() method for each row.
+	 * class's <code>mapRow</code> method for each row.
 	 */
 	protected class ResultReaderImpl implements ResultReader {
 
 		/** List to save results in */
-		private List results;
+		private final List results;
 
-		private Object[] params;
+		private final Object[] params;
 
-		private Map context;
+		private final Map context;
 
 		private int rowNum = 0;
 

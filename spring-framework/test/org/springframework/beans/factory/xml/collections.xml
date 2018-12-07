@@ -3,17 +3,6 @@
 
 <beans>
 
-	<description>
-		Tests for list and map handling in an XML bean definition file.
-	</description>
-	
-	<bean id="validEmptyWithDescription" class="org.springframework.beans.TestBean">
-		<description>
-			I have no properties and I'm happy without them. 
-		</description>
-	</bean>
-	
-	
 	<bean id="jenny" class="org.springframework.beans.TestBean">	
 		<property name="name"><value>Jenny</value></property>
 		<property name="age"><value>30</value></property>
@@ -107,26 +96,6 @@
 		<property name="name"><idref bean="verbose"/></property>
 	</bean>
 
-	<!--
-		Check automatic creation of alias, to allow for
-		names that are illegal as XML ids
-	-->
-	<bean id="aliased" class="org.springframework.beans.TestBean" name="myalias">
-		<property name="name"><value>aliased</value></property>
-	</bean>
-	
-	<bean id="multiAliased" class="org.springframework.beans.TestBean" name="alias1,alias2">
-		<property name="name"><value>aliased</value></property>
-	</bean>
-
-	<bean class="org.springframework.beans.TestBean" name="aliasWithoutId1,aliasWithoutId2,aliasWithoutId3">
-		<property name="name"><value>aliased</value></property>
-	</bean>
-
-	<bean class="org.springframework.beans.TestBean">
-		<property name="name"><null/></property>
-	</bean>
-
 	<bean id="emptyMap" class="org.springframework.beans.factory.HasMap">
 		<property name="map">
 			<map>
@@ -137,28 +106,50 @@
 	<bean id="literalMap" class="org.springframework.beans.factory.HasMap">	
 		<property name="map">
 			<map>
-				<entry key="foo"><value>bar</value></entry>
-				<entry key="fi"><value>fum</value></entry>
+				<entry key="foo" value="bar"/>
+				<entry key="fi" value="fum"/>
 				<entry key="fa"><null/></entry>
 			</map>
 		</property>
 	</bean>
-	
-	<bean id="mixedMap" class="org.springframework.beans.factory.HasMap">	
+
+	<bean id="mixedMap" class="org.springframework.beans.factory.HasMap">
 		<property name="map">
 			<map>
-				<entry key="foo"><value>bar</value></entry>
-				<entry key="jenny"><ref local="jenny"/></entry>
-				<entry key="david"><idref bean="david"/></entry>
+				<entry key-ref="fooKey">
+					<value type="java.lang.Integer">10</value>
+				</entry>
+				<entry>
+ 					<key>
+						<ref bean="jennyKey"/>
+					</key>
+					<ref local="jenny"/>
+				</entry>
+				<entry>
+ 					<key>
+ 						<bean class="java.lang.Integer">
+ 							<constructor-arg value="5"/>
+						</bean>
+					</key>
+					<idref bean="david"/>
+				</entry>
 			</map>
 		</property>
 	</bean>
-	
+
+	<bean id="fooKey" class="java.lang.String">
+		<constructor-arg value="foo"/>
+	</bean>
+
+	<bean id="jennyKey" class="java.lang.String">
+		<constructor-arg value="jenny"/>
+	</bean>
+
 	<bean id="pMixedMap" class="org.springframework.beans.factory.HasMap" singleton="false">
 		<property name="map">
 			<map>
-				<entry key="foo"><value>bar</value></entry>
-				<entry key="jenny"><ref local="pJenny"/></entry>
+				<entry key="foo" value="bar"/>
+				<entry key="jenny" value-ref="pJenny"/>
 			</map>
 		</property>
 	</bean>
@@ -166,7 +157,10 @@
 	<bean id="mixedMapWithList" class="org.springframework.beans.factory.HasMap">
 		<property name="map">
 			<map>
-				<entry key="foo"><value>bar</value></entry>
+				<entry>
+					<key><null/></key>
+					<value>bar</value>
+				</entry>
 				<entry key="jenny"><ref local="jenny"/></entry>
 				<entry key="list">
 					<list>
@@ -211,7 +205,7 @@
 	</bean>
 
 	<bean id="emptyProps" class="org.springframework.beans.factory.HasMap">
-		<property name="map">
+		<property name="props">
 			<props>
 			</props>
 		</property>
@@ -219,7 +213,7 @@
 	
 	
 	<bean id="props" class="org.springframework.beans.factory.HasMap">	
-		<property name="map">
+		<property name="props">
 			<props>
 				<prop key="foo">bar</prop>
 				<prop key="2">TWO</prop>
@@ -227,7 +221,16 @@
 		</property>
 	</bean>
 	
-	<bean id="objectArray" class="org.springframework.beans.factory.HasMap">	
+	<bean id="propsViaMap" class="org.springframework.beans.factory.HasMap">
+		<property name="props">
+			<map>
+				<entry key="foo"><value>bar</value></entry>
+				<entry key="2"><value>TWO</value></entry>
+			</map>
+		</property>
+	</bean>
+
+	<bean id="objectArray" class="org.springframework.beans.factory.HasMap">
 		<property name="objectArray">
 			<list>
 				<value>one</value>
@@ -245,9 +248,6 @@
 		</property>
 	</bean>
 	
-	<!--
-	Why does this fail with arrayStoreException? Seems like no
-	conversion takes place? RJ, June 7 03
 	<bean id="integerArray" class="org.springframework.beans.factory.HasMap">
 		<property name="integerArray">
 			<list>
@@ -257,7 +257,6 @@
 			</list>
 		</property>
 	</bean>
-	-->
 
 	<bean id="listFactory" class="org.springframework.beans.factory.config.ListFactoryBean">
 		<property name="sourceList">
@@ -338,6 +337,16 @@
 		<property name="singleton">
 			<value>true</value>
 		</property>
+	</bean>
+
+	<bean id="setAndMap" class="org.springframework.beans.factory.xml.XmlBeanCollectionTests$MapAndSet">
+		<constructor-arg>
+			<map>
+				<entry key="key1" value="val1"/>
+				<entry key="key2" value="val2"/>
+				<entry key="key3" value="val3"/>
+			</map>
+		</constructor-arg>
 	</bean>
 
 </beans>

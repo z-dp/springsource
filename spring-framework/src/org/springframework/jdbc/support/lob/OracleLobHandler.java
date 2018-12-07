@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,16 +12,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.support.lob;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
-import java.io.StringReader;
 import java.io.Writer;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -31,9 +28,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -47,8 +44,9 @@ import org.springframework.util.FileCopyUtils;
 
 /**
  * LobHandler implementation for Oracle databases. Uses proprietary API to
- * create oracle.sql.BLOB and oracle.sql.CLOB instances, as necessary when
- * working with Oracle's JDBC driver. Developed and tested on Oracle 9i.
+ * create <code>oracle.sql.BLOB</code> and <code>oracle.sql.CLOB</code>
+ * instances, as necessary when working with Oracle's JDBC driver.
+ * Note that this LobHandler requires Oracle JDBC driver 9i or higher!
  *
  * <p>While most databases are able to work with DefaultLobHandler, Oracle just
  * accepts Blob/Clob instances created via its own proprietary BLOB/CLOB API,
@@ -57,16 +55,17 @@ import org.springframework.util.FileCopyUtils;
  * this LobHandler implementation.
  *
  * <p>Needs to work on a native JDBC Connection, to be able to cast it to
- * oracle.jdbc.OracleConnection. If you pass in Connections from a connection
- * pool (the usual case in a J2EE environment), you need to set an appropriate
- * NativeJdbcExtractor to allow for automatical retrieval of the underlying
- * native JDBC Connection. LobHandler and NativeJdbcExtractor are separate
- * concerns, therefore they are represented by separate strategy interfaces.
+ * <code>oracle.jdbc.OracleConnection</code>. If you pass in Connections from
+ * a connection pool (the usual case in a J2EE environment), you need to set
+ * an appropriate NativeJdbcExtractor to allow for automatical retrieval of
+ * the underlying native JDBC Connection. LobHandler and NativeJdbcExtractor
+ * are separate concerns, therefore they are represented by separate strategy
+ * interfaces.
  *
  * <p>Coded via reflection to avoid dependencies on Oracle classes.
  * Even reads in Oracle constants via reflection because of different Oracle
- * drivers (classes12, ojdbc14) having different constant values!
- * As it initializes the Oracle classes on instantiation, do not define this
+ * drivers (classes12, ojdbc14) having different constant values! As this
+ * LobHandler initializes Oracle classes on instantiation, do not define this
  * as eager-initializing singleton if you do not want to depend on the Oracle
  * JAR being in the class path: use "lazy-init=true" to avoid this issue.
  *
@@ -76,9 +75,7 @@ import org.springframework.util.FileCopyUtils;
  * @see oracle.sql.BLOB
  * @see oracle.sql.CLOB
  */
-public class OracleLobHandler implements LobHandler {
-
-	private static final String CONNECTION_CLASS_NAME = "oracle.jdbc.OracleConnection";
+public class OracleLobHandler extends AbstractLobHandler {
 
 	private static final String BLOB_CLASS_NAME = "oracle.sql.BLOB";
 
@@ -91,54 +88,33 @@ public class OracleLobHandler implements LobHandler {
 
 	protected final Log logger = LogFactory.getLog(getClass());
 
-	private final Class blobClass;
-
-	private final Class clobClass;
-
-	private final Map durationSessionConstants = new HashMap();
-
-	private final Map modeReadWriteConstants = new HashMap();
-
 	private NativeJdbcExtractor nativeJdbcExtractor;
 
 	private Boolean cache = Boolean.TRUE;
 
+	private Class blobClass;
 
-	/**
-	 * This constructor retrieves the oracle.sql.BLOB and oracle.sql.CLOB
-	 * classes via reflection, and initializes the values for the
-	 * DURATION_SESSION and MODE_READWRITE constants defined there.
-	 * @see oracle.sql.BLOB#DURATION_SESSION
-	 * @see oracle.sql.BLOB#MODE_READWRITE
-	 * @see oracle.sql.CLOB#DURATION_SESSION
-	 * @see oracle.sql.CLOB#MODE_READWRITE
-	 */
-	public OracleLobHandler() throws ClassNotFoundException, NoSuchFieldException, IllegalAccessException {
-		// initialize oracle.sql.BLOB class
-		this.blobClass = getClass().getClassLoader().loadClass(BLOB_CLASS_NAME);
-		this.durationSessionConstants.put(this.blobClass,
-		                                  new Integer(this.blobClass.getField(DURATION_SESSION_FIELD_NAME).getInt(null)));
-		this.modeReadWriteConstants.put(this.blobClass,
-		                                new Integer(this.blobClass.getField(MODE_READWRITE_FIELD_NAME).getInt(null)));
+	private Class clobClass;
 
-		// initialize oracle.sql.CLOB class
-		this.clobClass = getClass().getClassLoader().loadClass(CLOB_CLASS_NAME);
-		this.durationSessionConstants.put(this.clobClass,
-		                                  new Integer(this.clobClass.getField(DURATION_SESSION_FIELD_NAME).getInt(null)));
-		this.modeReadWriteConstants.put(this.clobClass,
-		                                new Integer(this.clobClass.getField(MODE_READWRITE_FIELD_NAME).getInt(null)));
-	}
+	private final Map durationSessionConstants = new HashMap(2);
+
+	private final Map modeReadWriteConstants = new HashMap(2);
+
 
 	/**
 	 * Set an appropriate NativeJdbcExtractor to be able to retrieve the underlying
-	 * native oracle.jdbc.OracleConnection. This is necessary for DataSource-based
-	 * connection pools, as such pools need to return wrapped JDBC object handles.
+	 * native <code>oracle.jdbc.OracleConnection</code>. This is necessary for
+	 * DataSource-based connection pools, as those need to return wrapped JDBC
+	 * Connection handles that cannot be cast to a native Connection implementation.
 	 * <p>Effectively, this LobHandler just invokes a single NativeJdbcExtractor
-	 * method, namely getNativeConnectionFromStatement with a PreparedStatement
-	 * argument, falling back to a PreparedStatement.getConnection() call if no
-	 * extractor is set. So if PreparedStatement.getConnection() returns a native
-	 * JDBC Connection with your pool, you don't need to specify an extractor.
+	 * method, namely <code>getNativeConnectionFromStatement</code> with a
+	 * PreparedStatement argument (falling back to a
+	 * <code>PreparedStatement.getConnection()</code> call if no extractor is set).
+	 * <p>A common choice is SimpleNativeJdbcExtractor, whose Connection unwrapping
+	 * (which is what OracleLobHandler needs) will work with many connection pools.
+	 * See SimpleNativeJdbcExtractor's javadoc for details.
 	 * @see org.springframework.jdbc.support.nativejdbc.NativeJdbcExtractor#getNativeConnectionFromStatement
+	 * @see org.springframework.jdbc.support.nativejdbc.SimpleNativeJdbcExtractor
 	 * @see oracle.jdbc.OracleConnection
 	 */
 	public void setNativeJdbcExtractor(NativeJdbcExtractor nativeJdbcExtractor) {
@@ -147,7 +123,7 @@ public class OracleLobHandler implements LobHandler {
 
 	/**
 	 * Set whether to cache the temporary LOB in the buffer cache.
-	 * This value will be passed into BLOB/CLOB.createTemporary. Default is true.
+	 * This value will be passed into BLOB/CLOB.createTemporary. Default is "true".
 	 * @see oracle.sql.BLOB#createTemporary
 	 * @see oracle.sql.CLOB#createTemporary
 	 */
@@ -156,34 +132,71 @@ public class OracleLobHandler implements LobHandler {
 	}
 
 
+	/**
+	 * Retrieve the <code>oracle.sql.BLOB</code> and <code>oracle.sql.CLOB</code>
+	 * classes via reflection, and initialize the values for the
+	 * DURATION_SESSION and MODE_READWRITE constants defined there.
+	 * @param con the Oracle Connection, for using the exact same class loader
+	 * that the Oracle driver was loaded with
+	 * @see oracle.sql.BLOB#DURATION_SESSION
+	 * @see oracle.sql.BLOB#MODE_READWRITE
+	 * @see oracle.sql.CLOB#DURATION_SESSION
+	 * @see oracle.sql.CLOB#MODE_READWRITE
+	 */
+	protected synchronized void initOracleDriverClasses(Connection con) {
+		if (this.blobClass == null) {
+			try {
+				// Initialize oracle.sql.BLOB class
+				this.blobClass = con.getClass().getClassLoader().loadClass(BLOB_CLASS_NAME);
+				this.durationSessionConstants.put(
+						this.blobClass, new Integer(this.blobClass.getField(DURATION_SESSION_FIELD_NAME).getInt(null)));
+				this.modeReadWriteConstants.put(
+						this.blobClass, new Integer(this.blobClass.getField(MODE_READWRITE_FIELD_NAME).getInt(null)));
+
+				// Initialize oracle.sql.CLOB class
+				this.clobClass = con.getClass().getClassLoader().loadClass(CLOB_CLASS_NAME);
+				this.durationSessionConstants.put(
+						this.clobClass, new Integer(this.clobClass.getField(DURATION_SESSION_FIELD_NAME).getInt(null)));
+				this.modeReadWriteConstants.put(
+						this.clobClass, new Integer(this.clobClass.getField(MODE_READWRITE_FIELD_NAME).getInt(null)));
+			}
+			catch (Exception ex) {
+				throw new InvalidDataAccessApiUsageException(
+						"Couldn't initialize OracleLobHandler because Oracle driver classes are not available. " +
+						"Note that OracleLobHandler requires Oracle JDBC driver 9i or higher!", ex);
+			}
+		}
+	}
+
+
 	public byte[] getBlobAsBytes(ResultSet rs, int columnIndex) throws SQLException {
-		logger.debug("Returning BLOB as bytes");
+		logger.debug("Returning Oracle BLOB as bytes");
 		Blob blob = rs.getBlob(columnIndex);
-		return (blob != null ? blob.getBytes(1, (int) blob.length()) : new byte[0]);
+		return (blob != null ? blob.getBytes(1, (int) blob.length()) : null);
 	}
 
 	public InputStream getBlobAsBinaryStream(ResultSet rs, int columnIndex) throws SQLException {
-		logger.debug("Returning BLOB as binary stream");
+		logger.debug("Returning Oracle BLOB as binary stream");
 		Blob blob = rs.getBlob(columnIndex);
-		return (blob != null ? blob.getBinaryStream() : new ByteArrayInputStream(new byte[0]));
+		return (blob != null ? blob.getBinaryStream() : null);
 	}
 
 	public String getClobAsString(ResultSet rs, int columnIndex) throws SQLException {
-		logger.debug("Returning CLOB as string");
+		logger.debug("Returning Oracle CLOB as string");
 		Clob clob = rs.getClob(columnIndex);
-		return (clob != null ? clob.getSubString(1, (int) clob.length()) : "");
+		return (clob != null ? clob.getSubString(1, (int) clob.length()) : null);
 	}
 
 	public InputStream getClobAsAsciiStream(ResultSet rs, int columnIndex) throws SQLException {
-		logger.debug("Returning CLOB as ASCII stream");
+		logger.debug("Returning Oracle CLOB as ASCII stream");
 		Clob clob = rs.getClob(columnIndex);
-		return (clob != null ? clob.getAsciiStream() : new ByteArrayInputStream(new byte[0]));
+		return (clob != null ? clob.getAsciiStream() : null);
 	}
 
 	public Reader getClobAsCharacterStream(ResultSet rs, int columnIndex) throws SQLException {
-		logger.debug("Returning CLOB as character stream");
+		logger.debug("Returning Oracle CLOB as character stream");
 		Clob clob = rs.getClob(columnIndex);
-		return (clob != null ? clob.getCharacterStream() : new StringReader(""));
+		return (clob != null ? clob.getCharacterStream() : null);
 	}
 
 	public LobCreator getLobCreator() {
@@ -198,137 +211,139 @@ public class OracleLobHandler implements LobHandler {
 	 */
 	protected class OracleLobCreator implements LobCreator {
 
-		private final List createdLobs = new ArrayList();
+		private final List createdLobs = new LinkedList();
 
-		public void setBlobAsBytes(PreparedStatement ps, int parameterIndex, final byte[] content)
+		public void setBlobAsBytes(PreparedStatement ps, int paramIndex, final byte[] content)
 				throws SQLException {
+
 			if (content != null) {
-				Blob blob = (Blob) createLob(ps, blobClass, new LobCallback() {
+				Blob blob = (Blob) createLob(ps, false, new LobCallback() {
 					public void populateLob(Object lob) throws Exception {
 						Method methodToInvoke = lob.getClass().getMethod("getBinaryOutputStream", new Class[0]);
-						OutputStream out = (OutputStream) methodToInvoke.invoke(lob, null);
-						try {
-							out.write(content);
-							out.flush();
-						}
-						finally {
-							try {
-								out.close();
-							}
-							catch (IOException ex) {
-								logger.warn("Could not close BLOB OutputStream", ex);
-							}
-						}
+						OutputStream out = (OutputStream) methodToInvoke.invoke(lob, (Object[]) null);
+						FileCopyUtils.copy(content, out);
 					}
 				});
-				ps.setBlob(parameterIndex, blob);
-				logger.debug("Set bytes for BLOB with length " + blob.length());
+				ps.setBlob(paramIndex, blob);
+				if (logger.isDebugEnabled()) {
+					logger.debug("Set bytes for Oracle BLOB with length " + blob.length());
+				}
 			}
 			else {
-				ps.setBlob(parameterIndex, null);
-				logger.debug("Set BLOB to null");
+				ps.setBlob(paramIndex, null);
+				logger.debug("Set Oracle BLOB to null");
 			}
 		}
 
-		public void setBlobAsBinaryStream(PreparedStatement ps, int parameterIndex,
-		                                  final InputStream binaryStream, int contentLength)
+		public void setBlobAsBinaryStream(
+				PreparedStatement ps, int paramIndex, final InputStream binaryStream, int contentLength)
 				throws SQLException {
+
 			if (binaryStream != null) {
-				Blob blob = (Blob) createLob(ps, blobClass, new LobCallback() {
+				Blob blob = (Blob) createLob(ps, false, new LobCallback() {
 					public void populateLob(Object lob) throws Exception {
-						Method methodToInvoke = lob.getClass().getMethod("getBinaryOutputStream", null);
-						FileCopyUtils.copy(binaryStream, ((OutputStream) methodToInvoke.invoke(lob, null)));
+						Method methodToInvoke = lob.getClass().getMethod("getBinaryOutputStream", (Class[]) null);
+						OutputStream out = (OutputStream) methodToInvoke.invoke(lob, (Object[]) null);
+						FileCopyUtils.copy(binaryStream, out);
 					}
 				});
-				ps.setBlob(parameterIndex, blob);
-				logger.debug("Set binary stream for BLOB with length " + blob.length());
+				ps.setBlob(paramIndex, blob);
+				if (logger.isDebugEnabled()) {
+					logger.debug("Set binary stream for Oracle BLOB with length " + blob.length());
+				}
 			}
 			else {
-				ps.setBlob(parameterIndex, null);
-				logger.debug("Set BLOB to null");
+				ps.setBlob(paramIndex, null);
+				logger.debug("Set Oracle BLOB to null");
 			}
 		}
 
-		public void setClobAsString(PreparedStatement ps, int parameterIndex, final String content)
+		public void setClobAsString(PreparedStatement ps, int paramIndex, final String content)
 		    throws SQLException {
+
 			if (content != null) {
-				Clob clob = (Clob) createLob(ps, clobClass, new LobCallback() {
+				Clob clob = (Clob) createLob(ps, true, new LobCallback() {
 					public void populateLob(Object lob) throws Exception {
-						Method methodToInvoke = lob.getClass().getMethod("getCharacterOutputStream", null);
-						Writer writer = ((Writer) methodToInvoke.invoke(lob, null));
-						try {
-							writer.write(content);
-							writer.flush();
-						}
-						finally {
-							try {
-								writer.close();
-							}
-							catch (IOException ex) {
-								logger.warn("Could not close CLOB Writer", ex);
-							}
-						}
+						Method methodToInvoke = lob.getClass().getMethod("getCharacterOutputStream", (Class[]) null);
+						Writer writer = (Writer) methodToInvoke.invoke(lob, (Object[]) null);
+						FileCopyUtils.copy(content, writer);
 					}
 				});
-				ps.setClob(parameterIndex, clob);
-				logger.debug("Set string for CLOB with length " + clob.length());
+				ps.setClob(paramIndex, clob);
+				if (logger.isDebugEnabled()) {
+					logger.debug("Set string for Oracle CLOB with length " + clob.length());
+				}
 			}
 			else {
-				ps.setClob(parameterIndex, null);
-				logger.debug("Set CLOB to null");
+				ps.setClob(paramIndex, null);
+				logger.debug("Set Oracle CLOB to null");
 			}
 		}
 
-		public void setClobAsAsciiStream(PreparedStatement ps, int parameterIndex,
-		                                 final InputStream asciiStream, int contentLength)
+		public void setClobAsAsciiStream(
+				PreparedStatement ps, int paramIndex, final InputStream asciiStream, int contentLength)
 		    throws SQLException {
+
 			if (asciiStream != null) {
-				Clob clob = (Clob) createLob(ps, clobClass, new LobCallback() {
+				Clob clob = (Clob) createLob(ps, true, new LobCallback() {
 					public void populateLob(Object lob) throws Exception {
-						Method methodToInvoke = lob.getClass().getMethod("getAsciiOutputStream", null);
-						FileCopyUtils.copy(asciiStream, ((OutputStream) methodToInvoke.invoke(lob, null)));
+						Method methodToInvoke = lob.getClass().getMethod("getAsciiOutputStream", (Class[]) null);
+						OutputStream out = (OutputStream) methodToInvoke.invoke(lob, (Object[]) null);
+						FileCopyUtils.copy(asciiStream, out);
 					}
 				});
-				ps.setClob(parameterIndex, clob);
-				logger.debug("Set ASCII stream for CLOB with length " + clob.length());
+				ps.setClob(paramIndex, clob);
+				if (logger.isDebugEnabled()) {
+					logger.debug("Set ASCII stream for Oracle CLOB with length " + clob.length());
+				}
 			}
 			else {
-				ps.setClob(parameterIndex, null);
-				logger.debug("Set CLOB to null");
+				ps.setClob(paramIndex, null);
+				logger.debug("Set Oracle CLOB to null");
 			}
 		}
 
-		public void setClobAsCharacterStream(PreparedStatement ps, int parameterIndex,
-		                                     final Reader characterStream, int contentLength)
+		public void setClobAsCharacterStream(
+				PreparedStatement ps, int paramIndex, final Reader characterStream, int contentLength)
 		    throws SQLException {
+
 			if (characterStream != null) {
-				Clob clob = (Clob) createLob(ps, clobClass, new LobCallback() {
+				Clob clob = (Clob) createLob(ps, true, new LobCallback() {
 					public void populateLob(Object lob) throws Exception {
-						Method methodToInvoke = lob.getClass().getMethod("getCharacterOutputStream", null);
-						FileCopyUtils.copy(characterStream, ((Writer) methodToInvoke.invoke(lob, null)));
+						Method methodToInvoke = lob.getClass().getMethod("getCharacterOutputStream", (Class[]) null);
+						Writer writer = (Writer) methodToInvoke.invoke(lob, (Object[]) null);
+						FileCopyUtils.copy(characterStream, writer);
 					}
 				});
-				ps.setClob(parameterIndex, clob);
-				logger.debug("Set character stream for CLOB with length " + clob.length());
+				ps.setClob(paramIndex, clob);
+				if (logger.isDebugEnabled()) {
+					logger.debug("Set character stream for Oracle CLOB with length " + clob.length());
+				}
 			}
 			else {
-				ps.setClob(parameterIndex, null);
-				logger.debug("Set CLOB to null");
+				ps.setClob(paramIndex, null);
+				logger.debug("Set Oracle CLOB to null");
 			}
 		}
-
 
 		/**
 		 * Create a LOB instance for the given PreparedStatement,
 		 * populating it via the given callback.
 		 */
-		protected Object createLob(PreparedStatement ps, Class lobClass, LobCallback callback) throws SQLException {
+		protected Object createLob(PreparedStatement ps, boolean clob, LobCallback callback)
+				throws SQLException {
+
+			Connection con = null;
 			try {
-				Object lob = prepareLob(getOracleConnection(ps), lobClass);
+				con = getOracleConnection(ps);
+				initOracleDriverClasses(con);
+				Object lob = prepareLob(con, clob ? clobClass : blobClass);
 				callback.populateLob(lob);
-				lob.getClass().getMethod("close", null).invoke(lob, null);
+				lob.getClass().getMethod("close", (Class[]) null).invoke(lob, (Object[]) null);
 				this.createdLobs.add(lob);
-				logger.debug("Created new Oracle LOB");
+				if (logger.isDebugEnabled()) {
+					logger.debug("Created new Oracle " + (clob ? "CLOB" : "BLOB"));
+				}
 				return lob;
 			}
 			catch (SQLException ex) {
@@ -338,8 +353,15 @@ public class OracleLobHandler implements LobHandler {
 				if (ex.getTargetException() instanceof SQLException) {
 					throw (SQLException) ex.getTargetException();
 				}
+				else if (con != null && ex.getTargetException() instanceof ClassCastException) {
+					throw new InvalidDataAccessApiUsageException(
+							"OracleLobCreator needs to work on [oracle.jdbc.OracleConnection], not on [" +
+							con.getClass().getName() + "]: specify a corresponding NativeJdbcExtractor",
+							ex.getTargetException());
+				}
 				else {
-					throw new DataAccessResourceFailureException("Could not create Oracle LOB", ex.getTargetException());
+					throw new DataAccessResourceFailureException("Could not create Oracle LOB",
+							ex.getTargetException());
 				}
 			}
 			catch (Exception ex) {
@@ -350,15 +372,11 @@ public class OracleLobHandler implements LobHandler {
 		/**
 		 * Retrieve the underlying OracleConnection, using a NativeJdbcExtractor if set.
 		 */
-		protected Connection getOracleConnection(PreparedStatement ps) throws SQLException, ClassNotFoundException {
-			Connection conToUse = (nativeJdbcExtractor != null) ?
+		protected Connection getOracleConnection(PreparedStatement ps)
+				throws SQLException, ClassNotFoundException {
+
+			return (nativeJdbcExtractor != null) ?
 					nativeJdbcExtractor.getNativeConnectionFromStatement(ps) : ps.getConnection();
-			Class oracleConnectionClass = Class.forName(CONNECTION_CLASS_NAME);
-			if (!oracleConnectionClass.isAssignableFrom(conToUse.getClass())) {
-				throw new InvalidDataAccessApiUsageException("OracleLobHandler needs to work on OracleConnection - " +
-																										 "maybe set the nativeJdbcExtractor property?");
-			}
-			return conToUse;
 		}
 
 		/**
@@ -370,10 +388,10 @@ public class OracleLobHandler implements LobHandler {
 			blob.open(BLOB.MODE_READWRITE);
 			return blob;
 			*/
-			Method createTemporary = lobClass.getMethod("createTemporary",
-			                                            new Class[] {Connection.class, boolean.class, int.class});
-			Object lob = createTemporary.invoke(null, new Object[] {con, cache,
-			                                                        durationSessionConstants.get(lobClass)});
+			Method createTemporary = lobClass.getMethod(
+					"createTemporary", new Class[] {Connection.class, boolean.class, int.class});
+			Object lob = createTemporary.invoke(
+					null, new Object[] {con, cache, durationSessionConstants.get(lobClass)});
 			Method open = lobClass.getMethod("open", new Class[] {int.class});
 			open.invoke(lob, new Object[] {modeReadWriteConstants.get(lobClass)});
 			return lob;
@@ -407,7 +425,6 @@ public class OracleLobHandler implements LobHandler {
 
 	/**
 	 * Internal callback interface for use with createLob.
-	 * @see OracleLobCreator#createLob
 	 */
 	protected static interface LobCallback {
 

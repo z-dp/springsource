@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,22 +12,35 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.dao;
 
 /**
- * Exception thrown on an optimistic locking violation. This exception will
- * be thrown either by O/R mapping tools or by custom DAO implementations.
+ * Exception thrown on an optimistic locking violation.
+ *
+ * <p>This exception will be thrown either by O/R mapping tools
+ * or by custom DAO implementations. Optimistic locking failure
+ * is typically <i>not</i> detected by the database itself.
+ *
  * @author Rod Johnson
- * @version $Id: OptimisticLockingFailureException.java,v 1.5 2004/03/18 02:46:07 trisberg Exp $
+ * @see PessimisticLockingFailureException
  */
-public class OptimisticLockingFailureException extends DataAccessException {
+public class OptimisticLockingFailureException extends ConcurrencyFailureException {
 
+	/**
+	 * Constructor for OptimisticLockingFailureException.
+	 * @param msg the detail message
+	 */
 	public OptimisticLockingFailureException(String msg) {
 		super(msg);
 	}
 
+	/**
+	 * Constructor for OptimisticLockingFailureException.
+	 * @param msg the detail message
+	 * @param ex root cause from data access API in use
+	 */
 	public OptimisticLockingFailureException(String msg, Throwable ex) {
 		super(msg, ex);
 	}

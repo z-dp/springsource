@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.ui.freemarker;
 
@@ -31,13 +31,25 @@ import org.springframework.context.ResourceLoaderAware;
  * in application code, e.g. for generating email content. For web views,
  * FreeMarkerConfigurer is used to set up a FreeMarkerConfigurationFactory.
  *
- * <p>See base class FreeMarkerConfigurationFactory for details.
+ * The simplest way to use this class is to specify just a "templateLoaderPath";
+ * you do not need any further configuration then. For example, in a web
+ * application context:
+ *
+ * <pre>
+ * &lt;bean id="freemarkerConfiguration" class="org.springframework.ui.freemarker.FreeMarkerConfigurationFactoryBean"&gt;
+ *   &lt;property name="templateLoaderPath"&gt;&lt;value&gt;/WEB-INF/freemarker/&lt;/value>&lt;/property&gt;
+ * &lt;/bean&gt;</pre>
+
+ * See the base class FreeMarkerConfigurationFactory for configuration details.
  *
  * <p>Note: Spring's FreeMarker support requires FreeMarker 2.3 or higher.
  *
  * @author Darren Davison
- * @since 3/3/2004
- * @version $Id: FreeMarkerConfigurationFactoryBean.java,v 1.1 2004/03/20 15:41:33 trisberg Exp $
+ * @since 03.03.2004
+ * @see #setConfigLocation
+ * @see #setFreemarkerSettings
+ * @see #setTemplateLoaderPath
+ * @see org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer
  */
 public class FreeMarkerConfigurationFactoryBean extends FreeMarkerConfigurationFactory
 		implements FactoryBean, InitializingBean, ResourceLoaderAware {

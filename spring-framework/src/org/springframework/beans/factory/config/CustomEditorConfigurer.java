@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory.config;
 
@@ -23,6 +23,7 @@ import java.util.Map;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanInitializationException;
 import org.springframework.core.Ordered;
+import org.springframework.util.ClassUtils;
 
 /**
  * BeanFactoryPostProcessor implementation that allows for convenient
@@ -31,26 +32,37 @@ import org.springframework.core.Ordered;
  * <p>Configuration example, assuming XML bean definitions and inner
  * beans for PropertyEditor instances:
  *
- * <p><code>
- * &lt;bean id="customEditorConfigurer" class="org.springframework.beans.factory.config.CustomEditorConfigurer"&gt;<br>
- * &nbsp;&nbsp;&lt;property name="customEditors"&gt;<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&lt;map&gt;<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;entry key="java.util.Date"&gt;<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean class="mypackage.MyCustomDateEditor"/&gt;<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/entry&gt;<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;entry key="mypackage.MyObject"&gt;<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean id="myEditor" class="mypackage.MObjectEditor"&gt;<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property name="myParam"&gt;&lt;value&gt;myValue&lt;/value&gt;&lt;/property&gt;<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/entry&gt;<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&lt;/map&gt;<br>
- * &nbsp;&nbsp;&lt;/property&gt;<br>
- * &lt;/bean&gt;
- * </code>
+ * <pre>
+ * &lt;bean id="customEditorConfigurer" class="org.springframework.beans.factory.config.CustomEditorConfigurer"&gt;
+ *   &lt;property name="customEditors"&gt;
+ *     &lt;map&gt;
+ *       &lt;entry key="java.util.Date"&gt;
+ *         &lt;bean class="mypackage.MyCustomDateEditor"/&gt;
+ *       &lt;/entry&gt;
+ *       &lt;entry key="mypackage.MyObject"&gt;
+ *         &lt;bean id="myEditor" class="mypackage.MyObjectEditor"&gt;
+ *           &lt;property name="myParam"&gt;&lt;value&gt;myValue&lt;/value&gt;&lt;/property&gt;
+ *         &lt;/bean&gt;
+ *       &lt;/entry&gt;
+ *     &lt;/map&gt;
+ *   &lt;/property&gt;
+ * &lt;/bean&gt;</pre>
  *
+ * <p>Also supports "java.lang.String[]"-style array class names and primitive
+ * class names (e.g. "boolean"). Delegates to ClassUtils for actual class name
+ * resolution.
+ *
+ * <p><b>NOTE:</b> Custom property editors registered with this configurer do
+ * <i>not</i> apply to data binding. Custom editors for data binding need to
+ * be registered on the DataBinder: Use a common base class or delegate to
+ * common DataBinder initialization code to reuse editor registration there.
+ * 
  * @author Juergen Hoeller
  * @since 27.02.2004
  * @see ConfigurableBeanFactory#registerCustomEditor
+ * @see org.springframework.util.ClassUtils#forName
+ * @see org.springframework.validation.DataBinder#registerCustomEditor
+ * @see org.springframework.web.servlet.mvc.BaseCommandController#initBinder
  */
 public class CustomEditorConfigurer implements BeanFactoryPostProcessor, Ordered {
 
@@ -86,21 +98,21 @@ public class CustomEditorConfigurer implements BeanFactoryPostProcessor, Ordered
 				else if (key instanceof String) {
 					String className = (String) key;
 					try {
-						requiredType = Class.forName(className, true, Thread.currentThread().getContextClassLoader());
+						requiredType = ClassUtils.forName(className);
 					}
 					catch (ClassNotFoundException ex) {
-						throw new BeanInitializationException("Could not load required type [" + className +
-						                                      "] for custom editor", ex);
+						throw new BeanInitializationException(
+								"Could not load required type [" + className + "] for custom editor", ex);
 					}
 				}
 				else {
-					throw new BeanInitializationException("Invalid key [" + key + "] for custom editor - " +
-					                                      "needs to be Class or String");
+					throw new BeanInitializationException(
+							"Invalid key [" + key + "] for custom editor - needs to be Class or String");
 				}
 				Object value = this.customEditors.get(key);
 				if (!(value instanceof PropertyEditor)) {
-					throw new BeanInitializationException("Mapped value for custom editor is not of type " +
-					                                      "java.beans.PropertyEditor");
+					throw new BeanInitializationException("Mapped value [" + value + "] for custom editor key [" +
+							key + "] is not of required type [" + PropertyEditor.class.getName() + "]");
 				}
 				beanFactory.registerCustomEditor(requiredType, (PropertyEditor) value);
 			}

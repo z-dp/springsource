@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,9 +12,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.transaction.support;
+
+import java.io.Serializable;
 
 import org.springframework.core.Constants;
 import org.springframework.transaction.TransactionDefinition;
@@ -30,8 +32,9 @@ import org.springframework.transaction.TransactionDefinition;
  * @since 08.05.2003
  * @see org.springframework.transaction.support.TransactionTemplate
  * @see org.springframework.transaction.interceptor.DefaultTransactionAttribute
+ *  @version $Id: DefaultTransactionDefinition.java,v 1.12 2005/09/17 17:05:31 jhoeller Exp $
  */
-public class DefaultTransactionDefinition implements TransactionDefinition {
+public class DefaultTransactionDefinition implements TransactionDefinition, Serializable {
 
 	/** Prefix for transaction timeout values in description strings */
 	public static final String TIMEOUT_PREFIX = "timeout_";
@@ -39,9 +42,9 @@ public class DefaultTransactionDefinition implements TransactionDefinition {
 	/** Marker for read-only transactions in description strings */
 	public static final String READ_ONLY_MARKER = "readOnly";
 
+
 	/** Constants instance for TransactionDefinition */
 	private static final Constants constants = new Constants(TransactionDefinition.class);
-
 
 	private int propagationBehavior = PROPAGATION_REQUIRED;
 
@@ -51,20 +54,58 @@ public class DefaultTransactionDefinition implements TransactionDefinition {
 
 	private boolean readOnly = false;
 
+	private String name;
 
+
+	/**
+	 * Create a new DefaultTransactionDefinition, with default settings.
+	 * Can be modified through bean property setters.
+	 * @see #setPropagationBehavior
+	 * @see #setIsolationLevel
+	 * @see #setTimeout
+	 * @see #setReadOnly
+	 * @see #setName
+	 */
 	public DefaultTransactionDefinition() {
 	}
 
+	/**
+	 * Copy constructor. Definition can be modified through bean property setters.
+	 * @see #setPropagationBehavior
+	 * @see #setIsolationLevel
+	 * @see #setTimeout
+	 * @see #setReadOnly
+	 * @see #setName
+	 */
+	public DefaultTransactionDefinition(TransactionDefinition other) {
+		this.propagationBehavior = other.getPropagationBehavior();
+		this.isolationLevel = other.getIsolationLevel();
+		this.timeout = other.getTimeout();
+		this.readOnly = other.isReadOnly();
+		this.name = other.getName();
+	}
+
+	/**
+	 * Create a new DefaultTransactionDefinition with the the given
+	 * propagation behavior. Can be modified through bean property setters.
+	 * @param propagationBehavior one of the propagation constants in the
+	 * TransactionDefinition interface
+	 * @see #setIsolationLevel
+	 * @see #setTimeout
+	 * @see #setReadOnly
+	 */
 	public DefaultTransactionDefinition(int propagationBehavior) {
 		this.propagationBehavior = propagationBehavior;
 	}
+
 
 	/**
 	 * Set the propagation behavior by the name of the corresponding constant in
 	 * TransactionDefinition, e.g. "PROPAGATION_REQUIRED".
 	 * @param constantName name of the constant
 	 * @throws java.lang.IllegalArgumentException if an invalid constant was specified
-	 * @see org.springframework.transaction.TransactionDefinition#PROPAGATION_REQUIRED
+	 * @see #setPropagationBehavior
+	 * @see #PROPAGATION_REQUIRED
 	 */
 	public final void setPropagationBehaviorName(String constantName) throws IllegalArgumentException {
 		if (constantName == null || !constantName.startsWith(PROPAGATION_CONSTANT_PREFIX)) {
@@ -73,6 +114,11 @@ public class DefaultTransactionDefinition implements TransactionDefinition {
 		setPropagationBehavior(constants.asNumber(constantName).intValue());
 	}
 
+	/**
+	 * Set the propagation behavior. Must be one of the propagation constants
+	 * in the TransactionDefinition interface. Default is PROPAGATION_REQUIRED.
+	 * @see #PROPAGATION_REQUIRED
+	 */
 	public final void setPropagationBehavior(int propagationBehavior) {
 		if (!constants.getValues(PROPAGATION_CONSTANT_PREFIX).contains(new Integer(propagationBehavior))) {
 			throw new IllegalArgumentException("Only values of propagation constants allowed");
@@ -89,7 +135,8 @@ public class DefaultTransactionDefinition implements TransactionDefinition {
 	 * TransactionDefinition, e.g. "ISOLATION_DEFAULT".
 	 * @param constantName name of the constant
 	 * @throws java.lang.IllegalArgumentException if an invalid constant was specified
-	 * @see org.springframework.transaction.TransactionDefinition#ISOLATION_DEFAULT
+	 * @see #setIsolationLevel
+	 * @see #ISOLATION_DEFAULT
 	 */
 	public final void setIsolationLevelName(String constantName) throws IllegalArgumentException {
 		if (constantName == null || !constantName.startsWith(ISOLATION_CONSTANT_PREFIX)) {
@@ -98,6 +145,11 @@ public class DefaultTransactionDefinition implements TransactionDefinition {
 		setIsolationLevel(constants.asNumber(constantName).intValue());
 	}
 
+	/**
+	 * Set the isolation level. Must be one of the isolation constants
+	 * in the TransactionDefinition interface. Default is ISOLATION_DEFAULT.
+	 * @see #ISOLATION_DEFAULT
+	 */
 	public final void setIsolationLevel(int isolationLevel) {
 		if (!constants.getValues(ISOLATION_CONSTANT_PREFIX).contains(new Integer(isolationLevel))) {
 			throw new IllegalArgumentException("Only values of isolation constants allowed");
@@ -109,6 +161,11 @@ public class DefaultTransactionDefinition implements TransactionDefinition {
 		return isolationLevel;
 	}
 
+	/**
+	 * Set the timeout to apply, as number of seconds.
+	 * Default is TIMEOUT_DEFAULT (-1).
+	 * @see #TIMEOUT_DEFAULT
+	 */
 	public final void setTimeout(int timeout) {
 		if (timeout < TIMEOUT_DEFAULT) {
 			throw new IllegalArgumentException("Timeout must be a positive integer or TIMEOUT_DEFAULT");
@@ -120,12 +177,29 @@ public class DefaultTransactionDefinition implements TransactionDefinition {
 		return timeout;
 	}
 
+	/**
+	 * Set whether to optimize as read-only transaction.
+	 * Default is "false".
+	 */
 	public final void setReadOnly(boolean readOnly) {
 		this.readOnly = readOnly;
 	}
 
 	public final boolean isReadOnly() {
 		return readOnly;
+	}
+
+	/**
+	 * Set the name of this transaction. Default is none.
+	 * <p>This will be used as transaction name to be shown in a
+	 * transaction monitor, if applicable (for example, WebLogic's).
+	 */
+	public final void setName(String name) {
+		this.name = name;
+	}
+
+	public final String getName() {
+		return name;
 	}
 
 

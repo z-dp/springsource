@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.hibernate;
 
@@ -32,6 +32,7 @@ import net.sf.hibernate.Session;
 import net.sf.hibernate.SessionFactory;
 import net.sf.hibernate.cfg.Configuration;
 import net.sf.hibernate.cfg.Environment;
+import net.sf.hibernate.cfg.NamingStrategy;
 import net.sf.hibernate.dialect.Dialect;
 import net.sf.hibernate.tool.hbm2ddl.DatabaseMetadata;
 import org.apache.commons.logging.Log;
@@ -93,17 +94,48 @@ import org.springframework.jdbc.support.lob.LobHandler;
  */
 public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, DisposableBean {
 
-	private static ThreadLocal configTimeLobHandlerHolder = new ThreadLocal();
+	private static final ThreadLocal configTimeDataSourceHolder = new ThreadLocal();
+
+	private static final ThreadLocal configTimeTransactionManagerHolder = new ThreadLocal();
+
+	private static final ThreadLocal configTimeLobHandlerHolder = new ThreadLocal();
+
+	/**
+	 * Return the DataSource for the currently configured Hibernate SessionFactory,
+	 * to be used by LocalDataSourceConnectionProvoder.
+	 * <p>This instance will be set before initialization of the corresponding
+	 * SessionFactory, and reset immediately afterwards. It is thus only available
+	 * during configuration.
+	 * @see #setDataSource
+	 * @see LocalDataSourceConnectionProvider
+	 */
+	public static DataSource getConfigTimeDataSource() {
+		return (DataSource) configTimeDataSourceHolder.get();
+	}
+
+	/**
+	 * Return the JTA TransactionManager for the currently configured Hibernate
+	 * SessionFactory, to be used by LocalTransactionManagerLookup.
+	 * <p>This instance will be set before initialization of the corresponding
+	 * SessionFactory, and reset immediately afterwards. It is thus only available
+	 * during configuration.
+	 * @see #setJtaTransactionManager
+	 * @see LocalTransactionManagerLookup
+	 */
+	public static TransactionManager getConfigTimeTransactionManager() {
+		return (TransactionManager) configTimeTransactionManagerHolder.get();
+	}
 
 	/**
 	 * Return the LobHandler for the currently configured Hibernate SessionFactory,
-	 * to be used by Type implementations like ClobStringType.
+	 * to be used by UserType implementations like ClobStringType.
 	 * <p>This instance will be set before initialization of the corresponding
 	 * SessionFactory, and reset immediately afterwards. It is thus only available
-	 * in constructors of UserType implementations.
+	 * during configuration.
 	 * @see #setLobHandler
 	 * @see org.springframework.orm.hibernate.support.ClobStringType
-	 * @see net.sf.hibernate.type.Type
+	 * @see org.springframework.orm.hibernate.support.BlobByteArrayType
+	 * @see org.springframework.orm.hibernate.support.BlobSerializableType
 	 */
 	public static LobHandler getConfigTimeLobHandler() {
 		return (LobHandler) configTimeLobHandlerHolder.get();
@@ -124,11 +156,15 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 
 	private DataSource dataSource;
 
+	private boolean useTransactionAwareDataSource = false;
+
 	private TransactionManager jtaTransactionManager;
 
 	private LobHandler lobHandler;
 
 	private Interceptor entityInterceptor;
+
+	private NamingStrategy namingStrategy;
 
 	private boolean schemaUpdate = false;
 
@@ -161,7 +197,7 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 	public void setMappingResources(String[] mappingResources) {
 		this.mappingLocations = new Resource[mappingResources.length];
 		for (int i = 0; i < mappingResources.length; i++) {
-			this.mappingLocations[i] = new ClassPathResource(mappingResources[i]);
+			this.mappingLocations[i] = new ClassPathResource(mappingResources[i].trim());
 		}
 	}
 
@@ -201,7 +237,7 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 	}
 
 	/**
-	 * Set Hibernate properties, like "hibernate.dialect".
+	 * Set Hibernate properties, such as "hibernate.dialect".
 	 * <p>Can be used to override values in a Hibernate XML config file,
 	 * or to specify all necessary properties locally.
 	 * <p>Note: Do not specify a transaction provider here when using
@@ -214,14 +250,79 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 	}
 
 	/**
+	 * Return the Hibernate properties, if any. Mainly available for
+	 * configuration through property paths that specify individual keys.
+	 */
+	public Properties getHibernateProperties() {
+		if (this.hibernateProperties == null) {
+			this.hibernateProperties = new Properties();
+		}
+		return this.hibernateProperties;
+	}
+
+	/**
 	 * Set the DataSource to be used by the SessionFactory.
 	 * If set, this will override corresponding settings in Hibernate properties.
 	 * <p>Note: If this is set, the Hibernate settings should not define
 	 * a connection provider to avoid meaningless double configuration.
+	 * <p>If using HibernateTransactionManager as transaction strategy, consider
+	 * proxying your target DataSource with a LazyConnectionDataSourceProxy.
+	 * This defers fetching of an actual JDBC Connection until the first JDBC
+	 * Statement gets executed, even within JDBC transactions (as performed by
+	 * HibernateTransactionManager). Such lazy fetching is particularly beneficial
+	 * for read-only operations, in particular if the chances of resolving the
+	 * result in the second-level cache are high.
+	 * <p>As JTA and transactional JNDI DataSources already provide lazy enlistment
+	 * of JDBC Connections, LazyConnectionDataSourceProxy does not add value with
+	 * JTA (i.e. Spring's JtaTransactionManager) as transaction strategy.
+	 * @see #setUseTransactionAwareDataSource
 	 * @see LocalDataSourceConnectionProvider
+	 * @see HibernateTransactionManager
+	 * @see org.springframework.transaction.jta.JtaTransactionManager
+	 * @see org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy
 	 */
 	public void setDataSource(DataSource dataSource) {
 		this.dataSource = dataSource;
+	}
+
+	/**
+	 * Set whether to use a transaction-aware DataSource for the SessionFactory,
+	 * i.e. whether to automatically wrap the passed-in DataSource with Spring's
+	 * TransactionAwareDataSourceProxy.
+	 * <p>Default is "false": LocalSessionFactoryBean is usually used with Spring's
+	 * HibernateTransactionManager or JtaTransactionManager, both of which work nicely
+	 * on a plain JDBC DataSource. Hibernate Sessions and their JDBC Connections are
+	 * fully managed by the Hibernate/JTA transaction infrastructure in such a scenario.
+	 * <p>If you switch this flag to "true", Spring's Hibernate access will be able to
+	 * <i>participate in JDBC-based transactions managed outside of Hibernate</i>
+	 * (for example, by Spring's DataSourceTransactionManager). This can be convenient
+	 * if you need a different local transaction strategy for another O/R mapping tool,
+	 * for example, but still want Hibernate access to join into those transactions.
+	 * <p>A further benefit of this option is that <i>plain Sessions opened directly
+	 * via the SessionFactory</i>, outside of Spring's Hibernate support, will still
+	 * participate in active Spring-managed transactions.
+	 * <p>As a further effect, using a transaction-aware DataSource will <i>apply
+	 * remaining transaction timeouts to all created JDBC Statements</i>. This means
+	 * that all operations performed by the SessionFactory will automatically
+	 * participate in Spring-managed transaction timeouts, not just queries.
+	 * This adds value even for HibernateTransactionManager.
+	 * <p><b>WARNING: Be aware of side effects when using a transaction-aware
+	 * DataSource in combination with OpenSessionInViewFilter/Interceptor.</b>
+	 * This combination is only properly supported with HibernateTransactionManager
+	 * transactions. PROPAGATION_SUPPORTS with HibernateTransactionManager and
+	 * JtaTransactionManager in general are only supported on Hibernate3, which
+	 * introduces (optional) aggressive release of Connections.
+	 * @see #setDataSource
+	 * @see org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy
+	 * @see org.springframework.jdbc.datasource.DataSourceTransactionManager
+	 * @see org.springframework.orm.hibernate.support.OpenSessionInViewFilter
+	 * @see org.springframework.orm.hibernate.support.OpenSessionInViewInterceptor
+	 * @see HibernateTransactionManager
+	 * @see org.springframework.transaction.jta.JtaTransactionManager
+	 * @see org.springframework.orm.hibernate3.LocalSessionFactoryBean#setUseTransactionAwareDataSource
+	 */
+	public void setUseTransactionAwareDataSource(boolean useTransactionAwareDataSource) {
+		this.useTransactionAwareDataSource = useTransactionAwareDataSource;
 	}
 
 	/**
@@ -239,10 +340,12 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 
 	/**
 	 * Set the LobHandler to be used by the SessionFactory.
-	 * Will be exposed at config time for Type implementations.
+	 * Will be exposed at config time for UserType implementations.
 	 * @see #getConfigTimeLobHandler
+	 * @see net.sf.hibernate.UserType
 	 * @see org.springframework.orm.hibernate.support.ClobStringType
-	 * @see net.sf.hibernate.type.Type
+	 * @see org.springframework.orm.hibernate.support.BlobByteArrayType
+	 * @see org.springframework.orm.hibernate.support.BlobSerializableType
 	 */
 	public void setLobHandler(LobHandler lobHandler) {
 		this.lobHandler = lobHandler;
@@ -260,9 +363,19 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 	 * @see HibernateTemplate#setEntityInterceptor
 	 * @see HibernateInterceptor#setEntityInterceptor
 	 * @see HibernateTransactionManager#setEntityInterceptor
+	 * @see net.sf.hibernate.cfg.Configuration#setInterceptor
 	 */
 	public void setEntityInterceptor(Interceptor entityInterceptor) {
 		this.entityInterceptor = entityInterceptor;
+	}
+
+	/**
+	 * Set a Hibernate NamingStrategy for the SessionFactory, determining the
+	 * physical column and table names given the info in the mapping document.
+	 * @see net.sf.hibernate.cfg.Configuration#setNamingStrategy
+	 */
+	public void setNamingStrategy(NamingStrategy namingStrategy) {
+		this.namingStrategy = namingStrategy;
 	}
 
 	/**
@@ -284,96 +397,120 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 	 * @throws HibernateException in case of Hibernate initialization errors
 	 */
 	public void afterPropertiesSet() throws IllegalArgumentException, HibernateException, IOException {
-		// create Configuration instance
+		// Create Configuration instance.
 		Configuration config = newConfiguration();
 
+		if (this.dataSource != null) {
+			// Make given DataSource available for SessionFactory configuration.
+			configTimeDataSourceHolder.set(this.dataSource);
+		}
+
+		if (this.jtaTransactionManager != null) {
+			// Make Spring-provided JTA TransactionManager available.
+			configTimeTransactionManagerHolder.set(this.jtaTransactionManager);
+		}
+
 		if (this.lobHandler != null) {
-			// make given LobHandler available for SessionFactory configuration
-			// do early because because mapping resource might refer to custom types
+			// Make given LobHandler available for SessionFactory configuration.
+			// Do early because because mapping resource might refer to custom types.
 			configTimeLobHandlerHolder.set(this.lobHandler);
 		}
 
-		if (this.configLocation != null) {
-			// load Hibernate configuration from given location
-			config.configure(this.configLocation.getURL());
-		}
+		try {
 
-		if (this.mappingLocations != null) {
-			// register given Hibernate mapping definitions, contained in resource files
-			for (int i = 0; i < this.mappingLocations.length; i++) {
-				config.addInputStream(this.mappingLocations[i].getInputStream());
+			if (this.entityInterceptor != null) {
+				// Set given entity interceptor at SessionFactory level.
+				config.setInterceptor(this.entityInterceptor);
 			}
-		}
 
-		if (this.mappingJarLocations != null) {
-			// register given Hibernate mapping definitions, contained in jar files
-			for (int i = 0; i < this.mappingJarLocations.length; i++) {
-				Resource resource = this.mappingJarLocations[i];
-				config.addJar(resource.getFile());
+			if (this.namingStrategy != null) {
+				// Pass given naming strategy to Hibernate Configuration.
+				config.setNamingStrategy(this.namingStrategy);
 			}
-		}
 
-		if (this.mappingDirectoryLocations != null) {
-			// register all Hibernate mapping definitions in the given directories
-			for (int i = 0; i < this.mappingDirectoryLocations.length; i++) {
-				File file = this.mappingDirectoryLocations[i].getFile();
-				if (!file.isDirectory()) {
-					throw new IllegalArgumentException("Mapping directory location [" + this.mappingDirectoryLocations[i] +
-																						 "] does not denote a directory");
+			if (this.configLocation != null) {
+				// Load Hibernate configuration from given location.
+				config.configure(this.configLocation.getURL());
+			}
+
+			if (this.hibernateProperties != null) {
+				// Add given Hibernate properties to Configuration.
+				config.addProperties(this.hibernateProperties);
+			}
+
+			if (this.dataSource != null) {
+				// Set Spring-provided DataSource as Hibernate property.
+				config.setProperty(Environment.CONNECTION_PROVIDER,
+						this.useTransactionAwareDataSource ?
+						TransactionAwareDataSourceConnectionProvider.class.getName() :
+						LocalDataSourceConnectionProvider.class.getName());
+			}
+
+			if (this.jtaTransactionManager != null) {
+				// Set Spring-provided JTA TransactionManager as Hibernate property.
+				config.setProperty(Environment.TRANSACTION_MANAGER_STRATEGY, LocalTransactionManagerLookup.class.getName());
+			}
+
+			if (this.mappingLocations != null) {
+				// Register given Hibernate mapping definitions, contained in resource files.
+				for (int i = 0; i < this.mappingLocations.length; i++) {
+					config.addInputStream(this.mappingLocations[i].getInputStream());
 				}
-				config.addDirectory(file);
+			}
+
+			if (this.mappingJarLocations != null) {
+				// Register given Hibernate mapping definitions, contained in jar files.
+				for (int i = 0; i < this.mappingJarLocations.length; i++) {
+					Resource resource = this.mappingJarLocations[i];
+					config.addJar(resource.getFile());
+				}
+			}
+
+			if (this.mappingDirectoryLocations != null) {
+				// Register all Hibernate mapping definitions in the given directories.
+				for (int i = 0; i < this.mappingDirectoryLocations.length; i++) {
+					File file = this.mappingDirectoryLocations[i].getFile();
+					if (!file.isDirectory()) {
+						throw new IllegalArgumentException(
+								"Mapping directory location [" + this.mappingDirectoryLocations[i] +
+								"] does not denote a directory");
+					}
+					config.addDirectory(file);
+				}
+			}
+
+			// Perform custom post-processing in subclasses.
+			postProcessConfiguration(config);
+
+			// Build SessionFactory instance.
+			logger.info("Building new Hibernate SessionFactory");
+			this.configuration = config;
+			this.sessionFactory = newSessionFactory(config);
+		}
+
+		finally {
+			if (this.dataSource != null) {
+				// Reset DataSource holder.
+				configTimeDataSourceHolder.set(null);
+			}
+
+			if (this.jtaTransactionManager != null) {
+				// Reset TransactionManager holder.
+				configTimeTransactionManagerHolder.set(null);
+			}
+
+			if (this.lobHandler != null) {
+				// Reset LobHandler holder.
+				configTimeLobHandlerHolder.set(null);
 			}
 		}
 
-		if (this.hibernateProperties != null) {
-			// add given Hibernate properties
-			config.addProperties(this.hibernateProperties);
-		}
-
-		if (this.dataSource != null) {
-			// make given DataSource available for SessionFactory configuration
-			config.setProperty(Environment.CONNECTION_PROVIDER, LocalDataSourceConnectionProvider.class.getName());
-			LocalDataSourceConnectionProvider.configTimeDataSourceHolder.set(this.dataSource);
-		}
-
-		if (this.jtaTransactionManager != null) {
-			config.setProperty(Environment.TRANSACTION_MANAGER_STRATEGY, LocalTransactionManagerLookup.class.getName());
-			LocalTransactionManagerLookup.configTimeTransactionManagerHolder.set(this.jtaTransactionManager);
-		}
-
-		if (this.entityInterceptor != null) {
-			// set given entity interceptor at SessionFactory level
-			config.setInterceptor(this.entityInterceptor);
-		}
-
-		// perform custom post-processing in subclasses
-		postProcessConfiguration(config);
-
-		// build SessionFactory instance
-		logger.info("Building new Hibernate SessionFactory");
-		this.configuration = config;
-		this.sessionFactory = newSessionFactory(config);
-
-		if (this.jtaTransactionManager != null) {
-			// reset TransactionManager holder
-			LocalTransactionManagerLookup.configTimeTransactionManagerHolder.set(null);
-		}
-
-		if (this.dataSource != null) {
-			// reset DataSource holder
-			LocalDataSourceConnectionProvider.configTimeDataSourceHolder.set(null);
-		}
-
-		if (this.lobHandler != null) {
-			// reset LobHandler holder
-			configTimeLobHandlerHolder.set(null);
-		}
-
-		// execute schema update if requested
+		// Execute schema update if requested.
 		if (this.schemaUpdate) {
 			updateDatabaseSchema();
 		}
 	}
+	
 
 	/**
 	 * Subclasses can override this method to perform custom initialization
@@ -424,7 +561,7 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 	 * SchemaExport class, to be invoked on application setup.
 	 * <p>Fetch the LocalSessionFactoryBean itself rather than the exposed
 	 * SessionFactory to be able to invoke this method, e.g. via
-	 * <code>LocalSessionFactoryBean lsfb = ctx.getBean("&mySessionFactory");</code>.
+	 * <code>LocalSessionFactoryBean lsfb = (LocalSessionFactoryBean) ctx.getBean("&mySessionFactory");</code>.
 	 * <p>Uses the SessionFactory that this bean generates for accessing a JDBC
 	 * connection to perform the script.
 	 * @throws DataAccessException in case of script execution errors
@@ -453,7 +590,7 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 	 * SchemaExport class, to be invoked on application setup.
 	 * <p>Fetch the LocalSessionFactoryBean itself rather than the exposed
 	 * SessionFactory to be able to invoke this method, e.g. via
-	 * <code>LocalSessionFactoryBean lsfb = ctx.getBean("&mySessionFactory");</code>.
+	 * <code>LocalSessionFactoryBean lsfb = (LocalSessionFactoryBean) ctx.getBean("&mySessionFactory");</code>.
 	 * <p>Uses the SessionFactory that this bean generates for accessing a JDBC
 	 * connection to perform the script.
 	 * @throws DataAccessException in case of script execution errors
@@ -467,7 +604,7 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 			new HibernateCallback() {
 				public Object doInHibernate(Session session) throws HibernateException, SQLException {
 					Connection con = session.connection();
-					final Dialect dialect = Dialect.getDialect(configuration.getProperties());
+					Dialect dialect = Dialect.getDialect(configuration.getProperties());
 					String[] sql = configuration.generateSchemaCreationScript(dialect);
 					executeSchemaScript(con, sql);
 					return null;
@@ -483,22 +620,23 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 	 * on application startup. Can also be invoked manually.
 	 * <p>Fetch the LocalSessionFactoryBean itself rather than the exposed
 	 * SessionFactory to be able to invoke this method, e.g. via
-	 * <code>LocalSessionFactoryBean lsfb = ctx.getBean("&mySessionFactory");</code>.
+	 * <code>LocalSessionFactoryBean lsfb = (LocalSessionFactoryBean) ctx.getBean("&mySessionFactory");</code>.
 	 * <p>Uses the SessionFactory that this bean generates for accessing a JDBC
 	 * connection to perform the script.
-	 * @throws HibernateException in case of Hibernate initialization errors
+	 * @throws DataAccessException in case of script execution errors
 	 * @see #setSchemaUpdate
 	 * @see net.sf.hibernate.cfg.Configuration#generateSchemaUpdateScript
 	 * @see net.sf.hibernate.tool.hbm2ddl.SchemaUpdate
 	 */
-	public void updateDatabaseSchema() throws HibernateException {
+	public void updateDatabaseSchema() throws DataAccessException {
 		logger.info("Updating database schema for Hibernate SessionFactory");
 		HibernateTemplate hibernateTemplate = new HibernateTemplate(this.sessionFactory);
+		hibernateTemplate.setFlushMode(HibernateTemplate.FLUSH_NEVER);
 		hibernateTemplate.execute(
 			new HibernateCallback() {
 				public Object doInHibernate(Session session) throws HibernateException, SQLException {
 					Connection con = session.connection();
-					final Dialect dialect = Dialect.getDialect(configuration.getProperties());
+					Dialect dialect = Dialect.getDialect(configuration.getProperties());
 					DatabaseMetadata metadata = new DatabaseMetadata(con, dialect);
 					String[] sql = configuration.generateSchemaUpdateScript(dialect, metadata);
 					executeSchemaScript(con, sql);
@@ -510,26 +648,58 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 
 	/**
 	 * Execute the given schema script on the given JDBC Connection.
-	 * Will log unsuccessful statements and continue to execute.
+	 * <p>Note that the default implementation will log unsuccessful statements
+	 * and continue to execute. Override the <code>executeSchemaStatement</code>
+	 * method to treat failures differently.
 	 * @param con the JDBC Connection to execute the script on
 	 * @param sql the SQL statements to execute
 	 * @throws SQLException if thrown by JDBC methods
+	 * @see #executeSchemaStatement
 	 */
 	protected void executeSchemaScript(Connection con, String[] sql) throws SQLException {
-		Statement stmt = con.createStatement();
-		try {
-			for (int i = 0; i < sql.length; i++) {
-				logger.debug("Executing schema statement: " + sql[i]);
+		if (sql != null && sql.length > 0) {
+			boolean oldAutoCommit = con.getAutoCommit();
+			if (!oldAutoCommit) {
+				con.setAutoCommit(true);
+			}
+			try {
+				Statement stmt = con.createStatement();
 				try {
-					stmt.executeUpdate(sql[i]);
+					for (int i = 0; i < sql.length; i++) {
+						executeSchemaStatement(stmt, sql[i]);
+					}
 				}
-				catch (SQLException ex) {
-					logger.info("Unsuccessful schema statement: " + sql[i], ex);
+				finally {
+					JdbcUtils.closeStatement(stmt);
+				}
+			}
+			finally {
+				if (!oldAutoCommit) {
+					con.setAutoCommit(false);
 				}
 			}
 		}
-		finally {
-			JdbcUtils.closeStatement(stmt);
+	}
+
+	/**
+	 * Execute the given schema SQL on the given JDBC Statement.
+	 * <p>Note that the default implementation will log unsuccessful statements
+	 * and continue to execute. Override this method to treat failures differently.
+	 * @param stmt the JDBC Statement to execute the SQL on
+	 * @param sql the SQL statement to execute
+	 * @throws SQLException if thrown by JDBC methods (and considered fatal)
+	 */
+	protected void executeSchemaStatement(Statement stmt, String sql) throws SQLException {
+		if (logger.isDebugEnabled()) {
+			logger.debug("Executing schema statement: " + sql);
+		}
+		try {
+			stmt.executeUpdate(sql);
+		}
+		catch (SQLException ex) {
+			if (logger.isWarnEnabled()) {
+				logger.warn("Unsuccessful schema statement: " + sql, ex);
+			}
 		}
 	}
 
@@ -541,6 +711,7 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 	public Configuration getConfiguration() {
 		return configuration;
 	}
+
 
 	/**
 	 * Return the singleton SessionFactory.
@@ -557,12 +728,26 @@ public class LocalSessionFactoryBean implements FactoryBean, InitializingBean, D
 		return true;
 	}
 
+
 	/**
 	 * Close the SessionFactory on bean factory shutdown.
 	 */
 	public void destroy() throws HibernateException {
 		logger.info("Closing Hibernate SessionFactory");
-		this.sessionFactory.close();
+		if (this.dataSource != null) {
+			// Make given DataSource available for potential SchemaExport,
+			// which unfortunately reinstantiates a ConnectionProvider.
+			configTimeDataSourceHolder.set(this.dataSource);
+		}
+		try {
+			this.sessionFactory.close();
+		}
+		finally {
+			if (this.dataSource != null) {
+				// Reset DataSource holder.
+				configTimeDataSourceHolder.set(null);
+			}
+		}
 	}
 
 }

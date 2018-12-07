@@ -4,27 +4,28 @@
 <beans>
 
 	<bean id="rod1" class="org.springframework.beans.factory.xml.ConstructorDependenciesBean">
-		<constructor-arg><ref bean="other"/></constructor-arg>
 		<constructor-arg><ref bean="kerry2"/></constructor-arg>
 	</bean>
 
 	<bean id="rod2" class="org.springframework.beans.factory.xml.ConstructorDependenciesBean">
-		<constructor-arg index="1"><ref bean="kerry1"/></constructor-arg>
-		<constructor-arg index="0"><ref bean="kerry2"/></constructor-arg>
+		<constructor-arg index="1" ref="kerry1"/>
+		<constructor-arg index="0" ref="kerry2"/>
 		<constructor-arg><ref bean="other"/></constructor-arg>
 	</bean>
 
 	<bean id="rod3" class="org.springframework.beans.factory.xml.ConstructorDependenciesBean"
-		autowire="constructor">
-		<constructor-arg><ref bean="kerry2"/></constructor-arg>
+			autowire="constructor">
+		<constructor-arg index="0"><ref bean="kerry2"/></constructor-arg>
+		<constructor-arg index="1"><ref bean="kerry2"/></constructor-arg>
 	</bean>
 
 	<bean id="rod4" class="org.springframework.beans.factory.xml.DerivedConstructorDependenciesBean"
-		autowire="constructor">
-		<constructor-arg>
+			autowire="constructor">
+		<constructor-arg index="0">
 			<description>wife</description>
 			<ref bean="kerry2"/>
 		</constructor-arg>
+		<constructor-arg><ref bean="kerry2"/></constructor-arg>
 	</bean>
 
 	<bean id="rod5" class="org.springframework.beans.factory.xml.DerivedConstructorDependenciesBean">
@@ -43,7 +44,8 @@
 		<constructor-arg index="0"><ref bean="kerry2"/></constructor-arg>
 	</bean>
 
-	<bean id="rod6" class="org.springframework.beans.factory.xml.DerivedConstructorDependenciesBean">
+	<bean id="rod6" class="org.springframework.beans.factory.xml.DerivedConstructorDependenciesBean"
+			init-method="init" destroy-method="destroy">
 		<constructor-arg index="1"><ref bean="kerry1"/></constructor-arg>
 		<constructor-arg><ref bean="other"/></constructor-arg>
 		<constructor-arg index="0"><ref bean="kerry2"/></constructor-arg>
@@ -73,9 +75,37 @@
 		<constructor-arg index="0"><ref local="kerry2"/></constructor-arg>
 	</bean>
 
+	<bean id="rod12" class="org.springframework.beans.factory.xml.ConstructorDependenciesBean">
+		<constructor-arg index="0"><ref bean="kerry1"/></constructor-arg>
+	</bean>
+
+	<bean id="rod13" class="org.springframework.beans.factory.xml.ConstructorDependenciesBean">
+		<constructor-arg index="0"><ref bean="kerry1"/></constructor-arg>
+		<constructor-arg index="1"><ref bean="kerry2"/></constructor-arg>
+	</bean>
+
+	<bean id="rod14" class="org.springframework.beans.factory.xml.ConstructorDependenciesBean">
+		<constructor-arg><ref bean="kerry1"/></constructor-arg>
+		<constructor-arg><ref bean="kerry2"/></constructor-arg>
+	</bean>
+
+	<bean id="rod15" class="org.springframework.beans.factory.xml.ConstructorDependenciesBean">
+		<constructor-arg><ref bean="kerry2"/></constructor-arg>
+		<constructor-arg><ref bean="kerry1"/></constructor-arg>
+	</bean>
+
+	<bean id="rod16" class="org.springframework.beans.factory.xml.ConstructorDependenciesBean">
+		<constructor-arg><ref bean="kerry2"/></constructor-arg>
+		<constructor-arg><ref bean="kerry1"/></constructor-arg>
+		<constructor-arg><value>29</value></constructor-arg>
+	</bean>
+
 	<bean id="kerry1" class="org.springframework.beans.TestBean">
 		<property name="name">
 			<value>Kerry1</value>
+		</property>
+		<property name="age">
+			<value>33</value>
 		</property>
 	</bean>
 
@@ -83,8 +113,45 @@
 		<property name="name">
 			<value>Kerry2</value>
 		</property>
+		<property name="age">
+			<value>32</value>
+		</property>
 	</bean>
 
 	<bean id="other" class="org.springframework.beans.IndexedTestBean"/>
+
+	<bean id="file" class="java.io.File">
+		<constructor-arg><value>/test</value></constructor-arg>
+	</bean>
+
+	<bean id="beanWithBoolean" class="org.springframework.beans.factory.xml.SingleSimpleTypeConstructorBean" singleton="false">
+		<constructor-arg type="boolean" value="true"/>
+	</bean>
+
+	<bean id="beanWithBoolean2" class="org.springframework.beans.factory.xml.SingleSimpleTypeConstructorBean" singleton="false">
+		<constructor-arg value="true"/>
+	</bean>
+
+	<bean id="beanWithBooleanAndString" class="org.springframework.beans.factory.xml.SingleSimpleTypeConstructorBean" singleton="false">
+		<constructor-arg type="boolean"><value>true</value></constructor-arg>
+		<constructor-arg><value>A String</value></constructor-arg>
+	</bean>
+
+	<bean id="beanWithBooleanAndString2" class="org.springframework.beans.factory.xml.SingleSimpleTypeConstructorBean" singleton="false">
+		<constructor-arg value="A String"/>
+		<constructor-arg value="true"/>
+	</bean>
+
+	<bean id="Boolean" class="java.lang.Boolean">
+		<constructor-arg value="false"/>
+	</bean>
+
+	<bean id="beanWithDoubleBoolean" class="org.springframework.beans.factory.xml.XmlBeanFactoryTests$DoubleBooleanConstructorBean" autowire="constructor" singleton="false">
+		<constructor-arg type="java.lang.Boolean"><value>true</value></constructor-arg>
+	</bean>
+
+	<bean id="beanWithDoubleBooleanAndIndex" class="org.springframework.beans.factory.xml.XmlBeanFactoryTests$DoubleBooleanConstructorBean" autowire="constructor" singleton="false">
+		<constructor-arg index="1"><value>true</value></constructor-arg>
+	</bean>
 
 </beans>

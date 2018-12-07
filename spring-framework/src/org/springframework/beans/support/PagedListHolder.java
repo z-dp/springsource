@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.support;
 
@@ -56,6 +56,7 @@ public class PagedListHolder implements Serializable {
 
 	public static final int DEFAULT_MAX_LINKED_PAGES = 10;
 
+
 	private List source;
 
 	private Date refreshDate;
@@ -68,23 +69,38 @@ public class PagedListHolder implements Serializable {
 
 	private int page = 0;
 
+	private boolean newPageSet;
+
 	private int maxLinkedPages = DEFAULT_MAX_LINKED_PAGES;
 
 
 	/**
 	 * Create a new holder instance.
 	 * You'll need to set a source list to be able to use the holder.
+	 * @see #setSource
 	 */
 	public PagedListHolder() {
 		this(new ArrayList(0));
 	}
 
 	/**
-	 * Create a new holder instance with the given source list.
+	 * Create a new holder instance with the given source list, starting with
+	 * a default sort definition (with "toggleAscendingOnProperty" activated).
+	 * @param source the source List
+	 * @see MutableSortDefinition#setToggleAscendingOnProperty
 	 */
 	public PagedListHolder(List source) {
+		this(source, new MutableSortDefinition(true));
+	}
+
+	/**
+	 * Create a new holder instance with the given source list.
+	 * @param source the source List
+	 * @param sort the SortDefinition to start with
+	 */
+	public PagedListHolder(List source, SortDefinition sort) {
 		setSource(source);
-		setSort(new MutableSortDefinition(true));
+		setSort(sort);
 	}
 
 
@@ -135,7 +151,9 @@ public class PagedListHolder implements Serializable {
 	public void setPageSize(int pageSize) {
 		if (pageSize != this.pageSize) {
 			this.pageSize = pageSize;
-			this.page = 0;
+			if (!this.newPageSet) {
+				this.page = 0;
+			}
 		}
 	}
 
@@ -151,11 +169,8 @@ public class PagedListHolder implements Serializable {
 	 * Page numbering starts with 0.
 	 */
 	public void setPage(int page) {
-		if (page >= this.getNrOfPages() ) {
-			this.page = this.getNrOfPages() - 1;
-		} else {
-			this.page = page;
-		}
+		this.page = page;
+		this.newPageSet = true;
 	}
 
 	/**
@@ -163,7 +178,11 @@ public class PagedListHolder implements Serializable {
 	 * Page numbering starts with 0.
 	 */
 	public int getPage() {
-		return page;
+		this.newPageSet = false;
+		if (this.page >= getPageCount()) {
+			this.page = getPageCount() - 1;
+		}
+		return this.page;
 	}
 
 	/**
@@ -184,8 +203,8 @@ public class PagedListHolder implements Serializable {
 	/**
 	 * Return the number of pages for the current source list.
 	 */
-	public int getNrOfPages() {
-		float nrOfPages = (float) this.source.size() / this.pageSize;
+	public int getPageCount() {
+		float nrOfPages = (float) getSource().size() / getPageSize();
 		return (int) ((nrOfPages > (int) nrOfPages || nrOfPages == 0.0) ? nrOfPages + 1 : nrOfPages);
 	}
 
@@ -193,14 +212,14 @@ public class PagedListHolder implements Serializable {
 	 * Return if the current page is the first one.
 	 */
 	public boolean isFirstPage() {
-		return this.page == 0;
+		return getPage() == 0;
 	}
 
 	/**
 	 * Return if the current page is the last one.
 	 */
 	public boolean isLastPage() {
-		return this.page == getNrOfPages() -1;
+		return getPage() == getPageCount() -1;
 	}
 
 	/**
@@ -227,7 +246,7 @@ public class PagedListHolder implements Serializable {
 	 * Return the total number of elements in the source list.
 	 */
 	public int getNrOfElements() {
-		return this.source.size();
+		return getSource().size();
 	}
 
 	/**
@@ -235,7 +254,7 @@ public class PagedListHolder implements Serializable {
 	 * Element numbering starts with 0.
 	 */
 	public int getFirstElementOnPage() {
-		return (this.pageSize * this.page);
+		return (getPageSize() * getPage());
 	}
 
 	/**
@@ -243,42 +262,72 @@ public class PagedListHolder implements Serializable {
 	 * Element numbering starts with 0.
 	 */
 	public int getLastElementOnPage() {
-		int endIndex = this.pageSize * (this.page + 1);
-		return (endIndex > this.source.size() ? this.source.size() : endIndex) -1;
+		int endIndex = getPageSize() * (getPage() + 1);
+		return (endIndex > getSource().size() ? getSource().size() : endIndex) -1;
 	}
 
 	/**
 	 * Return a sub-list representing the current page.
 	 */
 	public List getPageList() {
-		return this.source.subList(getFirstElementOnPage(), getLastElementOnPage() +1);
+		return getSource().subList(getFirstElementOnPage(), getLastElementOnPage() +1);
 	}
 
 	/**
 	 * Return the first page to which create a link around the current page.
 	 */
 	public int getFirstLinkedPage() {
-		return Math.max(0, this.getPage() - (this.maxLinkedPages /2));
+		return Math.max(0, getPage() - (getMaxLinkedPages() /2));
 	}
 
 	/**
-	 * Return the first page to which create a link around the current page.
+	 * Return the last page to which create a link around the current page.
 	 */
 	public int getLastLinkedPage() {
-		return Math.min(getFirstLinkedPage() + this.maxLinkedPages -1, this.getNrOfPages() -1);
+		return Math.min(getFirstLinkedPage() + getMaxLinkedPages() -1, getPageCount() -1);
 	}
 
 
 	/**
-	 * Resort the list if necessary, i.e. if the current sort instance isn't equal
-	 * to the backed-up sortUsed instance.
+	 * Resort the list if necessary, i.e. if the current <code>sort</code> instance
+	 * isn't equal to the backed-up <code>sortUsed</code> instance.
+	 * <p>Calls <code>doSort</code> to trigger actual sorting.
+	 * @see #doSort
 	 */
 	public void resort() {
-		if (this.sort != null && !"".equals(this.sort.getProperty()) && !this.sort.equals(this.sortUsed)) {
-			PropertyComparator.sort(this.source, this.sort);
-			this.sortUsed = new MutableSortDefinition(this.sort);
+		SortDefinition sort = getSort();
+		if (sort != null && !sort.equals(this.sortUsed)) {
+			this.sortUsed = copySortDefinition(sort);
+			doSort(getSource(), sort);
 			setPage(0);
 		}
+	}
+
+	/**
+	 * Create a deep copy of the given sort definition,
+	 * for use as state holder to compare a modified sort definition against.
+	 * <p>Default implementation creates a MutableSortDefinition instance.
+	 * Can be overridden in subclasses, in particular in case of custom
+	 * extensions to the SortDefinition interface. Is allowed to return
+	 * null, which means that no sort state will be held, triggering
+	 * actual sorting for each <code>resort</code> call.
+	 * @param sort the current SortDefinition object
+	 * @return a deep copy of the SortDefinition object
+	 * @see MutableSortDefinition#MutableSortDefinition(SortDefinition)
+	 */
+	protected SortDefinition copySortDefinition(SortDefinition sort) {
+		return new MutableSortDefinition(sort);
+	}
+
+	/**
+	 * Actually perform sorting of the given source list, according to
+	 * the given sort definition.
+	 * <p>The default implementation uses Spring's PropertyComparator.
+	 * Can be overridden in subclasses.
+	 * @see PropertyComparator#sort(java.util.List, SortDefinition)
+	 */
+	protected void doSort(List source, SortDefinition sort) {
+		PropertyComparator.sort(source, sort);
 	}
 
 }

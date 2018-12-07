@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.jdo;
 
@@ -26,32 +26,31 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * This interceptor binds a new JDO PersistenceManager to the thread before a method
  * call, closing and removing it afterwards in case of any method outcome.
- * If there already was a pre-bound PersistenceManager (e.g. from JdoTransactionManager,
- * or from a surrounding JDO-intercepted method), the interceptor simply takes part in it.
+ * If there already is a pre-bound PersistenceManager (e.g. from JdoTransactionManager,
+ * or from a surrounding JDO-intercepted method), the interceptor simply participates in it.
  *
- * <p>Application code must retrieve a JDO PersistenceManager via
- * PersistenceManagerFactoryUtils' getPersistenceManager method, to be able to detect
- * a thread-bound PersistenceManager. It is preferable to use getPersistenceManager
- * with allowCreate=false, as the code relies on the interceptor to provide proper
- * PersistenceManager handling. Typically the code will look as follows:
+ * <p>Application code must retrieve a JDO PersistenceManager via the
+ * <code>PersistenceManagerFactoryUtils.getPersistenceManager</code> method,
+ * to be able to detect a thread-bound PersistenceManager. It is preferable to use
+ * <code>getPersistenceManager</code> with allowCreate=false, if the code relies on
+ * the interceptor to provide proper PersistenceManager handling. Typically, the code
+ * will look as follows:
  *
- * <p><code>
- * public void doJdoAction() {<br>
- * &nbsp;&nbsp;PersistenceManager pm = PersistenceManagerFactoryUtils.getPersistenceManager(this.pmf, false);<br>
- * &nbsp;&nbsp;try {<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;...<br>
- * &nbsp;&nbsp;}<br>
- * &nbsp;&nbsp;catch (JDOException ex) {<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;throw PersistenceManagerFactoryUtils.convertJdoAccessException(ex);<br>
- * &nbsp;&nbsp;}<br>
- * }
- * </code>
+ * <pre>
+ * public void doJdoAction() {
+ *   PersistenceManager pm = PersistenceManagerFactoryUtils.getPersistenceManager(this.pmf, false);
+ *   try {
+ *     ...
+ *   }
+ *   catch (JDOException ex) {
+ *     throw PersistenceManagerFactoryUtils.convertJdoAccessException(ex);
+ *   }
+ * }</pre>
  *
- * <p>Note that the application must care about handling JDOExceptions itself,
- * preferably via delegating to PersistenceManagerFactoryUtils' convertJdoAccessException
- * that converts them to ones that are compatible with the org.springframework.dao exception
- * hierarchy (jlike JdoTemplate does). As JDOExceptions are unchecked, they can simply
- * get thrown too, sacrificing generic DAO abstraction in terms of exceptions though.
+ * Note that the application must care about handling JDOExceptions itself,
+ * preferably via delegating to the <code>PersistenceManagerFactoryUtils.convertJdoAccessException</code>
+ * method that converts them to exceptions that are compatible with the
+ * <code>org.springframework.dao</code> exception hierarchy (like JdoTemplate does).
  *
  * <p>This interceptor could convert unchecked JDOExceptions to unchecked dao ones
  * on-the-fly. The intercepted method wouldn't have to throw any special checked
@@ -74,6 +73,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  *
  * @author Juergen Hoeller
  * @since 13.06.2003
+ * @see PersistenceManagerFactoryUtils#getPersistenceManager
+ * @see JdoTransactionManager
+ * @see JdoTemplate
  */
 public class JdoInterceptor extends JdoAccessor implements MethodInterceptor {
 
@@ -99,7 +101,7 @@ public class JdoInterceptor extends JdoAccessor implements MethodInterceptor {
 			}
 			else {
 				TransactionSynchronizationManager.unbindResource(getPersistenceManagerFactory());
-				PersistenceManagerFactoryUtils.closePersistenceManagerIfNecessary(pm, getPersistenceManagerFactory());
+				PersistenceManagerFactoryUtils.releasePersistenceManager(pm, getPersistenceManagerFactory());
 			}
 		}
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework.adapter;
 
@@ -23,35 +23,24 @@ import javax.servlet.ServletException;
 import javax.transaction.TransactionRolledbackException;
 
 import junit.framework.TestCase;
-
 import org.aopalliance.intercept.MethodInvocation;
 import org.easymock.MockControl;
+
 import org.springframework.aop.ThrowsAdvice;
-import org.springframework.aop.framework.AopConfigException;
 import org.springframework.aop.framework.MethodCounter;
 
 /**
- * 
  * @author Rod Johnson
- * @version $Id: ThrowsAdviceInterceptorTests.java,v 1.2 2004/03/18 03:01:16 trisberg Exp $
  */
 public class ThrowsAdviceInterceptorTests extends TestCase {
 
-	/**
-	 * Constructor for ThrowsAdviceInterceptorTest.
-	 * @param arg0
-	 */
-	public ThrowsAdviceInterceptorTests(String arg0) {
-		super(arg0);
-	}
-	
 	public void testNoHandlerMethods() {
 		Object o = new Object();
 		try {
 			new ThrowsAdviceInterceptor(o);
 			fail("Should require one handler method at least");
 		}
-		catch (AopConfigException ex) {
+		catch (IllegalArgumentException ex) {
 			// Ok
 		}
 	}
@@ -98,7 +87,7 @@ public class ThrowsAdviceInterceptorTests extends TestCase {
 		MockControl mc = MockControl.createControl(MethodInvocation.class);
 		MethodInvocation mi = (MethodInvocation) mc.getMock();
 		mi.getMethod();
-		mc.setReturnValue(Object.class.getMethod("hashCode", null), 1);
+		mc.setReturnValue(Object.class.getMethod("hashCode", (Class[]) null), 1);
 		mi.getArguments();
 		mc.setReturnValue(null);
 		mi.getThis();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,14 +12,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.hibernate.support;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import net.sf.hibernate.FlushMode;
 import net.sf.hibernate.HibernateException;
 import net.sf.hibernate.Session;
 
@@ -33,7 +32,7 @@ import org.springframework.web.servlet.ModelAndView;
 
 /**
  * Spring web HandlerInterceptor that binds a Hibernate Session to the thread for the
- * whole processing of the request. Intended for the "Open Session in View" pattern,
+ * entire processing of the request. Intended for the "Open Session in View" pattern,
  * i.e. to allow for lazy loading in web views despite the original transactions
  * already being completed.
  *
@@ -53,20 +52,47 @@ import org.springframework.web.servlet.ModelAndView;
  * objects with a Hibernate Session has to occur at the very beginning of request
  * processing, to avoid clashes will already loaded instances of the same objects.
  *
- * <p><b>NOTE</b>: This interceptor will by default not flush the Hibernate session,
- * as it assumes to be used in combination with middle tier transactions that care for
- * the flushing, or HibernateAccessors with flushMode FLUSH_EAGER. If you want this
+ * <p>Alternatively, turn this interceptor into deferred close mode, by specifying
+ * "singleSession"="false": It will not use a single session per request then,
+ * but rather let each data access operation or transaction use its own session
+ * (like without Open Session in View). Each of those sessions will be registered
+ * for deferred close, though, actually processed at request completion.
+ *
+ * <p>A single session per request allows for most efficient first-level caching,
+ * but can cause side effects, for example on saveOrUpdate or if continuing
+ * after a rolled-back transaction. The deferred close strategy is as safe as
+ * no Open Session in View in that respect, while still allowing for lazy loading
+ * in views (but not providing a first-level cache for the entire request).
+ *
+ * <p><b>NOTE</b>: This interceptor will by default <i>not</i> flush the Hibernate Session,
+ * as it assumes to be used in combination with business layer transactions that care
+ * for the flushing, or HibernateAccessors with flushMode FLUSH_EAGER. If you want this
  * interceptor to flush after the handler has been invoked but before view rendering,
- * set the flushMode of this interceptor to FLUSH_AUTO in such a scenario.
+ * set the flushMode of this interceptor to FLUSH_AUTO in such a scenario. Note that
+ * the flushMode of this interceptor will just apply in single session mode!
  *
  * @author Juergen Hoeller
  * @since 06.12.2003
+ * @see #setSingleSession
  * @see #setFlushMode
  * @see OpenSessionInViewFilter
  * @see org.springframework.orm.hibernate.HibernateInterceptor
  * @see org.springframework.orm.hibernate.HibernateTransactionManager
+ * @see org.springframework.orm.hibernate.SessionFactoryUtils#getSession
+ * @see org.springframework.transaction.support.TransactionSynchronizationManager
  */
 public class OpenSessionInViewInterceptor extends HibernateAccessor implements HandlerInterceptor {
+
+	/**
+	 * Suffix that gets appended to the SessionFactory toString representation
+	 * for the "participate in existing session handling" request attribute.
+	 * @see #getParticipateAttributeName
+	 */
+	public static final String PARTICIPATE_SUFFIX = ".PARTICIPATE";
+
+
+	private boolean singleSession = true;
+
 
 	/**
 	 * Create a new OpenSessionInViewInterceptor,
@@ -78,50 +104,133 @@ public class OpenSessionInViewInterceptor extends HibernateAccessor implements H
 	}
 
 	/**
-	 * Opens a new Hibernate Session according to the settings of this HibernateAccessor
+	 * Set whether to use a single session for each request. Default is "true".
+	 * <p>If set to false, each data access operation or transaction will use
+	 * its own session (like without Open Session in View). Each of those
+	 * sessions will be registered for deferred close, though, actually
+	 * processed at request completion.
+	 * @see SessionFactoryUtils#initDeferredClose
+	 * @see SessionFactoryUtils#processDeferredClose
+	 */
+	public void setSingleSession(boolean singleSession) {
+		this.singleSession = singleSession;
+	}
+
+	/**
+	 * Return whether to use a single session for each request.
+	 */
+	protected boolean isSingleSession() {
+		return singleSession;
+	}
+
+
+	/**
+	 * Open a new Hibernate Session according to the settings of this HibernateAccessor
 	 * and binds in to the thread via TransactionSynchronizationManager.
 	 * @see org.springframework.orm.hibernate.SessionFactoryUtils#getSession
 	 * @see org.springframework.transaction.support.TransactionSynchronizationManager
 	 */
-	public boolean preHandle(HttpServletRequest request, HttpServletResponse response,
-													 Object handler) throws DataAccessException {
-		logger.debug("Opening Hibernate Session in OpenSessionInViewInterceptor");
-		Session session = SessionFactoryUtils.getSession(getSessionFactory(), getEntityInterceptor(),
-																										 getJdbcExceptionTranslator());
-		if (getFlushMode() == FLUSH_NEVER) {
-			session.setFlushMode(FlushMode.NEVER);
+	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+	    throws DataAccessException {
+
+		if ((isSingleSession() && TransactionSynchronizationManager.hasResource(getSessionFactory())) ||
+		    SessionFactoryUtils.isDeferredCloseActive(getSessionFactory())) {
+			// do not modify the Session: just mark the request accordingly
+			String participateAttributeName = getParticipateAttributeName();
+			Integer count = (Integer) request.getAttribute(participateAttributeName);
+			int newCount = (count != null) ? count.intValue() + 1 : 1;
+			request.setAttribute(getParticipateAttributeName(), new Integer(newCount));
 		}
-		TransactionSynchronizationManager.bindResource(getSessionFactory(), new SessionHolder(session));
+
+		else {
+			if (isSingleSession()) {
+				// single session mode
+				logger.debug("Opening single Hibernate Session in OpenSessionInViewInterceptor");
+				Session session = SessionFactoryUtils.getSession(
+						getSessionFactory(), getEntityInterceptor(), getJdbcExceptionTranslator());
+				applyFlushMode(session, false);
+				TransactionSynchronizationManager.bindResource(getSessionFactory(), new SessionHolder(session));
+			}
+			else {
+				// deferred close mode
+				SessionFactoryUtils.initDeferredClose(getSessionFactory());
+			}
+		}
+
 		return true;
 	}
 
 	/**
-	 * Flushes the Hibernate Session before view rendering, if necessary.
-	 * Set the flushMode of this HibernateAccessor to FLUSH_NEVER to avoid this extra flushing.
+	 * Flush the Hibernate Session before view rendering, if necessary.
+	 * Note that this just applies in single session mode!
+	 * <p>The default is FLUSH_NEVER to avoid this extra flushing, assuming that
+	 * middle tier transactions have flushed their changes on commit.
 	 * @see #setFlushMode
 	 */
-	public void postHandle(HttpServletRequest request, HttpServletResponse response,
-												 Object handler, ModelAndView modelAndView) throws DataAccessException {
-		logger.debug("Flushing Hibernate Session in OpenSessionInViewInterceptor");
-		SessionHolder sessionHolder = (SessionHolder) TransactionSynchronizationManager.getResource(getSessionFactory());
-		try {
-			flushIfNecessary(sessionHolder.getSession(), false);
-		}
-		catch (HibernateException ex) {
-			throw convertHibernateAccessException(ex);
+	public void postHandle(
+			HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView)
+			throws DataAccessException {
+
+		if (isSingleSession()) {
+			// only potentially flush in single session mode
+			SessionHolder sessionHolder =
+					(SessionHolder) TransactionSynchronizationManager.getResource(getSessionFactory());
+			logger.debug("Flushing single Hibernate Session in OpenSessionInViewInterceptor");
+			try {
+				flushIfNecessary(sessionHolder.getSession(), false);
+			}
+			catch (HibernateException ex) {
+				throw convertHibernateAccessException(ex);
+			}
 		}
 	}
 
 	/**
-	 * Unbinds the Hibernate Session from the thread and closes it.
-	 * @see org.springframework.orm.hibernate.SessionFactoryUtils#closeSessionIfNecessary
+	 * Unbind the Hibernate Session from the thread and closes it (in single session
+	 * mode), or process deferred close for all sessions that have been opened
+	 * during the current request (in deferred close mode).
+	 * @see org.springframework.orm.hibernate.SessionFactoryUtils#releaseSession
 	 * @see org.springframework.transaction.support.TransactionSynchronizationManager
 	 */
-	public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
-															Object handler, Exception ex) throws DataAccessException {
-		SessionHolder sessionHolder = (SessionHolder) TransactionSynchronizationManager.unbindResource(getSessionFactory());
-		logger.debug("Closing Hibernate Session in OpenSessionInViewInterceptor");
-		SessionFactoryUtils.closeSessionIfNecessary(sessionHolder.getSession(), getSessionFactory());
+	public void afterCompletion(
+			HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex)
+			throws DataAccessException {
+
+		String participateAttributeName = getParticipateAttributeName();
+		Integer count = (Integer) request.getAttribute(participateAttributeName);
+		if (count != null) {
+			// Do not modify the Session: just clear the marker.
+			if (count.intValue() > 1) {
+				request.setAttribute(participateAttributeName, new Integer(count.intValue() - 1));
+			}
+			else {
+				request.removeAttribute(participateAttributeName);
+			}
+		}
+
+		else {
+			if (isSingleSession()) {
+				// single session mode
+				SessionHolder sessionHolder =
+						(SessionHolder) TransactionSynchronizationManager.unbindResource(getSessionFactory());
+				logger.debug("Closing single Hibernate Session in OpenSessionInViewInterceptor");
+				SessionFactoryUtils.releaseSession(sessionHolder.getSession(), getSessionFactory());
+			}
+			else {
+				// deferred close mode
+				SessionFactoryUtils.processDeferredClose(getSessionFactory());
+			}
+		}
+	}
+
+	/**
+	 * Return the name of the request attribute that identifies that a request is
+	 * already filtered. Default implementation takes the toString representation
+	 * of the SessionFactory instance and appends ".PARTICIPATE".
+	 * @see #PARTICIPATE_SUFFIX
+	 */
+	protected String getParticipateAttributeName() {
+		return getSessionFactory().toString() + PARTICIPATE_SUFFIX;
 	}
 
 }

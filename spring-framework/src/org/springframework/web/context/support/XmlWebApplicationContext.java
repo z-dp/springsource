@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,54 +12,53 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.context.support;
 
-import javax.servlet.ServletContext;
+import java.io.IOException;
 
 import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.context.support.AbstractXmlApplicationContext;
-import org.springframework.core.io.Resource;
-import org.springframework.ui.context.Theme;
-import org.springframework.ui.context.ThemeSource;
-import org.springframework.ui.context.support.UiApplicationContextUtils;
-import org.springframework.util.StringUtils;
-import org.springframework.web.context.ConfigurableWebApplicationContext;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.beans.factory.xml.ResourceEntityResolver;
+import org.springframework.beans.factory.xml.XmlBeanDefinitionReader;
 
 /**
- * WebApplicationContext implementation that takes configuration from an XML document.
+ * WebApplicationContext implementation that takes configuration from an XML document,
+ * understood by an XmlBeanDefinitionReader. This is essentially the equivalent of
+ * AbstractXmlApplicationContext and its subclasses for a web environment.
  *
  * <p>By default, the configuration will be taken from "/WEB-INF/applicationContext.xml"
  * for the root context, and "/WEB-INF/test-servlet.xml" for a context with the namespace
- * "test-servlet" (like for a DispatcherServlet instance with the web.xml servlet-name "test").
- * These config location defaults can be overridden via setConfigLocations, respectively
- * via the "contextConfigLocation" parameters of ContextLoader and FrameworkServlet.
+ * "test-servlet" (like for a DispatcherServlet instance with the servlet-name "test").
+ *
+ * <p>The config location defaults can be overridden via the "contextConfigLocation"
+ * context param of ContextLoader and servlet param of FrameworkServlet. Config locations
+ * can either denote concrete files like "/WEB-INF/context.xml" or Ant-style patterns
+ * like "/WEB-INF/*-context.xml" (see PathMatcher javadoc for pattern details).
  *
  * <p>Note: In case of multiple config locations, later bean definitions will
  * override ones defined in earlier loaded files. This can be leveraged to
  * deliberately override certain bean definitions via an extra XML file.
  *
- * <p>Interprets resource paths as servlet context resources, i.e. as paths beneath
- * the web application root. Absolute paths, e.g. for files outside the web app root,
- * can be accessed via "file:" URLs, as implemented by AbstractApplicationContext.
- *
- * <p>In addition to the special beans detected by AbstractApplicationContext,
- * this class detects a ThemeSource bean in the context, with the name
- * "themeSource".
+ * <p><b>For a WebApplicationContext that reads in a different bean definition format,
+ * create an analogous subclass of AbstractRefreshableWebApplicationContext.</b>
+ * Such a context implementation can be specified as "contextClass" context-param
+ * for ContextLoader or "contextClass" init-param for FrameworkServlet.
  *
  * @author Rod Johnson
  * @author Juergen Hoeller
  * @see #setNamespace
  * @see #setConfigLocations
+ * @see org.springframework.core.io.support.PathMatchingResourcePatternResolver
+ * @see org.springframework.beans.factory.xml.XmlBeanDefinitionReader
+ * @see org.springframework.context.support.AbstractXmlApplicationContext
  * @see org.springframework.web.context.ContextLoader#initWebApplicationContext
+ * @see org.springframework.web.context.ContextLoader#CONTEXT_CLASS_PARAM
  * @see org.springframework.web.servlet.FrameworkServlet#initWebApplicationContext
- * @see org.springframework.context.support.AbstractApplicationContext#getResource
- * @see org.springframework.ui.context.ThemeSource
+ * @see org.springframework.web.servlet.FrameworkServlet#setContextClass
  */
-public class XmlWebApplicationContext extends AbstractXmlApplicationContext
-		implements ConfigurableWebApplicationContext {
+public class XmlWebApplicationContext extends AbstractRefreshableWebApplicationContext {
 
 	/** Default config location for the root context */
 	public static final String DEFAULT_CONFIG_LOCATION = "/WEB-INF/applicationContext.xml";
@@ -71,96 +70,76 @@ public class XmlWebApplicationContext extends AbstractXmlApplicationContext
 	public static final String DEFAULT_CONFIG_LOCATION_SUFFIX = ".xml";
 
 
-	/** Servlet context that this context runs in */
-	private ServletContext servletContext;
+	/**
+	 * Loads the bean definitions via an XmlBeanDefinitionReader.
+	 * @see org.springframework.beans.factory.xml.XmlBeanDefinitionReader
+	 * @see #initBeanDefinitionReader
+	 * @see #loadBeanDefinitions
+	 */
+	protected void loadBeanDefinitions(DefaultListableBeanFactory beanFactory) throws IOException {
+		// Create a new XmlBeanDefinitionReader for the given BeanFactory.
+		XmlBeanDefinitionReader beanDefinitionReader = new XmlBeanDefinitionReader(beanFactory);
 
-	/** Namespace of this context, or null if root */
-	private String namespace = null;
+		// Configure the bean definition reader with this context's
+		// resource loading environment.
+		beanDefinitionReader.setResourceLoader(this);
+		if (getClassLoader() != null) {
+			beanDefinitionReader.setBeanClassLoader(getClassLoader());
+		}
+		beanDefinitionReader.setEntityResolver(new ResourceEntityResolver(this));
 
-	/** Paths to XML configuration files */
-	private String[] configLocations;
-
-	/** the ThemeSource for this ApplicationContext */
-	private ThemeSource themeSource;
-
-	public void setServletContext(ServletContext servletContext) {
-		this.servletContext = servletContext;
+		// Allow a subclass to provide custom initialization of the reader,
+		// then proceed with actually loading the bean definitions.
+		initBeanDefinitionReader(beanDefinitionReader);
+		loadBeanDefinitions(beanDefinitionReader);
 	}
 
-	public ServletContext getServletContext() {
-		return this.servletContext;
+	/**
+	 * Initialize the bean definition reader used for loading the bean
+	 * definitions of this context. Default implementation is empty.
+	 * <p>Can be overridden in subclasses, e.g. for turning off XML validation
+	 * or using a different XmlBeanDefinitionParser implementation.
+	 * @param beanDefinitionReader the bean definition reader used by this context
+	 * @see org.springframework.beans.factory.xml.XmlBeanDefinitionReader#setValidating
+	 * @see org.springframework.beans.factory.xml.XmlBeanDefinitionReader#setParserClass
+	 */
+	protected void initBeanDefinitionReader(XmlBeanDefinitionReader beanDefinitionReader) {
 	}
 
-	public void setNamespace(String namespace) {
-		this.namespace = namespace;
-	}
-
-	protected String getNamespace() {
-		return this.namespace;
-	}
-
-	public void setConfigLocations(String[] configLocations) {
-		this.configLocations = configLocations;
-	}
-
-	protected String[] getConfigLocations() {
-		return this.configLocations;
-	}
-
-
-	public void refresh() throws BeansException {
-		if (this.namespace != null) {
-			setDisplayName("XmlWebApplicationContext for namespace '" + this.namespace + "'");
-			if (this.configLocations == null || this.configLocations.length == 0) {
-				this.configLocations = new String[] {DEFAULT_CONFIG_LOCATION_PREFIX + this.namespace +
-						DEFAULT_CONFIG_LOCATION_SUFFIX};
+	/**
+	 * Load the bean definitions with the given XmlBeanDefinitionReader.
+	 * <p>The lifecycle of the bean factory is handled by the refreshBeanFactory method;
+	 * therefore this method is just supposed to load and/or register bean definitions.
+	 * <p>Delegates to a ResourcePatternResolver for resolving location patterns
+	 * into Resource instances.
+	 * @throws org.springframework.beans.BeansException in case of bean registration errors
+	 * @throws java.io.IOException if the required XML document isn't found
+	 * @see #refreshBeanFactory
+	 * @see #getConfigLocations
+	 * @see #getResources
+	 * @see #getResourcePatternResolver
+	 */
+	protected void loadBeanDefinitions(XmlBeanDefinitionReader reader) throws BeansException, IOException {
+		String[] configLocations = getConfigLocations();
+		if (configLocations != null) {
+			for (int i = 0; i < configLocations.length; i++) {
+				reader.loadBeanDefinitions(configLocations[i]);
 			}
+		}
+	}
+
+	/**
+	 * The default location for the root context is "/WEB-INF/applicationContext.xml",
+	 * and "/WEB-INF/test-servlet.xml" for a context with the namespace "test-servlet"
+	 * (like for a DispatcherServlet instance with the servlet-name "test").
+	 */
+	protected String[] getDefaultConfigLocations() {
+		if (getNamespace() != null) {
+			return new String[] {DEFAULT_CONFIG_LOCATION_PREFIX + getNamespace() + DEFAULT_CONFIG_LOCATION_SUFFIX};
 		}
 		else {
-			setDisplayName("Root XmlWebApplicationContext");
-			if (this.configLocations == null || this.configLocations.length == 0) {
-				this.configLocations = new String[] {DEFAULT_CONFIG_LOCATION};
-			}
+			return new String[] {DEFAULT_CONFIG_LOCATION};
 		}
-		super.refresh();
-	}
-
-	protected void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) {
-		beanFactory.addBeanPostProcessor(new ServletContextAwareProcessor(this.servletContext));
-		beanFactory.ignoreDependencyType(ServletContext.class);
-	}
-
-	/**
-	 * This implementation supports file paths beneath the root of the web application.
-	 */
-	protected Resource getResourceByPath(String path) {
-		if (path != null && !path.startsWith("/")) {
-			// the Servlet spec requires that resource paths start with a slash,
-			// even if many containers accept paths without leading slash too
-			path = "/" + path;
-		}
-		return new ServletContextResource(this.servletContext, path);
-	}
-
-	/**
-	 * Initialize the theme capability.
-	 */
-	protected void onRefresh() {
-		this.themeSource = UiApplicationContextUtils.initThemeSource(this);
-	}
-
-	public Theme getTheme(String themeName) {
-		return this.themeSource.getTheme(themeName);
-	}
-
-
-	/**
-	 * Return diagnostic information.
-	 */
-	public String toString() {
-		StringBuffer sb = new StringBuffer(super.toString() + "; ");
-		sb.append("config locations=[" + StringUtils.arrayToCommaDelimitedString(this.configLocations) + "]; ");
-		return sb.toString();
 	}
 
 }

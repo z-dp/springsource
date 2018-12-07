@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.ejb.support;
 
@@ -44,13 +44,13 @@ import org.apache.commons.logging.LogFactory;
  * eliminating a common cause of EJB deployment failure.
  *
  * @author Rod Johnson
- * @version $Id: AbstractStatelessSessionBean.java,v 1.7 2004/03/18 02:46:14 trisberg Exp $
  */
 public abstract class AbstractStatelessSessionBean extends AbstractSessionBean {
 
 	protected final Log logger = LogFactory.getLog(getClass());
 
-	/** 
+
+	/**
 	 * This implementation loads the BeanFactory. A BeansException thrown by
 	 * loadBeanFactory will simply get propagated, as it is a runtime exception.
 	 * <p>Don't override it (although it can't be made final): code your own
@@ -74,6 +74,7 @@ public abstract class AbstractStatelessSessionBean extends AbstractSessionBean {
 	 * @throws CreateException
 	 */
 	protected abstract void onEjbCreate() throws CreateException;
+
 
 	/**
 	 * @see javax.ejb.SessionBean#ejbActivate(). This method always throws an exception, as

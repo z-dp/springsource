@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory.access;
 
@@ -20,7 +20,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import junit.framework.Test;
 import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 import org.springframework.beans.BeansException;
 import org.springframework.beans.TestBean;
@@ -28,17 +30,29 @@ import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
 /**
- * 
  * @author Rod Johnson
- * @since 02-Dec-02
+ * @since 02.12.2002
  */
 public class BeanFactoryBootstrapTests extends TestCase {
 	
-	private Properties _savedProps;
+	private Properties savedProps;
+
+	protected void setUp() {
+		// Save and restore System properties, which get destroyed for the tests.
+		this.savedProps = System.getProperties();
+	}
+
+    public BeanFactoryBootstrapTests(String string) {
+        super(string);
+    }
+
+    protected void tearDown() {
+		System.setProperties(this.savedProps);
+	}
 
 	/** How to test many singletons? */
 	public void testGetInstanceWithNullPropertiesFails() throws BeansException {
-		System.setProperties(null);
+        System.setProperties(null);
 		BeanFactoryBootstrap.reinitialize();
 		try {
 			BeanFactoryBootstrap bsb = BeanFactoryBootstrap.getInstance();
@@ -50,7 +64,7 @@ public class BeanFactoryBootstrapTests extends TestCase {
 	}
 	
 	public void testGetInstanceWithUnknownBeanFactoryClassFails() throws BeansException {
-		System.setProperties(null);
+        System.setProperties(null);
 		Properties p = new Properties();
 		p.put(BeanFactoryBootstrap.BEAN_FACTORY_BEAN_NAME + ".class",
 		"org.springframework.beans.factory.support.xxxxXmlBeanFactory");
@@ -67,7 +81,7 @@ public class BeanFactoryBootstrapTests extends TestCase {
 	}
 	
 	public void testGetInstanceWithMistypedBeanFactoryClassFails() throws BeansException {
-		System.setProperties(null);
+        System.setProperties(null);
 		Properties p = new Properties();
 		p.put(BeanFactoryBootstrap.BEAN_FACTORY_BEAN_NAME + ".class",
 		"java.awt.Point");
@@ -85,8 +99,7 @@ public class BeanFactoryBootstrapTests extends TestCase {
 			ex.printStackTrace();
 		}
 	}
-	
-	
+
 //	public void testXmlBeanFactory() throws Exception {
 //		Properties p = new Properties();
 //		p.put(BeanFactoryBootstrap.BEAN_FACTORY_BEAN_NAME + ".class", 
@@ -119,27 +132,22 @@ public class BeanFactoryBootstrapTests extends TestCase {
 //			throw ex;
 //		}
 //	}
-	
-	
+
 	public void testDummyBeanFactory() throws Exception {
-		Properties p = new Properties();
+        Properties p = new Properties();
 		p.put(BeanFactoryBootstrap.BEAN_FACTORY_BEAN_NAME + ".class",
 		"org.springframework.beans.factory.access.BeanFactoryBootstrapTests$DummyBeanFactory");
 		
-		
 		System.setProperties(p);
-		System.getProperties().list(System.out);
-		
+
 		BeanFactoryBootstrap.reinitialize();
 
 		try {
 			BeanFactoryBootstrap bsb = BeanFactoryBootstrap.getInstance();
-			System.out.println("Got bean factory");
 			assertNotNull("Bsb instance is not null", bsb);
 			assertTrue("Is dummy", bsb.getBeanFactory() instanceof DummyBeanFactory);
 			TestBean tb = (TestBean) bsb.getBeanFactory().getBean("test");
 			assertNotNull("Test bean is not null", tb);
-			System.out.println(tb);
 			//assertTrue("Property set", tb.getFoo().equals("bar"));
 		}
 		catch (Exception ex) {
@@ -148,52 +156,54 @@ public class BeanFactoryBootstrapTests extends TestCase {
 		}
 	}
 
-	public static class DummyBeanFactory implements BeanFactory {
-		
-		public Map m = new HashMap();
-		
-		 {
-			m.put("test", new TestBean());
-			m.put("s", new String());
-		}
-		
-		public Object getBean(String name) {
-			Object bean = m.get(name);
-			if (bean == null)
-				throw new NoSuchBeanDefinitionException(name, "no message");
-			return bean;
-		}
+    // A temporary solution to make tests work on JRockit VM
+    // Alef knows more about this
+    public static Test suite() {
+        TestSuite suite = new TestSuite();
+        suite.addTest(new BeanFactoryBootstrapTests("testGetInstanceWithNullPropertiesFails"));
+        suite.addTest(new BeanFactoryBootstrapTests("testGetInstanceWithUnknownBeanFactoryClassFails"));
+        suite.addTest(new BeanFactoryBootstrapTests("testGetInstanceWithMistypedBeanFactoryClassFails"));
+        suite.addTest(new BeanFactoryBootstrapTests("testDummyBeanFactory"));
+        return suite;
+    }
 
-		public Object getBean(String name, Class requiredType) {
-			return getBean(name);
-		}
 
-		public boolean containsBean(String name) {
-			return m.containsKey(name);
-		}
+    private static class DummyBeanFactory implements BeanFactory {
 
-		public boolean isSingleton(String name) {
-			return true;
-		}
+			public Map map = new HashMap();
 
-		public String[] getAliases(String name) {
-			throw new UnsupportedOperationException("getAliases");
-		}
-	}
+			 {
+				this.map.put("test", new TestBean());
+				this.map.put("s", "");
+			}
 
-	/* (non-Javadoc)
-	 * @see junit.framework.TestCase#setUp()
-	 */
-	protected void setUp() throws Exception {
-		// save and restore System properties, which get destroyed for the tests
-		_savedProps = System.getProperties();
-	}
+			public Object getBean(String name) {
+				Object bean = this.map.get(name);
+				if (bean == null) {
+					throw new NoSuchBeanDefinitionException(name, "no message");
+				}
+				return bean;
+			}
 
-	/* (non-Javadoc)
-	 * @see junit.framework.TestCase#tearDown()
-	 */
-	protected void tearDown() throws Exception {
-		System.setProperties(_savedProps);
-	}
+			public Object getBean(String name, Class requiredType) {
+				return getBean(name);
+			}
+
+			public boolean containsBean(String name) {
+				return this.map.containsKey(name);
+			}
+
+			public boolean isSingleton(String name) {
+				return true;
+			}
+
+			public Class getType(String name) {
+				return null;
+			}
+
+			public String[] getAliases(String name) {
+				throw new UnsupportedOperationException("getAliases");
+			}
+    }
 
 }

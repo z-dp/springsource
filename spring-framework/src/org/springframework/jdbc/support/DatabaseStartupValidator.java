@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.support;
 
@@ -34,7 +34,7 @@ import org.springframework.jdbc.CannotGetJdbcConnectionException;
  * SessionFactory or custom data access objects that access a DataSource directly.
  *
  * <p>Useful to defer application initialization until a database has started up.
- * Particularly appropriate for waiting on a slow-starting Oracle database.
+ * Particularly appropriate for waiting on a slowly starting Oracle database.
  *
  * @author Juergen Hoeller
  * @since 18.12.2003
@@ -80,8 +80,8 @@ public class DatabaseStartupValidator implements InitializingBean {
 	}
 
 	/**
-	 * Set the timeout after which a fatal exception will be thrown.
-	 * Default is 60.
+	 * Set the timeout (in seconds) after which a fatal exception
+	 * will be thrown. Default is 60.
 	 */
 	public void setTimeout(int timeout) {
 		this.timeout = timeout;
@@ -140,7 +140,8 @@ public class DatabaseStartupValidator implements InitializingBean {
 				Thread.sleep(this.interval * 1000);
 			}
 			catch (InterruptedException ex) {
-				// ignore
+				// Re-interrupt current thread, to allow other threads to react.
+				Thread.currentThread().interrupt();
 			}
 		}
 

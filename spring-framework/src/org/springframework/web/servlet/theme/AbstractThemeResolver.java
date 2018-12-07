@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,18 +12,16 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.theme;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.web.servlet.ThemeResolver;
 
 /**
  * Abstract base class for ThemeResolver implementations.
  * Provides support for a default theme name.
+ *
  * @author Juergen Hoeller
  * @author Jean-Pierre Pawlak
  * @since 17.06.2003
@@ -36,7 +34,6 @@ public abstract class AbstractThemeResolver implements ThemeResolver {
 
 	/**
 	 * Set the name of the default theme.
-	 * @param defaultThemeName new default theme name
 	 */
 	public void setDefaultThemeName(String defaultThemeName) {
 		this.defaultThemeName = defaultThemeName;
@@ -44,17 +41,9 @@ public abstract class AbstractThemeResolver implements ThemeResolver {
 
 	/**
 	 * Return the name of the default theme.
-	 * @return the default theme name
 	 */
 	public String getDefaultThemeName() {
 		return defaultThemeName;
-	}
-
-	/**
-	 * Make the theme name available for the view.
-	 */
-	public void makeThemeNameAvailable(HttpServletRequest request, HttpServletResponse response) {
-		setThemeName(request, response, resolveThemeName(request));
 	}
 
 }

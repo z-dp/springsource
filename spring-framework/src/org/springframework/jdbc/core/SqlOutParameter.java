@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.core;
 
@@ -26,69 +26,99 @@ package org.springframework.jdbc.core;
  *
  * @author Rod Johnson
  * @author Thomas Risberg
+ * @author Juergen Hoeller
+ * @see SqlReturnResultSet
  */
-public class SqlOutParameter extends SqlParameter {
+public class SqlOutParameter extends ResultSetSupportingSqlParameter {
 
-	private boolean resultSetSupported = false;
+	private SqlReturnType sqlReturnType;
 
-	private RowCallbackHandler rowCallbackHandler = null;
-
-	private RowMapper rowMapper = null;
-
-	private boolean rowMapperSupported = false;
-
-	private int rowsExpected = 0;
 
 	/**
-	 * Create a new OutputParameter, supplying name and SQL type
+	 * Create a new SqlOutParameter.
 	 * @param name name of the parameter, as used in input and output maps
-	 * @param type SQL type of the parameter according to java.sql.Types
+	 * @param sqlType SQL type of the parameter according to java.sql.Types
 	 */
-	public SqlOutParameter(String name, int type) {
-		super(name, type);
-	}
-
-	public SqlOutParameter(String name, int type, String typeName) {
-		super(name, type, typeName);
-	}
-
-	public SqlOutParameter(String name, int type, RowCallbackHandler rch) {
-		super(name, type);
-		this.rowCallbackHandler = rch;
-		this.resultSetSupported = true;
-	}
-
-	public SqlOutParameter(String name, int type, RowMapper rm, int rowsExpected) {
-		super(name, type);
-		this.rowMapper = rm;
-		this.resultSetSupported = true;
-		this.rowsExpected = rowsExpected;
-		this.rowMapperSupported = true;
-	}
-
-	public SqlOutParameter(String name, int type, RowMapper rm) {
-		this(name, type, rm, 0);
-	}
-	
-	public boolean isResultSetSupported() {
-		return resultSetSupported;
-	}
-	
-	public boolean isRowMapperSupported() {
-		return rowMapperSupported;
-	}
-
-	public RowCallbackHandler getRowCallbackHandler() {
-		return rowCallbackHandler;
+	public SqlOutParameter(String name, int sqlType) {
+		super(name, sqlType);
 	}
 
 	/**
-	 * Return new instance of the implementation of a ResultReader usable for
-	 * returned ResultSets. This implementation invokes the RowMapper's
-	 * implementation of the mapRow method.
+	 * Create a new SqlOutParameter.
+	 * @param name name of the parameter, as used in input and output maps
+	 * @param sqlType SQL type of the parameter according to java.sql.Types
+	 * @param typeName the type name of the parameter (optional)
 	 */
-	protected final ResultReader newResultReader() {
-		return new ResultReaderStoredProcImpl(rowsExpected, rowMapper);
+	public SqlOutParameter(String name, int sqlType, String typeName) {
+		super(name, sqlType, typeName);
 	}
-	
+
+	/**
+	 * Create a new SqlOutParameter.
+	 * @param name name of the parameter, as used in input and output maps
+	 * @param sqlType SQL type of the parameter according to java.sql.Types
+	 * @param typeName the type name of the parameter (optional)
+	 * @param sqlReturnType custom value handler for complex type (optional)
+	 */
+	public SqlOutParameter(String name, int sqlType, String typeName, SqlReturnType sqlReturnType) {
+		super(name, sqlType, typeName);
+		this.sqlReturnType = sqlReturnType;
+	}
+
+	/**
+	 * Create a new SqlOutParameter.
+	 * @param name name of the parameter, as used in input and output maps
+	 * @param sqlType SQL type of the parameter according to java.sql.Types
+	 * @param rse ResultSetExtractor to use for parsing the ResultSet
+	 */
+	public SqlOutParameter(String name, int sqlType, ResultSetExtractor rse) {
+		super(name, sqlType, rse);
+	}
+
+	/**
+	 * Create a new SqlOutParameter.
+	 * @param name name of the parameter, as used in input and output maps
+	 * @param sqlType SQL type of the parameter according to java.sql.Types
+	 * @param rch RowCallbackHandler to use for parsing the ResultSet
+	 */
+	public SqlOutParameter(String name, int sqlType, RowCallbackHandler rch) {
+		super(name, sqlType, rch);
+	}
+
+	/**
+	 * Create a new SqlOutParameter.
+	 * @param name name of the parameter, as used in input and output maps
+	 * @param sqlType SQL type of the parameter according to java.sql.Types
+	 * @param rm RowMapper to use for parsing the ResultSet
+	 */
+	public SqlOutParameter(String name, int sqlType, RowMapper rm) {
+		super(name, sqlType, rm);
+	}
+
+	/**
+	 * Create a new SqlOutParameter.
+	 * @param name name of the parameter, as used in input and output maps
+	 * @param sqlType SQL type of the parameter according to java.sql.Types
+	 * @param rm RowMapper to use for parsing the ResultSet
+	 * @param rowsExpected number of expected rows
+	 */
+	public SqlOutParameter(String name, int sqlType, RowMapper rm, int rowsExpected) {
+		super(name, sqlType, rm, rowsExpected);
+	}
+
+
+	/**
+	 * Return whether this parameter holds a custom return type.
+	 */
+	public boolean isReturnTypeSupported() {
+		return (this.sqlReturnType != null);
+	}
+
+	/**
+	 * Return the custom return type, if any.
+	 */
+	public SqlReturnType getSqlReturnType() {
+		return sqlReturnType;
+	}
+
 }

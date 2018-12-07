@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans;
 
@@ -31,7 +31,6 @@ import java.io.PrintWriter;
  * @author Rod Johnson
  * @author Juergen Hoeller
  * @since 18 April 2001
- * @version $Id: PropertyAccessExceptionsException.java,v 1.5 2004/03/18 02:46:12 trisberg Exp $
  */
 public class PropertyAccessExceptionsException extends BeansException {
 
@@ -41,12 +40,14 @@ public class PropertyAccessExceptionsException extends BeansException {
 	/** List of PropertyAccessException objects */
 	private final PropertyAccessException[] propertyAccessExceptions;
 
+
 	/**
-	 * Create new empty PropertyAccessExceptionsException.
-	 * We'll add errors to it as we attempt to bind properties.
+	 * Create a new PropertyAccessExceptionsException.
+	 * @param beanWrapper the BeanWrapper that wraps the target object
+	 * @param propertyAccessExceptions the List of PropertyAccessExceptions
 	 */
-	protected PropertyAccessExceptionsException(BeanWrapper beanWrapper,
-	                                            PropertyAccessException[] propertyAccessExceptions) {
+	public PropertyAccessExceptionsException(
+			BeanWrapper beanWrapper, PropertyAccessException[] propertyAccessExceptions) {
 		super("");
 		this.beanWrapper = beanWrapper;
 		this.propertyAccessExceptions = propertyAccessExceptions;
@@ -82,7 +83,7 @@ public class PropertyAccessExceptionsException extends BeansException {
 	}
 
 	/**
-	 * Return the exception for this field, or null if there isn't one.
+	 * Return the exception for this field, or <code>null</code> if there isn't one.
 	 */
 	public PropertyAccessException getPropertyAccessException(String propertyName) {
 		for (int i = 0; i < this.propertyAccessExceptions.length; i++) {
@@ -94,42 +95,61 @@ public class PropertyAccessExceptionsException extends BeansException {
 		return null;
 	}
 
+
 	public String getMessage() {
-		StringBuffer sb = new StringBuffer();
-		sb.append(this.toString());
-		sb.append("; nested propertyAccessExceptions are: ");
+		StringBuffer sb = new StringBuffer("Failed properties: ");
 		for (int i = 0; i < this.propertyAccessExceptions.length; i++) {
-			PropertyAccessException pae = this.propertyAccessExceptions[i];
-			sb.append("[");
-			sb.append(pae.getClass().getName());
-			sb.append(": ");
-			sb.append(pae.getMessage());
-			sb.append(']');
+			sb.append(this.propertyAccessExceptions[i].getMessage());
 			if (i < this.propertyAccessExceptions.length - 1) {
-				sb.append(", ");
+				sb.append("; ");
 			}
 		}
 		return sb.toString();
 	}
 
-	public void printStackTrace(PrintStream ps) {
-		ps.println(this);
+	public String toString() {
+		StringBuffer sb = new StringBuffer();
+		sb.append(getClass().getName()).append("; nested PropertyAccessExceptions (");
+		sb.append(getExceptionCount()).append(") are:");
 		for (int i = 0; i < this.propertyAccessExceptions.length; i++) {
-			PropertyAccessException pae = this.propertyAccessExceptions[i];
-			pae.printStackTrace(ps);
+			sb.append('\n').append("PropertyAccessException ").append(i + 1).append(": ");
+			sb.append(this.propertyAccessExceptions[i]);
+		}
+		return sb.toString();
+	}
+
+	public void printStackTrace(PrintStream ps) {
+		ps.println(getClass().getName() + "; nested PropertyAccessException details (" +
+				getExceptionCount() + ") are:");
+		for (int i = 0; i < this.propertyAccessExceptions.length; i++) {
+			ps.println("PropertyAccessException " + (i + 1) + ":");
+			this.propertyAccessExceptions[i].printStackTrace(ps);
 		}
 	}
 
 	public void printStackTrace(PrintWriter pw) {
-		pw.println(this);
+		pw.println(getClass().getName() + "; nested PropertyAccessException details (" +
+				getExceptionCount() + ") are:");
 		for (int i = 0; i < this.propertyAccessExceptions.length; i++) {
-			PropertyAccessException pae = this.propertyAccessExceptions[i];
-			pae.printStackTrace(pw);
+			pw.println("PropertyAccessException " + (i + 1) + ":");
+			this.propertyAccessExceptions[i].printStackTrace(pw);
 		}
 	}
 
-	public String toString() {
-		return "PropertyAccessExceptionsException (" + getExceptionCount() + " errors)";
+	public boolean contains(Class exClass) {
+		if (exClass == null) {
+			return false;
+		}
+		if (exClass.isInstance(this)) {
+			return true;
+		}
+		for (int i = 0; i < this.propertyAccessExceptions.length; i++) {
+			PropertyAccessException pae = this.propertyAccessExceptions[i];
+			if (pae.contains(exClass)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 }

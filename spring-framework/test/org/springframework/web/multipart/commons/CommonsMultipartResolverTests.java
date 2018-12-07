@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.multipart.commons;
 
@@ -24,7 +24,6 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -38,19 +37,18 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.mockobjects.servlet.MockFilterChain;
-import com.mockobjects.servlet.MockFilterConfig;
 import junit.framework.TestCase;
 import org.apache.commons.fileupload.DiskFileUpload;
 import org.apache.commons.fileupload.FileItem;
 
 import org.springframework.beans.MutablePropertyValues;
+import org.springframework.mock.web.MockFilterConfig;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockServletContext;
 import org.springframework.web.bind.ServletRequestDataBinder;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.StaticWebApplicationContext;
-import org.springframework.web.mock.MockHttpServletRequest;
-import org.springframework.web.mock.MockHttpServletResponse;
-import org.springframework.web.mock.MockServletContext;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
@@ -81,9 +79,10 @@ public class CommonsMultipartResolverTests extends TestCase {
 		assertEquals("enc", fileUpload.getHeaderEncoding());
 		assertTrue(fileUpload.getRepositoryPath().endsWith("mytemp"));
 
-		MockHttpServletRequest originalRequest = new MockHttpServletRequest(null, null, null);
+		MockHttpServletRequest originalRequest = new MockHttpServletRequest();
 		originalRequest.setContentType("multipart/form-data");
 		originalRequest.addHeader("Content-type", "multipart/form-data");
+		originalRequest.addParameter("getField", "getValue");
 		assertTrue(resolver.isMultipart(originalRequest));
 		MultipartHttpServletRequest request = resolver.resolveMultipart(originalRequest);
 
@@ -92,9 +91,10 @@ public class CommonsMultipartResolverTests extends TestCase {
 		while (parameterEnum.hasMoreElements()) {
 			parameterNames.add(parameterEnum.nextElement());
 		}
-		assertEquals(2, parameterNames.size());
+		assertEquals(3, parameterNames.size());
 		assertTrue(parameterNames.contains("field3"));
 		assertTrue(parameterNames.contains("field4"));
+		assertTrue(parameterNames.contains("getField"));
 		assertEquals("value3", request.getParameter("field3"));
 		List parameterValues = Arrays.asList(request.getParameterValues("field3"));
 		assertEquals(1, parameterValues.size());
@@ -104,6 +104,9 @@ public class CommonsMultipartResolverTests extends TestCase {
 		assertEquals(2, parameterValues.size());
 		assertTrue(parameterValues.contains("value4"));
 		assertTrue(parameterValues.contains("value5"));
+		assertEquals("value4", request.getParameter("field4"));
+		assertEquals("getValue", request.getParameter("getField"));
+
 		List parameterMapKeys = new ArrayList();
 		List parameterMapValues = new ArrayList();
 		for (Iterator parameterMapIter = request.getParameterMap().keySet().iterator(); parameterMapIter.hasNext();) {
@@ -111,12 +114,14 @@ public class CommonsMultipartResolverTests extends TestCase {
 			parameterMapKeys.add(key);
 			parameterMapValues.add(request.getParameterMap().get(key));
 		}
-		assertEquals(2, parameterMapKeys.size());
-		assertEquals(2, parameterMapValues.size());
+		assertEquals(3, parameterMapKeys.size());
+		assertEquals(3, parameterMapValues.size());
 		int field3Index = parameterMapKeys.indexOf("field3");
 		int field4Index = parameterMapKeys.indexOf("field4");
+		int getFieldIndex = parameterMapKeys.indexOf("getField");
 		assertTrue(field3Index != -1);
 		assertTrue(field4Index != -1);
+		assertTrue(getFieldIndex != -1);
 		parameterValues = Arrays.asList((String[]) parameterMapValues.get(field3Index));
 		assertEquals(1, parameterValues.size());
 		assertTrue(parameterValues.contains("value3"));
@@ -124,17 +129,22 @@ public class CommonsMultipartResolverTests extends TestCase {
 		assertEquals(2, parameterValues.size());
 		assertTrue(parameterValues.contains("value4"));
 		assertTrue(parameterValues.contains("value5"));
+		parameterValues = Arrays.asList((String[]) parameterMapValues.get(getFieldIndex));
+		assertEquals(1, parameterValues.size());
+		assertTrue(parameterValues.contains("getValue"));
 
 		Set fileNames = new HashSet();
 		Iterator fileIter = request.getFileNames();
 		while (fileIter.hasNext()) {
 			fileNames.add(fileIter.next());
 		}
-		assertEquals(2, fileNames.size());
+		assertEquals(3, fileNames.size());
 		assertTrue(fileNames.contains("field1"));
 		assertTrue(fileNames.contains("field2"));
+		assertTrue(fileNames.contains("field2x"));
 		CommonsMultipartFile file1 = (CommonsMultipartFile) request.getFile("field1");
 		CommonsMultipartFile file2 = (CommonsMultipartFile) request.getFile("field2");
+		CommonsMultipartFile file2x = (CommonsMultipartFile) request.getFile("field2x");
 		List fileMapKeys = new ArrayList();
 		List fileMapValues = new ArrayList();
 		for (Iterator fileMapIter = request.getFileMap().keySet().iterator(); fileMapIter.hasNext();) {
@@ -142,21 +152,27 @@ public class CommonsMultipartResolverTests extends TestCase {
 			fileMapKeys.add(key);
 			fileMapValues.add(request.getFileMap().get(key));
 		}
-		assertEquals(2, fileMapKeys.size());
-		assertEquals(2, fileMapValues.size());
+		assertEquals(3, fileMapKeys.size());
+		assertEquals(3, fileMapValues.size());
 		int field1Index = fileMapKeys.indexOf("field1");
 		int field2Index = fileMapKeys.indexOf("field2");
+		int field2xIndex = fileMapKeys.indexOf("field2x");
 		assertTrue(field1Index != -1);
 		assertTrue(field2Index != -1);
+		assertTrue(field2xIndex != -1);
 		MultipartFile mapFile1 = (MultipartFile) fileMapValues.get(field1Index);
 		MultipartFile mapFile2 = (MultipartFile) fileMapValues.get(field2Index);
+		MultipartFile mapFile2x = (MultipartFile) fileMapValues.get(field2xIndex);
 		assertEquals(mapFile1, file1);
 		assertEquals(mapFile2, file2);
+		assertEquals(mapFile2x, file2x);
 
 		assertEquals("type1", file1.getContentType());
 		assertEquals("type2", file2.getContentType());
+		assertEquals("type2", file2x.getContentType());
 		assertEquals("field1.txt", file1.getOriginalFilename());
 		assertEquals("field2.txt", file2.getOriginalFilename());
+		assertEquals("field2x.txt", file2x.getOriginalFilename());
 		assertEquals("text1", new String(file1.getBytes()));
 		assertEquals("text2", new String(file2.getBytes()));
 		assertEquals(5, file1.getSize());
@@ -217,32 +233,28 @@ public class CommonsMultipartResolverTests extends TestCase {
 		CommonsMultipartResolver resolver = new CommonsMultipartResolver(wac.getServletContext());
 		assertTrue(resolver.getFileUpload().getRepositoryPath().endsWith("mytemp"));
 
-		MockFilterConfig filterConfig = new MockFilterConfig() {
-			public Enumeration getInitParameterNames() {
-				return Collections.enumeration(new ArrayList());
-			}
-		};
-		filterConfig.setupGetServletContext(wac.getServletContext());
-
+		MockFilterConfig filterConfig = new MockFilterConfig(wac.getServletContext(), "filter");
+		filterConfig.addInitParameter("class", "notWritable");
+		filterConfig.addInitParameter("unknownParam", "someValue");
 		final MultipartFilter filter = new MultipartFilter();
 		filter.init(filterConfig);
 
 		final List files = new ArrayList();
-		final MockFilterChain filterChain = new MockFilterChain() {
+		final FilterChain filterChain = new FilterChain() {
 			public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse) {
 				MultipartHttpServletRequest request = (MultipartHttpServletRequest) servletRequest;
 				files.addAll(request.getFileMap().values());
 			}
 		};
 
-		MockFilterChain filterChain2 = new MockFilterChain() {
+		FilterChain filterChain2 = new FilterChain() {
 			public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse)
 			    throws IOException, ServletException {
 				filter.doFilter(servletRequest, servletResponse, filterChain);
 			}
 		};
 
-		MockHttpServletRequest originalRequest = new MockHttpServletRequest(null, null, null);
+		MockHttpServletRequest originalRequest = new MockHttpServletRequest();
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		originalRequest.setContentType("multipart/form-data");
 		originalRequest.addHeader("Content-type", "multipart/form-data");
@@ -264,21 +276,11 @@ public class CommonsMultipartResolverTests extends TestCase {
 		CommonsMultipartResolver resolver = new CommonsMultipartResolver(wac.getServletContext());
 		assertTrue(resolver.getFileUpload().getRepositoryPath().endsWith("mytemp"));
 
-		MockFilterConfig filterConfig = new MockFilterConfig() {
-			public String getInitParameter(String s) {
-				if ("multipartResolverBeanName".equals(s))
-					return "myMultipartResolver";
-				else
-					return super.getInitParameter(s);
-			}
-			public Enumeration getInitParameterNames() {
-				return Collections.enumeration(Arrays.asList(new String[] {"multipartResolverBeanName"}));
-			}
-		};
-		filterConfig.setupGetServletContext(wac.getServletContext());
+		MockFilterConfig filterConfig = new MockFilterConfig(wac.getServletContext(), "filter");
+		filterConfig.addInitParameter("multipartResolverBeanName", "myMultipartResolver");
 
 		final List files = new ArrayList();
-		MockFilterChain filterChain = new MockFilterChain() {
+		FilterChain filterChain = new FilterChain() {
 			public void doFilter(ServletRequest originalRequest, ServletResponse response) {
 				if (originalRequest instanceof MultipartHttpServletRequest) {
 					MultipartHttpServletRequest request = (MultipartHttpServletRequest) originalRequest;
@@ -300,7 +302,7 @@ public class CommonsMultipartResolverTests extends TestCase {
 		};
 		filter.init(filterConfig);
 
-		MockHttpServletRequest originalRequest = new MockHttpServletRequest(null, null, null);
+		MockHttpServletRequest originalRequest = new MockHttpServletRequest();
 		originalRequest.setContentType("multipart/form-data");
 		originalRequest.addHeader("Content-type", "multipart/form-data");
 		HttpServletResponse response = new MockHttpServletResponse();
@@ -328,17 +330,18 @@ public class CommonsMultipartResolverTests extends TestCase {
 						throw new IllegalStateException("Already a multipart request");
 					}
 					List fileItems = new ArrayList();
-					MockFileItem fileItem1 = new MockFileItem("field1", "type1",
-					                                          empty ? "" : "field1.txt",
-					                                          empty ? "" : "text1");
-					MockFileItem fileItem2 = new MockFileItem("field2", "type2",
-					                                          empty ? "" : "C:/field2.txt",
-					                                          empty ? "" : "text2");
+					MockFileItem fileItem1 = new MockFileItem(
+					    "field1", "type1", empty ? "" : "field1.txt", empty ? "" : "text1");
+					MockFileItem fileItem2 = new MockFileItem(
+					    "field2", "type2", empty ? "" : "C:/field2.txt", empty ? "" : "text2");
+					MockFileItem fileItem2x = new MockFileItem(
+					    "field2x", "type2", empty ? "" : "C:\\field2x.txt", empty ? "" : "text2");
 					MockFileItem fileItem3 = new MockFileItem("field3", null, null, "value3");
 					MockFileItem fileItem4 = new MockFileItem("field4", null, null, "value4");
 					MockFileItem fileItem5 = new MockFileItem("field4", null, null, "value5");
 					fileItems.add(fileItem1);
 					fileItems.add(fileItem2);
+					fileItems.add(fileItem2x);
 					fileItems.add(fileItem3);
 					fileItems.add(fileItem4);
 					fileItems.add(fileItem5);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.transaction;
 
@@ -63,18 +63,6 @@ class TestTransactionManager extends AbstractPlatformTransactionManager {
 		this.begin = true;
 	}
 
-	protected Object doSuspend(Object transaction) throws TransactionException {
-		return null;
-	}
-
-	protected void doResume(Object transaction, Object suspendedResources)
-	    throws TransactionException {
-	}
-
-	protected boolean isRollbackOnly(Object transaction) throws TransactionException {
-		return false;
-	}
-
 	protected void doCommit(DefaultTransactionStatus status) {
 		if (!TRANSACTION.equals(status.getTransaction())) {
 			throw new IllegalArgumentException("Not the same transaction object");
@@ -94,9 +82,6 @@ class TestTransactionManager extends AbstractPlatformTransactionManager {
 			throw new IllegalArgumentException("Not the same transaction object");
 		}
 		this.rollbackOnly = true;
-	}
-
-	protected void doCleanupAfterCompletion(Object transaction) {
 	}
 
 }

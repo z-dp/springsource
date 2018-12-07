@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,32 +12,35 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory.config;
 
-import java.util.Iterator;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Properties;
+import java.util.Set;
 
 import org.springframework.beans.BeansException;
-import org.springframework.beans.FatalBeanException;
+import org.springframework.beans.factory.BeanInitializationException;
 
 /**
  * A property resource configurer that overrides bean property values in an application
  * context definition. It <i>pushes</i> values from a properties file into bean definitions.
  *
- * <p>Configuration lines are expected to be of the following form:<br><br>
- * <code>
- * &nbsp;&nbsp;beanName.property=value
- * </code>
+ * <p>Configuration lines are expected to be of the following form:
  *
- * <p>Example properties file:<br><br>
- * <code>
- * &nbsp;&nbsp;dataSource.driverClassName=com.mysql.jdbc.Driver<br>
- * &nbsp;&nbsp;dataSource.url=jdbc:mysql:mydb
- * </code>
+ * <pre>
+ * beanName.property=value</pre>
  *
- * <p>In contrast to PropertyPlaceholderConfigurer, the original definition can have default
+ * Example properties file:
+ *
+ * <pre>
+ * dataSource.driverClassName=com.mysql.jdbc.Driver
+ * dataSource.url=jdbc:mysql:mydb</pre>
+ *
+ * In contrast to PropertyPlaceholderConfigurer, the original definition can have default
  * values or no values at all for such bean properties. If an overriding properties file does
  * not have an entry for a certain bean property, the default context definition is used.
  *
@@ -47,18 +50,65 @@ import org.springframework.beans.FatalBeanException;
  * <p>In case of multiple PropertyOverrideConfigurers that define different values for
  * the same bean property, the <i>last</i> one will win (due to the overriding mechanism).
  *
+ * <p>Property values can be converted after reading them in, through overriding
+ * the <code>convertPropertyValue</code> method. For example, encrypted values
+ * can be detected and decrypted accordingly before processing them.
+ *
  * @author Juergen Hoeller
+ * @author Rod Johnson
  * @since 12.03.2003
+ * @see #convertPropertyValue
  * @see PropertyPlaceholderConfigurer
- * @version $Id: PropertyOverrideConfigurer.java,v 1.5 2004/03/19 17:45:35 jhoeller Exp $
  */
 public class PropertyOverrideConfigurer extends PropertyResourceConfigurer {
 
+	public static final String DEFAULT_BEAN_NAME_SEPARATOR = ".";
+
+
+	private String beanNameSeparator = DEFAULT_BEAN_NAME_SEPARATOR;
+
+	private boolean ignoreInvalidKeys = false;
+
+	/** Contains names of beans that have overrides */
+	private Set beanNames = Collections.synchronizedSet(new HashSet());
+
+
+	/**
+	 * Set the separator to expect between bean name and property path.
+	 * Default is a dot (".").
+	 */
+	public void setBeanNameSeparator(String beanNameSeparator) {
+		this.beanNameSeparator = beanNameSeparator;
+	}
+
+	/**
+	 * Set whether to ignore invalid keys. Default is "false".
+	 * <p>If you ignore invalid keys, keys that do not follow the
+	 * 'beanName.property' format will just be logged as warning.
+	 * This allows to have arbitrary other keys in a properties file.
+	 */
+	public void setIgnoreInvalidKeys(boolean ignoreInvalidKeys) {
+		this.ignoreInvalidKeys = ignoreInvalidKeys;
+	}
+
+
 	protected void processProperties(ConfigurableListableBeanFactory beanFactory, Properties props)
 			throws BeansException {
-		for (Iterator it = props.keySet().iterator(); it.hasNext();) {
-			String key = (String) it.next();
-			processKey(beanFactory, key, props.getProperty(key));
+
+		for (Enumeration names = props.propertyNames(); names.hasMoreElements();) {
+			String key = (String) names.nextElement();
+			try {
+				processKey(beanFactory, key, props.getProperty(key));
+			}
+			catch (BeansException ex) {
+				String msg = "Could not process key '" + key + "' in PropertyOverrideConfigurer";
+				if (!this.ignoreInvalidKeys) {
+					throw new BeanInitializationException(msg, ex);
+				}
+				if (logger.isDebugEnabled()) {
+					logger.debug(msg, ex);
+				}
+			}
 		}
 	}
 
@@ -67,15 +117,41 @@ public class PropertyOverrideConfigurer extends PropertyResourceConfigurer {
 	 */
 	protected void processKey(ConfigurableListableBeanFactory factory, String key, String value)
 			throws BeansException {
-		int dotIndex = key.indexOf('.');
-		if (dotIndex == -1) {
-			throw new FatalBeanException("Invalid key [" + key + "]: expected 'beanName.property'");
+
+		int separatorIndex = key.indexOf(this.beanNameSeparator);
+		if (separatorIndex == -1) {
+			throw new BeanInitializationException("Invalid key '" + key +
+					"': expected 'beanName" + this.beanNameSeparator + "property'");
 		}
-		String beanName = key.substring(0, dotIndex);
-		String beanProperty = key.substring(dotIndex+1);
+		String beanName = key.substring(0, separatorIndex);
+		String beanProperty = key.substring(separatorIndex+1);
+		this.beanNames.add(beanName);
+		applyPropertyValue(factory, beanName, beanProperty, value);
+		if (logger.isDebugEnabled()) {
+			logger.debug("Property '" + key + "' set to value [" + value + "]");
+		}
+	}
+
+	/**
+	 * Apply the given property value to the corresponding bean.
+	 */
+	protected void applyPropertyValue(
+	    ConfigurableListableBeanFactory factory, String beanName, String property, String value) {
+
 		BeanDefinition bd = factory.getBeanDefinition(beanName);
-		bd.getPropertyValues().addPropertyValue(beanProperty, value);
-		logger.debug("Property '" + key + "' set to [" + value + "]");
+		bd.getPropertyValues().addPropertyValue(property, value);
+	}
+
+
+	/**
+	 * Were there overrides for this bean?
+	 * Only valid after processing has occurred at least once.
+	 * @param beanName name of the bean to query status for
+	 * @return whether there were property overrides for
+	 * the named bean
+	 */
+	public boolean hasPropertyOverridesFor(String beanName) {
+		return this.beanNames.contains(beanName);
 	}
 
 }

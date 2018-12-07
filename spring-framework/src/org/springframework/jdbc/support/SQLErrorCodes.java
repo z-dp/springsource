@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,114 +12,148 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.support;
 
+import org.springframework.util.StringUtils;
+
 /**
- * JavaBean for holding JDBC Error Codes for a particular database.
- * Normally loaded through a BeanFactory
- * implementation. Used by the SQLErrorCodeSQLExceptionTranslator.
+ * JavaBean for holding JDBC error codes for a particular database.
+ * Instances of this class are normally loaded through a bean factory.
+ *
+ * <p>Used by Spring's SQLErrorCodeSQLExceptionTranslator.
+ * The file "sql-error-codes.xml" in this package contains default
+ * SQLErrorCodes instances for various databases.
+ *
  * @author Thomas Risberg
- * @version $Id: SQLErrorCodes.java,v 1.4 2004/03/18 02:46:15 trisberg Exp $
+ * @author Juergen Hoeller
+ * @see SQLErrorCodesFactory
+ * @see SQLErrorCodeSQLExceptionTranslator
  */
 public class SQLErrorCodes {
 
-	private String databaseProductName = null;
+	private String[] databaseProductNames;
+
+	private boolean useSqlStateForTranslation = false;
 
 	private String[] badSqlGrammarCodes = new String[0];
 
-	private String[] dataIntegrityViolationCodes = new String[0];
-	
-	private String[] dataRetrievalFailureCodes = new String[0];
-	
-	private String[] optimisticLockingFailureCodes = new String[0];
-	
+	private String[] invalidResultSetAccessCodes = new String[0];
+
 	private String[] dataAccessResourceFailureCodes = new String[0];
 
+	private String[] dataIntegrityViolationCodes = new String[0];
+	
+	private String[] cannotAcquireLockCodes = new String[0];
+
+	private String[] deadlockLoserCodes = new String[0];
+
+	private String[] cannotSerializeTransactionCodes = new String[0];
+
+	private CustomSQLErrorCodesTranslation[] customTranslations;
+
+
 	/**
-	 * Sets the badSqlGrammarCodes.
+	 * Set this property if the database name contains spaces,
+	 * in which case we can not use the bean name for lookup.
 	 */
-	public void setBadSqlGrammarCodes(String[] badSqlGrammarCodes) {
-		this.badSqlGrammarCodes = badSqlGrammarCodes;
+	public void setDatabaseProductName(String databaseProductName) {
+		this.databaseProductNames = new String[] {databaseProductName};
+	}
+
+	public String getDatabaseProductName() {
+		return (this.databaseProductNames != null && this.databaseProductNames.length > 0 ?
+				this.databaseProductNames[0] : null);
 	}
 
 	/**
-	 * Returns the badSqlGrammarCodes.
+	 * Set this property to specify multiple database names that contains spaces,
+	 * in which case we can not use bean names for lookup.
 	 */
+	public void setDatabaseProductNames(String[] databaseProductNames) {
+		this.databaseProductNames = databaseProductNames;
+	}
+
+	public String[] getDatabaseProductNames() {
+		return databaseProductNames;
+	}
+
+	/**
+	 * Set this property to true for databases that do not provide an error code
+	 * but that do provide SQL State (this includes PostgreSQL).
+	 */
+	public void setUseSqlStateForTranslation(boolean useStateCodeForTranslation) {
+		this.useSqlStateForTranslation = useStateCodeForTranslation;
+	}
+
+	public boolean isUseSqlStateForTranslation() {
+		return useSqlStateForTranslation;
+	}
+
+
+	public void setBadSqlGrammarCodes(String[] badSqlGrammarCodes) {
+		this.badSqlGrammarCodes = StringUtils.sortStringArray(badSqlGrammarCodes);
+	}
+
 	public String[] getBadSqlGrammarCodes() {
 		return badSqlGrammarCodes;
 	}
 
-	/**
-	 * Sets the dataIntegrityViolationCodes.
-	 */
-	public void setDataIntegrityViolationCodes(String[] dataIntegrityViolationCodes) {
-		this.dataIntegrityViolationCodes = dataIntegrityViolationCodes;
+	public void setInvalidResultSetAccessCodes(String[] invalidResultSetAccessCodes) {
+		this.invalidResultSetAccessCodes = invalidResultSetAccessCodes;
 	}
 
-	/**
-	 * Returns the dataIntegrityViolationCodes.
-	 */
-	public String[] getDataIntegrityViolationCodes() {
-		return dataIntegrityViolationCodes;
+	public String[] getInvalidResultSetAccessCodes() {
+		return invalidResultSetAccessCodes;
 	}
 
-	/**
-	 * @return Returns the dataRetrievalFailureCodes.
-	 */
-	public String[] getDataRetrievalFailureCodes() {
-		return dataRetrievalFailureCodes;
-	}
-	/**
-	 * @param dataRetrievalFailureCodes The dataRetrievalFailureCodes to set.
-	 */
-	public void setDataRetrievalFailureCodes(String[] dataRetrievalFailureCodes) {
-		this.dataRetrievalFailureCodes = dataRetrievalFailureCodes;
+	public void setDataAccessResourceFailureCodes(String[] dataAccessResourceFailureCodes) {
+		this.dataAccessResourceFailureCodes = dataAccessResourceFailureCodes;
 	}
 
-	/**
-	 * @return Returns the dataAccessResourceFailureCodes.
-	 */
 	public String[] getDataAccessResourceFailureCodes() {
 		return dataAccessResourceFailureCodes;
 	}
 
-	/**
-	 * @param dataAccessResourceFailureCodes The dataAccessResourceFailureCodes to set.
-	 */
-	public void setDataAccessResourceFailureCodes(
-			String[] dataAccessResourceFailureCodes) {
-		this.dataAccessResourceFailureCodes = dataAccessResourceFailureCodes;
+	public void setDataIntegrityViolationCodes(String[] dataIntegrityViolationCodes) {
+		this.dataIntegrityViolationCodes = StringUtils.sortStringArray(dataIntegrityViolationCodes);
 	}
 
-	/**
-	 * @return Returns the optimisticLockingFailureCodes.
-	 */
-	public String[] getOptimisticLockingFailureCodes() {
-		return optimisticLockingFailureCodes;
+	public String[] getDataIntegrityViolationCodes() {
+		return dataIntegrityViolationCodes;
+	}
+
+	public void setCannotAcquireLockCodes(String[] cannotAcquireLockCodes) {
+		this.cannotAcquireLockCodes = StringUtils.sortStringArray(cannotAcquireLockCodes);
+	}
+
+	public String[] getCannotAcquireLockCodes() {
+		return cannotAcquireLockCodes;
+	}
+
+	public void setDeadlockLoserCodes(String[] deadlockLoserCodes) {
+		this.deadlockLoserCodes = deadlockLoserCodes;
+	}
+
+	public String[] getDeadlockLoserCodes() {
+		return deadlockLoserCodes;
+	}
+
+	public void setCannotSerializeTransactionCodes(String[] cannotSerializeTransactionCodes) {
+		this.cannotSerializeTransactionCodes = cannotSerializeTransactionCodes;
 	}
 	
-	/**
-	 * @param optimisticLockingFailureCodes The optimisticLockingFailureCodes to set.
-	 */
-	public void setOptimisticLockingFailureCodes(
-			String[] optimisticLockingFailureCodes) {
-		this.optimisticLockingFailureCodes = optimisticLockingFailureCodes;
+	public String[] getCannotSerializeTransactionCodes() {
+		return cannotSerializeTransactionCodes;
 	}
 
-	/**
-	 * @return Returns the databaseProductName.
-	 */
-	public String getDatabaseProductName() {
-		return databaseProductName;
+	public void setCustomTranslations(CustomSQLErrorCodesTranslation[] customTranslations) {
+		this.customTranslations = customTranslations;
 	}
 
-	/**
-	 * @param databaseProductName The databaseProductName to set.
-	 */
-	public void setDatabaseProductName(String databaseProductName) {
-		this.databaseProductName = databaseProductName;
+	public CustomSQLErrorCodesTranslation[] getCustomTranslations() {
+		return customTranslations;
 	}
 
 }

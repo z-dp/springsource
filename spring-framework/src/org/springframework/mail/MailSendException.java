@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.mail;
 
@@ -25,18 +25,27 @@ import java.util.Map;
 /**
  * Exception thrown when a mail sending error is encountered.
  * Can register failed messages with their exceptions.
+ *
  * @author Dmitriy Kopylenko
  * @author Juergen Hoeller
- * @version $Id: MailSendException.java,v 1.6 2004/03/18 02:46:05 trisberg Exp $
  */
 public class MailSendException extends MailException {
 
 	private Map failedMessages = new HashMap();
 
+	/**
+	 * Constructor for MailSendException.
+	 * @param msg the detail message
+	 */
 	public MailSendException(String msg) {
 		super(msg);
 	}
 
+	/**
+	 * Constructor for MailSendException.
+	 * @param msg the detail message
+	 * @param ex root cause from remoting API in use
+	 */
 	public MailSendException(String msg, Throwable ex) {
 		super(msg, ex);
 	}

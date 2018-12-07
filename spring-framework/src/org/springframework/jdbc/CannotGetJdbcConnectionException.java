@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,25 +12,24 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc;
 
 import java.sql.SQLException;
 
-import javax.naming.NamingException;
-
 import org.springframework.dao.DataAccessResourceFailureException;
 
 /**
  * Fatal exception thrown when we can't connect to an RDBMS using JDBC.
+ *
  * @author Rod Johnson
  */
 public class CannotGetJdbcConnectionException extends DataAccessResourceFailureException {
 
 	/**
 	 * Constructor for CannotGetJdbcConnectionException.
-	 * @param msg message
+	 * @param msg the detail message
 	 * @param ex SQLException root cause
 	 */
 	public CannotGetJdbcConnectionException(String msg, SQLException ex) {
@@ -39,19 +38,10 @@ public class CannotGetJdbcConnectionException extends DataAccessResourceFailureE
 
 	/**
 	 * Constructor for CannotGetJdbcConnectionException.
-	 * @param msg message
+	 * @param msg the detail message
 	 * @param ex ClassNotFoundException root cause
 	 */
 	public CannotGetJdbcConnectionException(String msg, ClassNotFoundException ex) {
-		super(msg, ex);
-	}
-
-	/**
-	 * Constructor for CannotGetJdbcConnectionException.
-	 * @param msg message
-	 * @param ex NamingException root cause
-	 */
-	public CannotGetJdbcConnectionException(String msg, NamingException ex) {
 		super(msg, ex);
 	}
 

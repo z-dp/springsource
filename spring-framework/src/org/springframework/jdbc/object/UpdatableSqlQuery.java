@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.object;
 
@@ -71,7 +71,7 @@ public abstract class UpdatableSqlQuery extends SqlQuery {
 	 * @param rs ResultSet we're working through
 	 * @param rowNum row number (from 0) we're up to
 	 * @param context passed to the execute() method.
-	 * It can be null if no contextual information is need.  If you
+	 * It can be <code>null</code> if no contextual information is need.  If you
 	 * need to pass in data for each row, you can pass in a HashMap with 
 	 * the primary key of the row being the key for the HashMap.  That way
 	 * it is easy to locate the updates for each row 
@@ -90,9 +90,9 @@ public abstract class UpdatableSqlQuery extends SqlQuery {
 	protected class ResultReaderImpl implements ResultReader {
 
 		/** List to save results in */
-		private List results;
+		private final List results;
 
-		private Map context;
+		private final Map context;
 
 		private int rowNum = 0;
 

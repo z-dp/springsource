@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.ui.freemarker;
 
@@ -48,6 +48,7 @@ public class SpringTemplateLoader implements TemplateLoader {
 
 	private final String templateLoaderPath;
 
+
 	/**
 	 * Create a new SpringTemplateLoader.
 	 * @param resourceLoader the Spring ResourceLoader to use
@@ -59,22 +60,36 @@ public class SpringTemplateLoader implements TemplateLoader {
 			templateLoaderPath += "/";
 		}
 		this.templateLoaderPath = templateLoaderPath;
-		logger.info("SpringTemplateLoader for FreeMarker: using resource loader [" + this.resourceLoader +
-								"] and template loader path [" + this.templateLoaderPath + "]");
+		if (logger.isInfoEnabled()) {
+			logger.info("SpringTemplateLoader for FreeMarker: using resource loader [" + this.resourceLoader +
+					"] and template loader path [" + this.templateLoaderPath + "]");
+		}
 	}
 
 	public Object findTemplateSource(String name) throws IOException {
+		if (logger.isDebugEnabled()) {
+			logger.debug("Looking for FreeMarker template with name [" + name + "]");
+		}
 		Resource resource = this.resourceLoader.getResource(this.templateLoaderPath + name);
 		return (resource.exists() ? resource : null);
 	}
 
-	public long getLastModified(Object templateSource) {
-		return -1;
-	}
-
 	public Reader getReader(Object templateSource, String encoding) throws IOException {
 		Resource resource = (Resource) templateSource;
-		return new InputStreamReader(resource.getInputStream(), encoding);
+		try {
+			return new InputStreamReader(resource.getInputStream(), encoding);
+		}
+		catch (IOException ex) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Could not find FreeMarker template: " + resource);
+			}
+			throw ex;
+		}
+	}
+
+
+	public long getLastModified(Object templateSource) {
+		return -1;
 	}
 
 	public void closeTemplateSource(Object templateSource) throws IOException {

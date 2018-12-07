@@ -3,15 +3,15 @@ package org.springframework.samples.petclinic.hibernate;
 import org.springframework.samples.petclinic.AbstractClinicTests;
 
 /**
- *  Live Unit tests for HsqlJdbcClinic implementations.
- * 	"applicationContext-jdbc.xml" determines which implementation is live-tested.
+ * Live unit tests for HibernateClinic implementation.
+ * "applicationContext-hibernate.xml" determines the actual beans to test.
  *
- *  @author Juergen Hoeller
+ * @author Juergen Hoeller
  */
 public class HibernateClinicTests extends AbstractClinicTests {
 
-	protected String getContextLocation() {
-		return "/org/springframework/samples/petclinic/hibernate/applicationContext-hibernate.xml";
+	protected String[] getConfigLocations() {
+		return new String[] { "/org/springframework/samples/petclinic/hibernate/applicationContext-hibernate.xml" };
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,10 +12,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.support;
 
+import java.io.Serializable;
 import java.lang.reflect.Method;
 
 import org.springframework.aop.ClassFilter;
@@ -28,18 +29,23 @@ import org.springframework.core.ControlFlowFactory;
  * Pointcut and method matcher for use in simple <b>cflow</b>-style pointcut.
  * Note that evaluating such pointcuts is 10-15 times slower than evaluating
  * normal pointcuts, but they are useful in some cases.
- * @see org.springframework.core.ControlFlow
+ *
  * @author Rod Johnson
- * @version $Id: ControlFlowPointcut.java,v 1.6 2004/03/18 02:46:11 trisberg Exp $
+ * @see org.springframework.core.ControlFlow
  */
-public class ControlFlowPointcut implements Pointcut, ClassFilter, MethodMatcher {
+public class ControlFlowPointcut implements Pointcut, ClassFilter, MethodMatcher, Serializable {
 	
 	private Class clazz;
 	
 	private String methodName;
 	
 	private int evaluations;
-	
+
+
+	/**
+	 * Construct a new pointcut that matches all control flows below that class.
+	 * @param clazz the clazz
+	 */
 	public ControlFlowPointcut(Class clazz) {
 		this(clazz, null);
 	}
@@ -48,15 +54,16 @@ public class ControlFlowPointcut implements Pointcut, ClassFilter, MethodMatcher
 	 * Construct a new pointcut that matches all calls below the
 	 * given method in the given class. If the method name is null,
 	 * matches all control flows below that class.
-	 * @param clazz
-	 * @param methodName
+	 * @param clazz the clazz
+	 * @param methodName the name of the method
 	 */
 	public ControlFlowPointcut(Class clazz, String methodName) {
 		this.clazz = clazz;
 		this.methodName = methodName;
 	}
 
-	/** 
+
+	/**
 	 * Subclasses can override this for greater filtering (and performance).
 	 */
 	public boolean matches(Class clazz) {
@@ -67,7 +74,7 @@ public class ControlFlowPointcut implements Pointcut, ClassFilter, MethodMatcher
 	 * Subclasses can override this if it's possible to filter out
 	 * some candidate classes.
 	 */
-	public boolean matches(Method m, Class targetClass) {
+	public boolean matches(Method method, Class targetClass) {
 		return true;
 	}
 
@@ -75,10 +82,10 @@ public class ControlFlowPointcut implements Pointcut, ClassFilter, MethodMatcher
 		return true;
 	}
 
-	public boolean matches(Method m, Class targetClass, Object[] args) {
-		++evaluations;
+	public boolean matches(Method method, Class targetClass, Object[] args) {
+		++this.evaluations;
 		ControlFlow cflow = ControlFlowFactory.createControlFlow();
-		return (methodName != null) ? cflow.under(clazz, methodName) : cflow.under(clazz);
+		return (this.methodName != null) ? cflow.under(this.clazz, this.methodName) : cflow.under(this.clazz);
 	}
 
 	/**
@@ -87,6 +94,7 @@ public class ControlFlowPointcut implements Pointcut, ClassFilter, MethodMatcher
 	public int getEvaluations() {
 		return evaluations;
 	}
+
 
 	public ClassFilter getClassFilter() {
 		return this;

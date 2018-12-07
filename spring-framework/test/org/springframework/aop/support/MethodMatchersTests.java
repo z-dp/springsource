@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.support;
 
@@ -24,36 +24,36 @@ import org.springframework.aop.MethodMatcher;
 import org.springframework.beans.IOther;
 import org.springframework.beans.ITestBean;
 import org.springframework.beans.TestBean;
+import org.springframework.util.SerializationTestUtils;
 
 /**
- * $Id: MethodMatchersTests.java,v 1.3 2004/03/18 03:01:17 trisberg Exp $
+ * $Id: MethodMatchersTests.java,v 1.7 2005/03/25 09:28:18 jhoeller Exp $
  */
 public class MethodMatchersTests extends TestCase {
 
-	final Method EXCEPTION_GETMESSAGE;
+	private final Method EXCEPTION_GETMESSAGE;
 
-	final Method ITESTBEAN_SETAGE;
+	private final Method ITESTBEAN_SETAGE;
 	
-	final Method ITESTBEAN_GETAGE;
+	private final Method ITESTBEAN_GETAGE;
 	
-	final Method IOTHER_ABSQUATULATE;
+	private final Method IOTHER_ABSQUATULATE;
 
-	/**
-	 * Constructor for DefaultMethodMatcherTests.
-	 * @param arg0
-	 */
-	public MethodMatchersTests(String arg0) throws Exception {
-		super(arg0);
-		EXCEPTION_GETMESSAGE = Exception.class.getMethod("getMessage", null);
-		ITESTBEAN_GETAGE = ITestBean.class.getMethod("getAge", null);
+	public MethodMatchersTests() throws Exception {
+		EXCEPTION_GETMESSAGE = Exception.class.getMethod("getMessage", (Class[]) null);
+		ITESTBEAN_GETAGE = ITestBean.class.getMethod("getAge", (Class[]) null);
 		ITESTBEAN_SETAGE = ITestBean.class.getMethod("setAge", new Class[] { int.class });
-		IOTHER_ABSQUATULATE = IOther.class.getMethod("absquatulate", null);
+		IOTHER_ABSQUATULATE = IOther.class.getMethod("absquatulate", (Class[]) null);
 	}
 
 	public void testDefaultMatchesAll() throws Exception {
 		MethodMatcher defaultMm = MethodMatcher.TRUE;
 		assertTrue(defaultMm.matches(EXCEPTION_GETMESSAGE, Exception.class));
 		assertTrue(defaultMm.matches(ITESTBEAN_SETAGE, TestBean.class));
+	}
+	
+	public void testMethodMatcherTrueSerializable() throws Exception {
+		assertSame(SerializationTestUtils.serializeAndDeserialize(MethodMatcher.TRUE), MethodMatcher.TRUE);
 	}
 
 	public void testSingle() throws Exception {

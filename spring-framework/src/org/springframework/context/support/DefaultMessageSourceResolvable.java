@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2005 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.context.support;
 
@@ -22,116 +22,108 @@ import org.springframework.context.MessageSourceResolvable;
 import org.springframework.util.StringUtils;
 
 /**
- * Default implementation of the MessageSourceResolvable interface. Easy way to
- * store all the necessary values needed to resolve messages from a
- * MessageSource.
- * 
- * @author Tony Falabella
+ * Default implementation of the MessageSourceResolvable interface.
+ * Offers an easy way to store all the necessary values needed to
+ * resolve a message via a MessageSource.
+ *
  * @author Juergen Hoeller
- * @version $Id: DefaultMessageSourceResolvable.java,v 1.1 2004/02/13 17:42:57
- *          jhoeller Exp $
+ * @since 13.02.2004
+ * @see org.springframework.context.MessageSource#getMessage(MessageSourceResolvable, java.util.Locale)
  */
-public class DefaultMessageSourceResolvable implements MessageSourceResolvable,
-        Serializable {
+public class DefaultMessageSourceResolvable implements MessageSourceResolvable, Serializable {
 
-    private String[] codes;
+	private final String[] codes;
 
-    private Object[] arguments;
+	private final Object[] arguments;
 
-    private String defaultMessage;
+	private final String defaultMessage;
 
-    /**
-     * Create a new instance, using multiple codes.
-     * 
-     * @see MessageSourceResolvable#getCodes
-     */
-    public DefaultMessageSourceResolvable(String[] codes, Object[] arguments) {
-        this(codes, arguments, null);
-    }
 
-    /**
-     * Create a new instance, using multiple codes and a default message.
-     * 
-     * @see MessageSourceResolvable#getCodes
-     */
-    public DefaultMessageSourceResolvable(String[] codes, Object[] arguments,
-            String defaultMessage) {
-        this.codes = codes;
-        this.arguments = arguments;
-        this.defaultMessage = defaultMessage;
-    }
+	/**
+	 * Create a new DefaultMessageSourceResolvable.
+	 * @param code the code to be used to resolve this message
+	 */
+	public DefaultMessageSourceResolvable(String code) {
+		this(new String[] {code}, null, null);
+	}
 
-    /**
-     * Copy constructor: Create a new instance from another resolvable.
-     */
-    public DefaultMessageSourceResolvable(MessageSourceResolvable resolvable) {
-        this(resolvable.getCodes(), resolvable.getArguments(), resolvable
-                .getDefaultMessage());
-    }
+	/**
+	 * Create a new DefaultMessageSourceResolvable.
+	 * @param codes the codes to be used to resolve this message
+	 */
+	public DefaultMessageSourceResolvable(String[] codes) {
+		this(codes, null, null);
+	}
 
-    /**
-     * Used only by subclasses who need to do custom initialization before
-     * setting code, arguments, and/or the default message.
-     */
-    protected DefaultMessageSourceResolvable() {
+	/**
+	 * Create a new DefaultMessageSourceResolvable.
+	 * @param codes the codes to be used to resolve this message
+	 * @param defaultMessage the default message to be used to resolve this message
+	 */
+	public DefaultMessageSourceResolvable(String[] codes, String defaultMessage) {
+		this(codes, null, defaultMessage);
+	}
 
-    }
+	/**
+	 * Create a new DefaultMessageSourceResolvable.
+	 * @param codes the codes to be used to resolve this message
+	 * @param arguments the array of arguments to be used to resolve this message
+	 */
+	public DefaultMessageSourceResolvable(String[] codes, Object[] arguments) {
+		this(codes, arguments, null);
+	}
 
-    public String[] getCodes() {
-        return codes;
-    }
+	/**
+	 * Create a new DefaultMessageSourceResolvable.
+	 * @param codes the codes to be used to resolve this message
+	 * @param arguments the array of arguments to be used to resolve this message
+	 * @param defaultMessage the default message to be used to resolve this message
+	 */
+	public DefaultMessageSourceResolvable(String[] codes, Object[] arguments, String defaultMessage) {
+		this.codes = codes;
+		this.arguments = arguments;
+		this.defaultMessage = defaultMessage;
+	}
 
-    /**
-     * Return the default code of this resolvable, i.e. the last one in the
-     * codes array.
-     */
-    public String getCode() {
-        return (codes != null && codes.length > 0) ? codes[codes.length - 1]
-                : null;
-    }
+	/**
+	 * Copy constructor: Create a new instance from another resolvable.
+	 * @param resolvable the resolvable to copy from
+	 */
+	public DefaultMessageSourceResolvable(MessageSourceResolvable resolvable) {
+		this(resolvable.getCodes(), resolvable.getArguments(), resolvable.getDefaultMessage());
+	}
 
-    public Object[] getArguments() {
-        return arguments;
-    }
 
-    public String getDefaultMessage() {
-        return defaultMessage;
-    }
+	public String[] getCodes() {
+		return codes;
+	}
 
-    protected void setCodes(String[] codes) {
-        this.codes = (String[])codes.clone();
-    }
+	/**
+	 * Return the default code of this resolvable, i.e. the last one in the
+	 * codes array.
+	 */
+	public String getCode() {
+		return (this.codes != null && this.codes.length > 0) ? this.codes[this.codes.length - 1] : null;
+	}
 
-    protected void setArguments(Object[] arguments) {
-        this.arguments = (Object[])arguments.clone();
-    }
+	public Object[] getArguments() {
+		return arguments;
+	}
 
-    protected void setDefaultMessage(String defaultMessage) {
-        this.defaultMessage = defaultMessage;
-    }
+	public String getDefaultMessage() {
+		return defaultMessage;
+	}
 
-    protected String resolvableToString() {
-        StringBuffer msgBuff = new StringBuffer();
-        msgBuff.append("codes=["
-                + StringUtils.arrayToDelimitedString(getCodes(), ",")
-                + "]; arguments=[");
-        if (arguments == null) {
-            msgBuff.append("null");
-        }
-        else {
-            for (int i = 0; i < getArguments().length; i++) {
-                msgBuff.append("(" + getArguments()[i].getClass().getName()
-                        + ")[" + getArguments()[i] + "]");
-                if (i < getArguments().length - 1)
-                    msgBuff.append(", ");
-            }
-        }
-        msgBuff.append("]; defaultMessage=[" + getDefaultMessage() + "]");
-        return msgBuff.toString();
-    }
+	protected String resolvableToString() {
+		StringBuffer buf = new StringBuffer();
+		buf.append("codes [").append(StringUtils.arrayToDelimitedString(this.codes, ","));
+		buf.append("]; arguments [" + StringUtils.arrayToDelimitedString(this.arguments, ","));
+		buf.append("]; default message [").append(this.defaultMessage).append(']');
+		return buf.toString();
+	}
 
-    public String toString() {
-        return resolvableToString();
-    }
+	public String toString() {
+		return "MessageSourceResolvable: " + resolvableToString();
+	}
 
 }

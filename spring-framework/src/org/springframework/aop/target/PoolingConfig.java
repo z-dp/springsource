@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,21 +12,33 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.target;
 
 /**
- * Config interface for a pooling invoker.
+ * Config interface for a pooling target source.
+ *
  * @author Rod Johnson
- * @version $Id: PoolingConfig.java,v 1.3 2004/03/18 02:46:13 trisberg Exp $
+ * @author Juergen Hoeller
  */
 public interface PoolingConfig {
-	
+
+	/**
+	 * Return the maximum size of the pool.
+	 */
 	int getMaxSize();
-	
-	int getActive() throws UnsupportedOperationException;
-	
-	int getFree() throws UnsupportedOperationException;
+
+	/**
+	 * Return the number of active objects in the pool.
+	 * @throws UnsupportedOperationException if not supported by the pool
+	 */
+	int getActiveCount() throws UnsupportedOperationException;
+
+	/**
+	 * Return the number of idle objects in the pool.
+	 * @throws UnsupportedOperationException if not supported by the pool
+	 */
+	int getIdleCount() throws UnsupportedOperationException;
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,21 +12,19 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans;
 
-import org.apache.commons.lang.builder.EqualsBuilder;
-import org.apache.commons.lang.builder.HashCodeBuilder;
-
 /**
  * Simple nested test bean used for testing bean factories, AOP framework etc.
- * @author  Trevor D. Cook
- * @since 30-Sep-2003
+ *
+ * @author Trevor D. Cook
+ * @since 30.09.2003
  */
 public class NestedTestBean implements INestedTestBean {
 
-	String company = "";
+	private String company = "";
 
 	public NestedTestBean() {
 	}
@@ -35,40 +33,28 @@ public class NestedTestBean implements INestedTestBean {
 		setCompany(company);
 	}
 
-	/**
-	 * Get the company Setter for property age.
-	 * 
-	 * @return the company
-	 */
+	public void setCompany(String company) {
+		this.company = (company != null ? company : "");
+	}
+
 	public String getCompany() {
 		return company;
 	}
 
-	/**
-	 * Set the company
-	 * 
-	 * @param company the company
-	 */
-	public void setCompany(String company) {
-		this.company = company;
-	}
-
-	/**
-	 * @see java.lang.Object#equals(java.lang.Object)
-	 */
 	public boolean equals(Object obj) {
 		if (!(obj instanceof NestedTestBean)) {
 			return false;
 		}
 		NestedTestBean ntb = (NestedTestBean) obj;
-		return new EqualsBuilder().append(company, ntb.company).isEquals();
+		return this.company.equals(ntb.company);
 	}
 
-	/**
-	 * @see java.lang.Object#hashCode()
-	 */
 	public int hashCode() {
-		return new HashCodeBuilder(23, 91).append(company).toHashCode();
+		return this.company.hashCode();
+	}
+
+	public String toString() {
+		return "NestedTestBean: " + this.company;
 	}
 
 }

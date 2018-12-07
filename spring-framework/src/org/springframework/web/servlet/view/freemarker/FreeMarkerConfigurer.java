@@ -1,23 +1,25 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.view.freemarker;
 
 import java.io.IOException;
+import java.util.List;
 
+import freemarker.cache.ClassTemplateLoader;
 import freemarker.template.Configuration;
 import freemarker.template.TemplateException;
 
@@ -28,16 +30,15 @@ import org.springframework.ui.freemarker.FreeMarkerConfigurationFactory;
 /**
  * JavaBean to configure FreeMarker for web usage, via the "configLocation"
  * and/or "freemarkerSettings" and/or "templateLoaderPath" properties.
- * The simplest way to use this class is to specify just a "templateLoaderPath":
- * You do not need any further configuration then.
+ * The simplest way to use this class is to specify just a "templateLoaderPath";
+ * you do not need any further configuration then.
  *
- * <p><code>
- * &lt;bean id="freemarkerConfig" class="org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer"&gt;<br>
- * &nbsp;&nbsp;&lt;property name="templateLoaderPath"&gt;&lt;value&gt;/WEB-INF/freemarker/&lt;/value&gt;&lt;/property&gt;<br>
- * &lt;/bean&gt;
- * </code>
+ * <pre>
+ * &lt;bean id="freemarkerConfig" class="org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer"&gt;
+ *   &lt;property name="templateLoaderPath"&gt;&lt;value&gt;/WEB-INF/freemarker/&lt;/value>&lt;/property&gt;
+ * &lt;/bean&gt;</pre>
  *
- * <p>This bean must be included in the application context of any application
+ * This bean must be included in the application context of any application
  * using Spring's FreeMarkerView for web MVC. It exists purely to configure FreeMarker.
  * It is not meant to be referenced by application components but just internally
  * by FreeMarkerView. Implements FreeMarkerConfig to be found by FreeMarkerView without
@@ -49,11 +50,19 @@ import org.springframework.ui.freemarker.FreeMarkerConfigurationFactory;
  * the "configuration" property. This allows to share a FreeMarker Configuration
  * for web and email usage, for example.
  *
- * <p>Note: Spring's FreeMarker support requires FreeMarker 2.3 or higher.
+ * <p>This configurer registers a template loader for this package, allowing to
+ * reference the "spring.ftl" macro library (contained in this package and thus
+ * in spring.jar) like this:
+ *
+ * <pre>
+ * &lt;#import "spring.ftl" as spring/&gt;
+ * &lt;@spring.bind "person.age"/&gt;
+ * age is ${spring.status.value}</pre>
+ *
+ * Note: Spring's FreeMarker support requires FreeMarker 2.3 or higher.
  *
  * @author Darren Davison
- * @since 3/3/2004
- * @version $Id: FreeMarkerConfigurer.java,v 1.1 2004/03/20 15:41:33 trisberg Exp $
+ * @since 03.03.2004
  * @see #setConfigLocation
  * @see #setFreemarkerSettings
  * @see #setTemplateLoaderPath
@@ -65,6 +74,7 @@ public class FreeMarkerConfigurer extends FreeMarkerConfigurationFactory
 		implements FreeMarkerConfig, InitializingBean, ResourceLoaderAware {
 
 	private Configuration configuration;
+
 
 	/**
 	 * Set a preconfigured Configuration to use for the FreeMarker web config, e.g. a
@@ -80,6 +90,7 @@ public class FreeMarkerConfigurer extends FreeMarkerConfigurationFactory
 	/**
 	 * Initialize FreeMarkerConfigurationFactory's Configuration
 	 * if not overridden by a preconfigured FreeMarker Configuation.
+	 * <p>Sets up a ClassTemplateLoader to use for loading Spring macros.
 	 * @see #createConfiguration
 	 * @see #setConfiguration
 	 */
@@ -89,6 +100,19 @@ public class FreeMarkerConfigurer extends FreeMarkerConfigurationFactory
 		}
 	}
 
+	/**
+	 * This implementation registers an additional ClassTemplateLoader
+	 * for the Spring-provided macros, added to the end of the list.
+	 */
+	protected void postProcessTemplateLoaders(List templateLoaders) {
+		templateLoaders.add(new ClassTemplateLoader(FreeMarkerConfigurer.class, ""));
+		logger.info("ClassTemplateLoader for Spring macros added to FreeMarker configuration");
+	}
+
+
+	/**
+	 * Return the Configuration object wrapped by this bean.
+	 */
 	public Configuration getConfiguration() {
 		return this.configuration;
 	}

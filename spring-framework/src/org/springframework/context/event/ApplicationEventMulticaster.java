@@ -1,5 +1,5 @@
  /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,28 +12,30 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.context.event;
 
+import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationListener;
 
 /**
- * Subinterface of ApplicationListener to be implemented by
- * listeners that can broadcast events to other listeners.
+ * Interface to be implemented by objects that can manage a number
+ * of ApplicationListeners, and publish events to them.
+ *
  * @author Rod Johnson
  */
-public interface ApplicationEventMulticaster extends ApplicationListener {
+public interface ApplicationEventMulticaster {
 
 	/**
-	 * Add a listener to be notified of all events
-	 * @param listener listener to add
+	 * Add a listener to be notified of all events.
+	 * @param listener the listener to add
 	 */
 	void addApplicationListener(ApplicationListener listener);
 
 	/**
-	 * Remove a listener in the notification list]
-	 * @param listener listener to remove
+	 * Remove a listener from the notification list.
+	 * @param listener the listener to remove
 	 */
 	void removeApplicationListener(ApplicationListener listener);
 
@@ -44,5 +46,10 @@ public interface ApplicationEventMulticaster extends ApplicationListener {
 	 */
 	void removeAllListeners();
 
-}
+	/**
+	 * Multicast the given application event to appropriate listeners.
+	 * @param event the event to multicast
+	 */
+	void multicastEvent(ApplicationEvent event);
 
+}

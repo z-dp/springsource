@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,10 +12,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.dao;
-
 
 /**
  * Exception thrown on incorrect usage of the API, such as failing to
@@ -30,7 +29,7 @@ public class InvalidDataAccessApiUsageException extends DataAccessException {
 
 	/**
 	 * Constructor for InvalidDataAccessApiUsageException.
-	 * @param msg message
+	 * @param msg the detail message
 	 */
 	public InvalidDataAccessApiUsageException(String msg) {
 		super(msg);
@@ -38,8 +37,8 @@ public class InvalidDataAccessApiUsageException extends DataAccessException {
 
 	/**
 	 * Constructor for InvalidDataAccessApiUsageException.
-	 * @param msg message
-	 * @param ex root cause, from an underlying API such as JDBC
+	 * @param msg the detail message
+	 * @param ex root cause from data access API in use
 	 */
 	public InvalidDataAccessApiUsageException(String msg, Throwable ex) {
 		super(msg, ex);

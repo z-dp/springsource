@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,13 +12,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.context;
 
 import org.springframework.beans.factory.HierarchicalBeanFactory;
 import org.springframework.beans.factory.ListableBeanFactory;
-import org.springframework.core.io.ResourceLoader;
+import org.springframework.core.io.support.ResourcePatternResolver;
 
 /** 
  * Central interface to provide configuration for an application.
@@ -47,16 +47,15 @@ import org.springframework.core.io.ResourceLoader;
  *
  * @author Rod Johnson
  * @author Juergen Hoeller
- * @version $Id: ApplicationContext.java,v 1.15 2004/03/22 10:34:50 jhoeller Exp $
  * @see ApplicationContextAware#setApplicationContext
  */
-public interface ApplicationContext
-    extends ListableBeanFactory, HierarchicalBeanFactory, MessageSource, ResourceLoader {
+public interface ApplicationContext extends ListableBeanFactory, HierarchicalBeanFactory,
+		MessageSource, ApplicationEventPublisher, ResourcePatternResolver {
 	
 	/**
-	 * Return the parent context, or null if there is no parent,
+	 * Return the parent context, or <code>null</code> if there is no parent,
 	 * and this is the root of the context hierarchy.
-	 * @return the parent context, or null if there is no parent
+	 * @return the parent context, or <code>null</code> if there is no parent
 	 */
 	ApplicationContext getParent();
 	

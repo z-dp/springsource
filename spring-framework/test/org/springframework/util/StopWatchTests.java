@@ -1,6 +1,6 @@
  
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,30 +13,19 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.util;
 
 import junit.framework.TestCase;
 
 /**
- *
  * @author Rod Johnson
- * @version $Id: StopWatchTests.java,v 1.3 2004/03/18 03:01:20 trisberg Exp $
  */
 public class StopWatchTests extends TestCase {
 
 	/**
-	 * Constructor for StopWatchTests.
-	 * @param arg0
-	 */
-	public StopWatchTests(String arg0) {
-		super(arg0);
-	}
-	
-	/**
 	 * Are timings off in JUnit?
-	 * @throws Exception
 	 */
 	public void testValidUsage() throws Exception {
 		StopWatch sw = new StopWatch();
@@ -113,13 +102,12 @@ public class StopWatchTests extends TestCase {
 		catch (UnsupportedOperationException ex) {
 			// Ok
 		}
-		
 	}
 	
 	public void testFailureToStartBeforeGettingTimings() {
 		StopWatch sw = new StopWatch();
 		try {
-			sw.getLastInterval();
+			sw.getLastTaskTimeMillis();
 			fail("Can't get last interval if no tests run");
 		}
 		catch (IllegalStateException ex) {

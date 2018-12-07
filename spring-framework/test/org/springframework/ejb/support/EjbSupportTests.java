@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.ejb.support;
 
@@ -35,14 +35,14 @@ import org.springframework.beans.factory.access.BeanFactoryLocator;
 import org.springframework.beans.factory.access.BeanFactoryReference;
 import org.springframework.beans.factory.access.BootstrapException;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
-import org.springframework.jndi.support.SimpleNamingContextBuilder;
+import org.springframework.mock.jndi.SimpleNamingContextBuilder;
 
 /**
  * Most of the value of the tests here is in being forced
  * to implement ejbCreate() methods.
+ *
  * @author Rod Johnson
- * @since 21-May-2003
- * @version $Id: EjbSupportTests.java,v 1.11 2004/03/18 03:01:38 trisberg Exp $
+ * @since 21.05.2003
  */
 public class EjbSupportTests extends TestCase {
 
@@ -89,7 +89,7 @@ public class EjbSupportTests extends TestCase {
 	}
 	
 	/**
-	 * Check there's a helpful message if no JNDI key is present
+	 * Check there's a helpful message if no JNDI key is present.
 	 */
 	public void testHelpfulNamingLookupMessage() throws NamingException, CreateException {
 		SimpleNamingContextBuilder.emptyActivatedContextBuilder();
@@ -124,8 +124,7 @@ public class EjbSupportTests extends TestCase {
 		
 		final BeanFactory bf = new StaticListableBeanFactory();
 		BeanFactoryLocator bfl = new BeanFactoryLocator() {
-			public BeanFactoryReference useBeanFactory(String factoryKey)
-					throws FatalBeanException {
+			public BeanFactoryReference useBeanFactory(String factoryKey) throws FatalBeanException {
 				return new BeanFactoryReference() {
 					public BeanFactory getFactory() {
 						return bf;
@@ -171,8 +170,7 @@ public class EjbSupportTests extends TestCase {
 	
 		final BeanFactory bf = new StaticListableBeanFactory();
 		BeanFactoryLocator bfl = new BeanFactoryLocator() {
-			public BeanFactoryReference useBeanFactory(String factoryKey)
-					throws FatalBeanException {
+			public BeanFactoryReference useBeanFactory(String factoryKey) throws FatalBeanException {
 				return new BeanFactoryReference() {
 					public BeanFactory getFactory() {
 						return bf;
@@ -188,8 +186,7 @@ public class EjbSupportTests extends TestCase {
 			protected void onEjbCreate() {
 				assertTrue(getBeanFactory() == bf);
 			}
-
-			public void onMessage(Message arg0) {
+			public void onMessage(Message msg) {
 				throw new UnsupportedOperationException("onMessage");
 			}
 		};
@@ -205,10 +202,8 @@ public class EjbSupportTests extends TestCase {
 		SessionContext sc = (SessionContext) mc.getMock();
 		mc.replay();
 	
-		final BeanFactory bf = new StaticListableBeanFactory();
 		BeanFactoryLocator bfl = new BeanFactoryLocator() {
-			public BeanFactoryReference useBeanFactory(String factoryKey)
-					throws FatalBeanException {
+			public BeanFactoryReference useBeanFactory(String factoryKey) throws FatalBeanException {
 				throw new BootstrapException("", null);
 		}};
 
@@ -228,4 +223,5 @@ public class EjbSupportTests extends TestCase {
 			// Ok
 		}
 	}
+
 }

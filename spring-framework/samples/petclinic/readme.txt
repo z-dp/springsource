@@ -1,26 +1,45 @@
 =========================================
-== Spring Petclinic sample application ==
+== Spring PetClinic sample application ==
 =========================================
 
 @author Ken Krebs
 @author Juergen Hoeller
+@author Rob Harrop
 
 
 1. DATA ACCESS STRATEGIES
 
-Since release 1.0 M2, Petclinic features alternative DAO implementations and
-application configurations for JDBC and Hibernate, on HSQL and MySQL.
-The default Petclinic configuration is Hibernate on HSQL; to be able to build
-and run it, the Spring distribution comes with Hibernate jar files.
-See "WEB-INF/web.xml", "WEB-INF/applicationContext-hibernate.xml", and
-"WEB-INF/applicationContext-jdbc.xml" for details.
+PetClinic features alternative DAO implementations and application configurations
+for JDBC, Hibernate, Apache OJB and Oracle TopLink, with HSQLDB and MySQL as target
+databases. The default PetClinic configuration is JDBC on HSQL (as of Spring 1.2.1).
+See "WEB-INF/web.xml" and "WEB-INF/applicationContext-*.xml" for details;
+a simple comment change in web.xml switches between the data access strategies.
 
-Both data access strategies can work with JTA for transaction management,
+The JDBC version of PetClinic also demonstrates JMX support: it exposes the
+CachingClinic management interface (implemented by its Clinic object) via JMX.
+On JDK 1.5, you can start up the JDK's JConsole to see and use the exported bean.
+On JDK < 1.5, your application server's JMX infrastructure needs to be used.
+Note that special setup is necessary on WebLogic <= 8.1 and on JBoss:
+see "jmxExporter" definition in "applicationContext-jdbc.xml" for details!
+
+The Spring distribution comes with all required Hibernate and OJB jar files
+to be able to build and run PetClinic on those two ORM tools. For TopLink,
+only a minimal toplink-api.jar is included in the Spring distribution.
+To run PetClinic with TopLink, download TopLink 10.1.3 or higher from the Oracle
+website (http://www.oracle.com/technology/products/ias/toplink), install it and
+copy toplink.jar and xmlparserv2.jar into Spring's "lib/toplink" directory.
+
+All data access strategies can work with JTA for transaction management,
 by activating the JtaTransactionManager and a JndiObjectFactoryBean that
 refers to a transactional container DataSource. The default for Hibernate
-is HibernateTransactionManager; for JDBC, DataSourceTransactionManager:
-They allow to work with any locally defined DataSource. In the default case,
-the sample configurations specify Spring's non-pooling DriverManagerDataSource.
+is HibernateTransactionManager; for OJB, PersistenceBrokerTransactionManager;
+for TopLink TopLinkTransactionManager; for JDBC, DataSourceTransactionManager.
+Those local strategies allow for working with any locally defined DataSource.
+
+Note that in the default case, the sample configurations specify Spring's
+non-pooling DriverManagerDataSource as local DataSource. You can change
+the DataSource definition to a Commons DBCP BasicDataSource, for example,
+to get proper connection pooling.
 
 
 2. BUILD AND DEPLOYMENT
@@ -49,6 +68,11 @@ corresponding DataSources in your J2EE container.
 Note on enabling Log4J:
 - Log4J is disabled by default, due to JBoss issues
 - drop a log4j.jar into the deployed "WEB-INF/lib" directory
-- uncomment the root category in "WEB-INF/classes/log4j.properties"
+- rename "WEB-INF/classes/log4j.properties.rename" to "log4j.properties"
 - uncomment the Log4J listener in "WEB-INF/web.xml"
+
+
+Additional documentation can be found in the file "petclinic.html" which is
+in the "war/html" directory. This file is available in the running application
+through the "Tutorial" link.
 

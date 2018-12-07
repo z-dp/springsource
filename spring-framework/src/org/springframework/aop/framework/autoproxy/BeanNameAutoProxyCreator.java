@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.framework.autoproxy;
 
@@ -20,17 +20,28 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
+import org.springframework.aop.TargetSource;
+
 /**
  * Auto proxy creator that identifies beans to proxy via a list of names.
  * Checks for direct, "xxx*", and "*xxx" matches.
+ *
+ * <p>For configuration details, see the javadoc of the parent class
+ * AbstractAutoProxyCreator. Typically, you will specify a list of
+ * interceptor names to apply to all identified beans, via the
+ * "interceptorNames" property.
+ *
  * @author Juergen Hoeller
  * @since 10.10.2003
  * @see #setBeanNames
  * @see #isMatch
+ * @see #setInterceptorNames
+ * @see AbstractAutoProxyCreator
  */
 public class BeanNameAutoProxyCreator extends AbstractAutoProxyCreator {
 
 	private List beanNames;
+
 
 	/**
 	 * Set the names of the beans that should automatically get wrapped with proxies.
@@ -41,10 +52,11 @@ public class BeanNameAutoProxyCreator extends AbstractAutoProxyCreator {
 		this.beanNames = Arrays.asList(beanNames);
 	}
 
+
 	/**
 	 * Identify as bean to proxy if the bean name is in the configured list of names.
 	 */
-	protected Object[] getInterceptorsAndAdvisorsForBean(Object bean, String beanName) {
+	protected Object[] getAdvicesAndAdvisorsForBean(Class beanClass, String beanName, TargetSource targetSource) {
 		if (this.beanNames != null) {
 			if (this.beanNames.contains(beanName)) {
 				return PROXY_WITHOUT_ADDITIONAL_INTERCEPTORS;

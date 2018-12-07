@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.view.freemarker;
 
@@ -22,9 +22,9 @@ import freemarker.template.Configuration;
  * Interface to be implemented by objects that configure and manage a
  * FreeMarker Configuration object in a web environment. Detected and
  * used by FreeMarkerView.
+ *
  * @author Darren Davison
- * @since 3/3/2004
- * @version $Id: FreeMarkerConfig.java,v 1.1 2004/03/20 15:41:33 trisberg Exp $
+ * @since 03.03.2004
  * @see FreeMarkerConfigurer
  * @see FreeMarkerView
  */

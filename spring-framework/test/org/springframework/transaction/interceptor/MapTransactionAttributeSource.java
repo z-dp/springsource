@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,34 +12,53 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.transaction.interceptor;
 
 import java.lang.reflect.Method;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 
 /**
- * 
+ * Inherits fallback behaviour from AbstractFallbackTransactionAttributeSource
  * @author Rod Johnson
- * @version $Id: MapTransactionAttributeSource.java,v 1.3 2004/03/18 03:01:17 trisberg Exp $
  */
-public class MapTransactionAttributeSource implements TransactionAttributeSource {
+public class MapTransactionAttributeSource extends AbstractFallbackTransactionAttributeSource {
 	
 	/**
-	 * Map from Method to TransactionAttribute
+	 * Map from Method or Clazz to TransactionAttribute
 	 */
-	private HashMap methodMap = new HashMap();
+	private HashMap attributeMap = new HashMap();
 	
 	public void register(Method m, TransactionAttribute txAtt) {
-		methodMap.put(m, txAtt);
+		attributeMap.put(m, txAtt);
 	}
-
+	
+	public void register(Class clazz, TransactionAttribute txAtt) {
+		attributeMap.put(clazz, txAtt);
+	}
+	
 	/**
-	 * @see org.springframework.transaction.interceptor.TransactionAttributeSource#getTransactionAttribute(org.aopalliance.intercept.MethodInvocation)
+	 * @see org.springframework.transaction.interceptor.AbstractFallbackTransactionAttributeSource#findAllAttributes(java.lang.Class)
 	 */
-	public TransactionAttribute getTransactionAttribute(Method m, Class clazz) {
-		return (TransactionAttribute) methodMap.get(m);
+	protected Collection findAllAttributes(Class clazz) {
+		return doFindAllAttributes(clazz);
 	}
+	
+	/**
+	 * @see org.springframework.transaction.interceptor.AbstractFallbackTransactionAttributeSource#findAllAttributes(java.lang.reflect.Method)
+	 */
+	protected Collection findAllAttributes(Method m) {
+		return doFindAllAttributes(m);
+	}
+	
+	private Collection doFindAllAttributes(Object what) {
+		//System.out.println("Trying key " + what);
+		Object att = attributeMap.get(what);		
+		return att != null ? Collections.singleton(att) : null;
+	}
+	
 
 }

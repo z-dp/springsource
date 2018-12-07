@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.core.io;
 
@@ -22,7 +22,7 @@ import java.net.URL;
 
 /**
  * Interface for a resource descriptor that abstracts from the actual
- * type of resource, like file or class path resource.
+ * type of underlying resource, such as a file or class path resource.
  *
  * <p>An InputStream can be opened for every resource if it exists in
  * physical form, but a URL or File handle can just be returned for
@@ -30,6 +30,15 @@ import java.net.URL;
  *
  * @author Juergen Hoeller
  * @since 28.12.2003
+ * @see #getInputStream()
+ * @see #getURL()
+ * @see #getFile()
+ * @see FileSystemResource
+ * @see ClassPathResource
+ * @see UrlResource
+ * @see ByteArrayResource
+ * @see InputStreamResource
+ * @see org.springframework.web.context.support.ServletContextResource
  */
 public interface Resource extends InputStreamSource {
 
@@ -61,10 +70,24 @@ public interface Resource extends InputStreamSource {
 	File getFile() throws IOException;
 
 	/**
+	 * Create a resource relative to this resource.
+	 * @param relativePath the relative path (relative to this resource)
+	 * @return the resource handle for the relative resource
+	 * @throws IOException if the relative resource cannot be determined
+	 */
+	Resource createRelative(String relativePath) throws IOException;
+
+	/**
+	 * Return a filename for this resource, i.e. typically the last
+	 * part of the path: for example, "myfile.txt".
+	 */
+	String getFilename();
+
+	/**
 	 * Return a description for this resource,
 	 * to be used for error output when working with the resource.
 	 * <p>Implementations are also encouraged to return this value
-	 * from their toString method.
+	 * from their <code>toString</code> method.
 	 * @see java.lang.Object#toString
 	 */
 	String getDescription();

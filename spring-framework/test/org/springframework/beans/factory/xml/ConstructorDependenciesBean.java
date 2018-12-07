@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,19 +12,22 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory.xml;
+
+import java.io.Serializable;
 
 import org.springframework.beans.IndexedTestBean;
 import org.springframework.beans.TestBean;
 
 /**
  * Simple bean used to check constructor dependency checking.
+ *
  * @author Juergen Hoeller
  * @since 09.11.2003
  */
-public class ConstructorDependenciesBean {
+public class ConstructorDependenciesBean implements Serializable {
 	
 	private int age;
 	
@@ -46,6 +49,17 @@ public class ConstructorDependenciesBean {
 
 	public ConstructorDependenciesBean(TestBean spouse1) {
 		this.spouse1 = spouse1;
+	}
+
+	public ConstructorDependenciesBean(TestBean spouse1, TestBean spouse2) {
+		this.spouse1 = spouse1;
+		this.spouse2 = spouse2;
+	}
+
+	public ConstructorDependenciesBean(TestBean spouse1, TestBean spouse2, int age) {
+		this.spouse1 = spouse1;
+		this.spouse2 = spouse2;
+		this.age = age;
 	}
 
 	public ConstructorDependenciesBean(TestBean spouse1, TestBean spouse2, IndexedTestBean other) {

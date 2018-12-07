@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,20 +12,25 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.target;
 
 import junit.framework.TestCase;
 
-import org.springframework.aop.framework.AopConfigException;
+import org.springframework.aop.framework.Advised;
+import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.aop.interceptor.SerializableNopInterceptor;
 import org.springframework.aop.interceptor.SideEffectBean;
+import org.springframework.aop.support.DefaultPointcutAdvisor;
+import org.springframework.beans.Person;
+import org.springframework.beans.SerializablePerson;
 import org.springframework.beans.factory.xml.XmlBeanFactory;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.util.SerializationTestUtils;
 
 /**
  * @author Rod Johnson
- * @version $Id: HotSwappableTargetSourceTests.java,v 1.4 2004/03/18 03:01:18 trisberg Exp $
  */
 public class HotSwappableTargetSourceTests extends TestCase {
 
@@ -95,14 +100,14 @@ public class HotSwappableTargetSourceTests extends TestCase {
 	 * @param invalid
 	 * @return the message
 	 */
-	private AopConfigException testRejectsSwapToInvalidValue(Object invalid) {
+	private IllegalArgumentException testRejectsSwapToInvalidValue(Object invalid) {
 		HotSwappableTargetSource swapper = (HotSwappableTargetSource) beanFactory.getBean("swapper");
-		AopConfigException aopex = null;
+		IllegalArgumentException aopex = null;
 		try {
 			swapper.swap(invalid);
 			fail("Shouldn't be able to swap to invalid value [" + invalid + "]");
 		}
-		catch (AopConfigException ex) {
+		catch (IllegalArgumentException ex) {
 			// Ok
 			aopex = ex;
 		}
@@ -113,7 +118,7 @@ public class HotSwappableTargetSourceTests extends TestCase {
 	}
 	
 	public void testRejectsSwapToNull() {
-		AopConfigException ex = testRejectsSwapToInvalidValue(null);
+		IllegalArgumentException ex = testRejectsSwapToInvalidValue(null);
 		assertTrue(ex.getMessage().indexOf("null") != -1);
 	}
 	
@@ -121,4 +126,29 @@ public class HotSwappableTargetSourceTests extends TestCase {
 	// how to decide what's valid?
 	
 	
+	public void testSerialization() throws Exception {
+		SerializablePerson sp1 = new SerializablePerson();
+		sp1.setName("Tony");
+		SerializablePerson sp2 = new SerializablePerson();
+		sp1.setName("Gordon");
+		
+		HotSwappableTargetSource hts = new HotSwappableTargetSource(sp1);
+		ProxyFactory pf = new ProxyFactory();
+		pf.addInterface(Person.class);
+		pf.setTargetSource(hts);
+		pf.addAdvisor(new DefaultPointcutAdvisor(new SerializableNopInterceptor()));
+		Person p = (Person) pf.getProxy();
+		
+		assertEquals(sp1.getName(), p.getName());
+		hts.swap(sp2);
+		assertEquals(sp2.getName(), p.getName());
+		
+		p = (Person) SerializationTestUtils.serializeAndDeserialize(p);
+		// We need to get a reference to the client-side targetsource
+		hts = (HotSwappableTargetSource) ((Advised) p).getTargetSource();
+		assertEquals(sp2.getName(), p.getName());
+		hts.swap(sp1);
+		assertEquals(sp1.getName(), p.getName());
+		
+	}
 }

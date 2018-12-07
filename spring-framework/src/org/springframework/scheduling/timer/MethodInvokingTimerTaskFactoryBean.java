@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,19 +12,14 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.scheduling.timer;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.TimerTask;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.factory.FactoryBean;
-import org.springframework.beans.factory.InitializingBean;
-import org.springframework.util.MethodInvoker;
+import org.springframework.scheduling.support.MethodInvokingRunnable;
 
 /**
  * FactoryBean that exposes a TimerTask object that delegates
@@ -32,22 +27,32 @@ import org.springframework.util.MethodInvoker;
  * Avoids the need to implement a one-line TimerTask that just
  * invokes an existing business method.
  *
- * <p>Derived from MethodInvoker to share common properties and
- * behavior with MethodInvokingFactoryBean.
+ * <p>Derives from MethodInvokingRunnable to share common properties
+ * and behavior, effectively providing a TimerTask adapter for it.
+ *
+ * <p>Often used to populate a ScheduledTimerTask object with a specific
+ * reflective method invocation. Note that you can alternatively populate
+ * a ScheduledTimerTask object with a plain MethodInvokingRunnable instance
+ * as well (as of Spring 1.2.4), without the need for this special FactoryBean.
  *
  * @author Juergen Hoeller
  * @since 19.02.2004
+ * @see DelegatingTimerTask
+ * @see ScheduledTimerTask#setTimerTask
+ * @see ScheduledTimerTask#setRunnable
+ * @see org.springframework.scheduling.support.MethodInvokingRunnable
  * @see org.springframework.beans.factory.config.MethodInvokingFactoryBean
  */
-public class MethodInvokingTimerTaskFactoryBean extends MethodInvoker
-		implements FactoryBean, InitializingBean {
+public class MethodInvokingTimerTaskFactoryBean extends MethodInvokingRunnable implements FactoryBean {
 
 	private TimerTask timerTask;
 
+
 	public void afterPropertiesSet() throws ClassNotFoundException, NoSuchMethodException {
-		prepare();
-		this.timerTask = new MethodInvokingTimerTask(this);
+		super.afterPropertiesSet();
+		this.timerTask = new DelegatingTimerTask(this);
 	}
+
 
 	public Object getObject() {
 		return this.timerTask;
@@ -59,47 +64,6 @@ public class MethodInvokingTimerTaskFactoryBean extends MethodInvoker
 
 	public boolean isSingleton() {
 		return true;
-	}
-
-
-	/**
-	 * TimerTask implementation that invokes a specified method.
-	 * Automatically applied by MethodInvokingTimerTaskFactoryBean.
-	 */
-	private static class MethodInvokingTimerTask extends TimerTask {
-
-		protected final Log logger = LogFactory.getLog(getClass());
-
-		private final MethodInvoker methodInvoker;
-
-		private final String errorMessage;
-
-		/**
-		 * Create a new MethodInvokingTimerTask with the MethodInvoker to use.
-		 */
-		public MethodInvokingTimerTask(MethodInvoker methodInvoker) {
-			this.methodInvoker = methodInvoker;
-			this.errorMessage = "Could not invoke method '" + this.methodInvoker.getTargetMethod() +
-					"' on target object [" + this.methodInvoker.getTargetObject() + "]";
-
-		}
-
-		/**
-		 * Invoke the method via the MethodInvoker.
-		 */
-		public void run() {
-			try {
-				this.methodInvoker.invoke();
-			}
-			catch (InvocationTargetException ex) {
-				logger.warn(this.errorMessage + ": " + ex.getTargetException().getMessage());
-				throw new TimerTaskExecutionException(this.errorMessage, ex.getTargetException());
-			}
-			catch (Exception ex) {
-				logger.warn(this.errorMessage + ": " + ex.getMessage());
-				throw new TimerTaskExecutionException(this.errorMessage, ex);
-			}
-		}
 	}
 
 }

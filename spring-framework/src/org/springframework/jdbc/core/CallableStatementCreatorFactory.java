@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.core;
 
@@ -26,25 +26,31 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.dao.InvalidDataAccessApiUsageException;
+import org.springframework.jdbc.support.nativejdbc.NativeJdbcExtractor;
 
 /**
  * Helper class that can efficiently create multiple CallableStatementCreator
  * objects with different parameters based on a SQL statement and a single
  * set of parameter declarations.
+ *
  * @author Rod Johnson
  * @author Thomas Risberg
+ * @author Juergen Hoeller
  */
 public class CallableStatementCreatorFactory { 
 
 	/** The SQL call string, which won't change when the parameters change. */
 	private final String callString;
 
-	/** List of SqlParameter objects. May not be null. */
-	private List declaredParameters = new LinkedList();
+	/** List of SqlParameter objects. May not be <code>null</code>. */
+	private final List declaredParameters;
 
 	private int resultSetType = ResultSet.TYPE_FORWARD_ONLY;
 
 	private boolean updatableResults = false;
+
+	private NativeJdbcExtractor nativeJdbcExtractor;
+
 
 	/**
 	 * Create a new factory. Will need to add parameters
@@ -52,6 +58,7 @@ public class CallableStatementCreatorFactory {
 	 */
 	public CallableStatementCreatorFactory(String callString) {
 		this.callString = callString;
+		this.declaredParameters = new LinkedList();
 	}
 
 	/**
@@ -93,8 +100,17 @@ public class CallableStatementCreatorFactory {
 	}
 
 	/**
+	 * Specify the NativeJdbcExtractor to use for unwrapping
+	 * CallableStatements, if any.
+	 */
+	public void setNativeJdbcExtractor(NativeJdbcExtractor nativeJdbcExtractor) {
+		this.nativeJdbcExtractor = nativeJdbcExtractor;
+	}
+
+
+	/**
 	 * Return a new CallableStatementCreator instance given this parameters.
-	 * @param inParams List of parameters. May be null.
+	 * @param inParams List of parameters. May be <code>null</code>.
 	 */
 	public CallableStatementCreator newCallableStatementCreator(Map inParams) {
 		return new CallableStatementCreatorImpl(inParams != null ? inParams : new HashMap());
@@ -102,7 +118,7 @@ public class CallableStatementCreatorFactory {
 
 	/**
 	 * Return a new CallableStatementCreator instance given this parameter mapper.
-	 * @param inParamMapper ParameterMapper implementation that will return a Map of parameters. May not be null.
+	 * @param inParamMapper ParameterMapper implementation that will return a Map of parameters. May not be <code>null</code>.
 	 */
 	public CallableStatementCreator newCallableStatementCreator(ParameterMapper inParamMapper) {
 		return new CallableStatementCreatorImpl(inParamMapper);
@@ -112,36 +128,39 @@ public class CallableStatementCreatorFactory {
 	/**
 	 * CallableStatementCreator implementation returned by this class.
 	 */
-	private class CallableStatementCreatorImpl implements CallableStatementCreator, SqlProvider {
+	private class CallableStatementCreatorImpl
+			implements CallableStatementCreator, SqlProvider, ParameterDisposer {
+
+		private ParameterMapper inParameterMapper;
 
 		private Map inParameters;
 
-		private ParameterMapper inParameterMapper;
-		
 		/**
-		 * @param inParams list of SqlParameter objects. May not be null
+		 * Create a new CallableStatementCreatorImpl.
+		 * @param inParamMapper ParameterMapper implementation for mapping input parameters.
+		 * May not be <code>null</code>.
 		 */
-		private CallableStatementCreatorImpl(final Map inParams) {
-			this.inParameters = inParams;
-			this.inParameterMapper = null;
-		}
-
-		/**
-		 * @param inParamMapper ParameterMapper implementation for mapping input parameters. May not be null
-		 */
-		private CallableStatementCreatorImpl(final ParameterMapper inParamMapper) {
-			this.inParameters = null;
+		public CallableStatementCreatorImpl(ParameterMapper inParamMapper) {
 			this.inParameterMapper = inParamMapper;
 		}
 
+		/**
+		 * Create a new CallableStatementCreatorImpl.
+		 * @param inParams list of SqlParameter objects. May not be <code>null</code>.
+		 */
+		public CallableStatementCreatorImpl(Map inParams) {
+			this.inParameters = inParams;
+		}
+
 		public CallableStatement createCallableStatement(Connection con) throws SQLException {
-			/* If we were given a ParameterMapper - we must let the mapper do its thing to create the Map */
-			if (inParameterMapper != null) {
-				inParameters = inParameterMapper.createMap(con);
+			// If we were given a ParameterMapper - we must let the mapper do its thing to create the Map.
+			if (this.inParameterMapper != null) {
+				this.inParameters = this.inParameterMapper.createMap(con);
 			}
 			else {
-				if (inParameters == null) {
-					throw new InvalidDataAccessApiUsageException("A ParameterMapper or a Map of parameters must be provided");
+				if (this.inParameters == null) {
+					throw new InvalidDataAccessApiUsageException(
+							"A ParameterMapper or a Map of parameters must be provided");
 				}
 			}
 
@@ -151,46 +170,44 @@ public class CallableStatementCreatorFactory {
 			}
 			else {
 				cs = con.prepareCall(callString, resultSetType,
-														 updatableResults ? ResultSet.CONCUR_UPDATABLE : ResultSet.CONCUR_READ_ONLY);
+						updatableResults ? ResultSet.CONCUR_UPDATABLE : ResultSet.CONCUR_READ_ONLY);
+			}
+
+			// Determine CallabeStatement to pass to custom types.
+			CallableStatement csToUse = cs;
+			if (nativeJdbcExtractor != null) {
+				csToUse = nativeJdbcExtractor.getNativeCallableStatement(cs);
 			}
 
 			int sqlColIndx = 1;
 			for (int i = 0; i < declaredParameters.size(); i++) {
-				SqlParameter p = (SqlParameter) CallableStatementCreatorFactory.this.declaredParameters.get(i);
-				if (!inParameters.containsKey(p.getName()) && !(p instanceof SqlOutParameter) && !(p instanceof SqlReturnResultSet)) {
-					throw new InvalidDataAccessApiUsageException("Required input parameter '" + p.getName() + "' is missing");
+				SqlParameter declaredParameter = (SqlParameter) declaredParameters.get(i);
+				if (!this.inParameters.containsKey(declaredParameter.getName()) &&
+						!(declaredParameter instanceof ResultSetSupportingSqlParameter)) {
+					throw new InvalidDataAccessApiUsageException(
+							"Required input parameter '" + declaredParameter.getName() + "' is missing");
 				}
-				// The value may still be null
-				Object in = inParameters.get(p.getName());
-				if (!(p instanceof SqlOutParameter) && !(p instanceof SqlReturnResultSet)) {
-					// Input parameters must be supplied
-					if (in == null && p.getTypeName() != null) {
-						cs.setNull(sqlColIndx, p.getSqlType(), p.getTypeName());
-					}
-					else
-						if (in != null) {
-							cs.setObject(sqlColIndx, in, p.getSqlType());
-						}
-						else {
-							cs.setNull(sqlColIndx, p.getSqlType());
-						}
+				// The value may still be null.
+				Object inValue = this.inParameters.get(declaredParameter.getName());
+				if (!(declaredParameter instanceof ResultSetSupportingSqlParameter)) {
+					StatementCreatorUtils.setParameterValue(csToUse, sqlColIndx, declaredParameter, inValue);
 				}
 				else {
-					// It's an output parameter. Skip SqlReturnResultSet parameters
+					// It's an output parameter: Skip SqlReturnResultSet parameters.
 					// It need not (but may be) supplied by the caller.
-					if (p instanceof SqlOutParameter) {
-						if (p.getTypeName() != null) {
-							cs.registerOutParameter(sqlColIndx, p.getSqlType(), p.getTypeName());
+					if (declaredParameter instanceof SqlOutParameter) {
+						if (declaredParameter.getTypeName() != null) {
+							cs.registerOutParameter(sqlColIndx, declaredParameter.getSqlType(), declaredParameter.getTypeName());
 						}
 						else {
-							cs.registerOutParameter(sqlColIndx, p.getSqlType());
+							cs.registerOutParameter(sqlColIndx, declaredParameter.getSqlType());
 						}
-						if (in != null) {
-							cs.setObject(sqlColIndx, in, p.getSqlType());
+						if (inValue != null) {
+							StatementCreatorUtils.setParameterValue(csToUse, sqlColIndx, declaredParameter, inValue);
 						}
 					}
 				}
-				if (!(p instanceof SqlReturnResultSet)) {
+				if (!(declaredParameter instanceof SqlReturnResultSet)) {
 					sqlColIndx++;
 				}
 			}
@@ -202,14 +219,15 @@ public class CallableStatementCreatorFactory {
 			return callString;
 		}
 
+		public void cleanupParameters() {
+			if (this.inParameters != null) {
+				StatementCreatorUtils.cleanupParameters(this.inParameters.values());
+			}
+		}
+
 		public String toString() {
 			StringBuffer buf = new StringBuffer("CallableStatementCreatorFactory.CallableStatementCreatorImpl: sql=[");
-			buf.append(callString);
-			buf.append("]: params=[");
-			if (inParameters != null) {
-				buf.append(inParameters.toString());
-			}
-			buf.append(']');
+			buf.append(callString).append("]; parameters=").append(this.inParameters);
 			return buf.toString();
 		}
 	}

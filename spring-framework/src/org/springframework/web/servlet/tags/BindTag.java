@@ -1,192 +1,181 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2005 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.tags;
 
 import java.beans.PropertyEditor;
-import java.util.List;
 
-import javax.servlet.jsp.JspException;
 import javax.servlet.jsp.JspTagException;
+import javax.servlet.jsp.PageContext;
 
-import org.springframework.context.NoSuchMessageException;
-import org.springframework.validation.BindException;
 import org.springframework.validation.Errors;
-import org.springframework.validation.ObjectError;
+import org.springframework.web.servlet.support.BindStatus;
 import org.springframework.web.util.ExpressionEvaluationUtils;
-import org.springframework.web.util.HtmlUtils;
 
 /**
  * <p>Bind tag, supporting evaluation of binding errors for a certain
- * bean or bean property. Exports a "status" variable of type BindStatus</p>
+ * bean or bean property. Exports a "status" variable of type BindStatus,
+ * both to Java expressions and JSP EL expressions.
  *
- * <p>The errors object that has been bound using this tag is exposed, as well
- * as the property that this errors object applies to. Children tags can
- * use the exposed properties
+ * <p>Can be used to bind to any bean or bean property in the model.
+ * The specified path determines whether the tag exposes the status of the
+ * bean itself (showing object-level errors), a specific bean property
+ * (showing field errors), or a matching set of bean properties (showing
+ * all corresponding field errors).
  *
- * <p>Discussed in Chapter 12 of
- * <a href="http://www.amazon.com/exec/obidos/tg/detail/-/0764543857/">Expert One-On-One J2EE Design and Development</a>
- * by Rod Johnson.
+ * <p>The Errors object that has been bound using this tag is exposed,
+ * as well as the bean property that this errors object applies to.
+ * Nested tags like the transform tag can access those exposed properties.
  *
  * @author Rod Johnson
  * @author Juergen Hoeller
+ * @see #setPath
+ * @see #getErrors
+ * @see #getProperty
+ * @see TransformTag
  */
-public class BindTag extends RequestContextAwareTag {
+public class BindTag extends HtmlEscapingAwareTag {
 
+	/**
+	 * Name of the exposed variable within the scope of this tag: "status".
+	 */
 	public static final String STATUS_VARIABLE_NAME = "status";
+
 
 	private String path;
 
-	private String property;
+	private boolean ignoreNestedPath = false;
 
-	private Errors errors;
+	private BindStatus status;
 
-	private PropertyEditor editor;
+	private Object previousStatus;
+
 
 	/**
-	 * Set the path that this tag should apply.
-	 * Can be a bean (e.g. "person"), or a bean property
-	 * (e.g. "person.name"), also supporting nested beans.
+	 * Set the path that this tag should apply. Can be a bean (e.g. "person")
+	 * to get global errors, or a bean property (e.g. "person.name") to get
+	 * field errors (also supporting nested fields and "person.na*" mappings).
+	 * "person.*" will return all errors for the specified bean, both global
+	 * and field errors.
+	 * @see org.springframework.validation.Errors#getGlobalErrors
+	 * @see org.springframework.validation.Errors#getFieldErrors
 	 */
-	public void setPath(String path) throws JspException {
+	public void setPath(String path) {
 		this.path = path;
 	}
 
 	/**
-	 * Retrieve the path that this tag should apply to
-	 * @return the path that this tag should apply to or <code>null</code>
-	 * if it is not set
-	 * @see #setPath(String)
+	 * Return the path that this tag applies to.
 	 */
 	public String getPath() {
 		return path;
 	}
 
 	/**
-	 * Retrieve the Errors instance that this tag is currently bound to.
-	 * Intended for cooperating nesting tags.
-	 * @return an instance of Errors
+	 * Set whether to ignore a nested path, if any.
+	 * Default is to not ignore.
 	 */
-	public Errors getErrors() {
-		return errors;
+	public void setIgnoreNestedPath(boolean ignoreNestedPath) {
+	  this.ignoreNestedPath = ignoreNestedPath;
 	}
 
 	/**
-	 * Retrieve the property that this tag is currently bound to,
-	 * or null if bound to an object rather than a specific property.
-	 * Intended for cooperating nesting tags.
+	 * Return whether to ignore a nested path, if any.
 	 */
-	public String getProperty() {
-		return property;
+	public boolean isIgnoreNestedPath() {
+	  return ignoreNestedPath;
 	}
 
-	/**
-	 * Retrieve the property editor for the property that this tag is
-	 * currently bound to. Intended for cooperating nesting tags.
-	 * @return the property editor, or null if none applicable
-	 */
-	public PropertyEditor getEditor() {
-		return editor;
-	}
 
-	protected int doStartTagInternal() throws Exception {
-		String resolvedPath = ExpressionEvaluationUtils.evaluateString("path", this.path, pageContext);
+	protected final int doStartTagInternal() throws Exception {
+		String resolvedPath = ExpressionEvaluationUtils.evaluateString("path", getPath(), pageContext);
 
-		// determine name of the object and property
-		String name = null;
-		this.property = null;
-
-		int dotPos = resolvedPath.indexOf('.');
-		if (dotPos == -1) {
-			// property not set, only the object itself
-			name = resolvedPath;
-		}
-		else {
-			name = resolvedPath.substring(0, dotPos);
-			this.property = resolvedPath.substring(dotPos + 1);
-		}
-
-		// retrieve Errors object
-		this.errors = getRequestContext().getErrors(name, false);
-		if (this.errors == null) {
-			throw new JspTagException("Could not find Errors instance for bean '" + name + "' in request: " +
-			                          "add the Errors model to your ModelAndView via errors.getModel()");
-		}
-
-		List fes = null;
-		Object value = null;
-
-		if (this.property != null) {
-			if ("*".equals(this.property)) {
-				fes = this.errors.getAllErrors();
-			}
-			else {
-				fes = this.errors.getFieldErrors(this.property);
-				value = this.errors.getFieldValue(this.property);
-				if (this.errors instanceof BindException) {
-					this.editor = ((BindException) this.errors).getCustomEditor(this.property);
-				}
-				else {
-					logger.warn("Cannot not expose custom property editor because Errors instance [" + this.errors +
-											"] is not of type BindException");
-				}
-				if (isHtmlEscape() && value instanceof String) {
-					value = HtmlUtils.htmlEscape((String)value);
-				}
+		if (!isIgnoreNestedPath()) {
+			String nestedPath = (String) pageContext.getAttribute(
+					NestedPathTag.NESTED_PATH_VARIABLE_NAME, PageContext.REQUEST_SCOPE);
+			if (nestedPath != null) {
+				resolvedPath = nestedPath + resolvedPath;
 			}
 		}
-		else {
-			fes = this.errors.getGlobalErrors();
+
+		try {
+			this.status = new BindStatus(getRequestContext(), resolvedPath, isHtmlEscape());
+		}
+		catch (IllegalStateException ex) {
+			throw new JspTagException(ex.getMessage());
 		}
 
-		// instantiate the status object
-		BindStatus status = new BindStatus(this.property, value, getErrorCodes(fes), getErrorMessages(fes));
-		this.pageContext.setAttribute(STATUS_VARIABLE_NAME, status);
+		// Save previous status value, for re-exposure at the end of this tag.
+		this.previousStatus = pageContext.getAttribute(STATUS_VARIABLE_NAME);
+
+		// Expose this tag's status object as PageContext attribute,
+		// making it available for JSP EL.
+		pageContext.setAttribute(STATUS_VARIABLE_NAME, this.status);
+
 		return EVAL_BODY_INCLUDE;
 	}
 
-	/**
-	 * Extract the error codes from the given ObjectError list.
-	 */
-	private String[] getErrorCodes(List fes) {
-		String[] codes = new String[fes.size()];
-		for (int i = 0; i < fes.size(); i++) {
-			ObjectError error = (ObjectError) fes.get(i);
-			codes[i] = error.getCode();
+	public int doEndTag() {
+		if (this.previousStatus != null) {
+			// Reset previous status value.
+			pageContext.setAttribute(STATUS_VARIABLE_NAME, this.previousStatus);
 		}
-		return codes;
+		else {
+			// Remove exposed status value.
+			pageContext.removeAttribute(STATUS_VARIABLE_NAME);
+		}
+
+		return EVAL_PAGE;
+	}
+
+
+	/**
+	 * Retrieve the property that this tag is currently bound to,
+	 * or <code>null</code> if bound to an object rather than a specific property.
+	 * Intended for cooperating nesting tags.
+	 * @return the property that this tag is currently bound to,
+	 * or <code>null</code> if none
+	 */
+	public final String getProperty() {
+		return this.status.getExpression();
 	}
 
 	/**
-	 * Extract the error messages from the given ObjectError list.
+	 * Retrieve the Errors instance that this tag is currently bound to.
+	 * Intended for cooperating nesting tags.
+	 * @return the current Errors instance, or <code>null</code> if none
 	 */
-	private String[] getErrorMessages(List fes) throws NoSuchMessageException, JspException {
-		String[] messages = new String[fes.size()];
-		for (int i = 0; i < fes.size(); i++) {
-			ObjectError error = (ObjectError) fes.get(i);
-			messages[i] = getRequestContext().getMessage(error, isHtmlEscape());
-		}
-		return messages;
+	public final Errors getErrors() {
+		return this.status.getErrors();
 	}
 
-	public void release() {
-		super.release();
-		this.path = null;
-		this.errors = null;
-		this.property = null;
+	/**
+	 * Retrieve the PropertyEditor for the property that this tag is
+	 * currently bound to. Intended for cooperating nesting tags.
+	 * @return the current PropertyEditor, or <code>null</code> if none
+	 */
+	public final PropertyEditor getEditor() {
+		return this.status.getEditor();
+	}
+
+
+	public void doFinally() {
+		super.doFinally();
+		this.status = null;
+		this.previousStatus = null;
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.support;
 
@@ -69,7 +69,6 @@ import org.springframework.beans.BeanUtils;
  * @since 24.05.2003
  * @see org.springframework.beans.support.PagedListSourceProvider
  * @see org.springframework.beans.propertyeditors.LocaleEditor
- * @version $Id: RefreshablePagedListHolder.java,v 1.2 2004/03/18 02:46:10 trisberg Exp $
  */
 public class RefreshablePagedListHolder extends PagedListHolder {
 
@@ -121,7 +120,7 @@ public class RefreshablePagedListHolder extends PagedListHolder {
 	 * Set the Locale that the source provider should use for loading the list.
 	 * This can either be populated programmatically (e.g. with the request locale),
 	 * or via binding (using Locale's toString syntax, e.g. "locale=en_US").
-	 * @param locale the current Locale, or null
+	 * @param locale the current Locale, or <code>null</code>
 	 */
 	public void setLocale(Locale locale) {
 		this.locale = locale;
@@ -129,7 +128,7 @@ public class RefreshablePagedListHolder extends PagedListHolder {
 
 	/**
 	 * Return the Locale that the source provider should use for loading the list.
-	 * @return the current Locale, or null
+	 * @return the current Locale, or <code>null</code>
 	 */
 	public Locale getLocale() {
 		return locale;
@@ -138,7 +137,7 @@ public class RefreshablePagedListHolder extends PagedListHolder {
 	/**
 	 * Set the filter object that the source provider should use for loading the list.
 	 * This will typically be a bean, for easy data binding.
-	 * @param filter the filter object, or null
+	 * @param filter the filter object, or <code>null</code>
 	 */
 	public void setFilter(Object filter) {
 		this.filter = filter;
@@ -146,7 +145,7 @@ public class RefreshablePagedListHolder extends PagedListHolder {
 
 	/**
 	 * Return the filter that the source provider should use for loading the list.
-	 * @return the current filter, or null
+	 * @return the current filter, or <code>null</code>
 	 */
 	public Object getFilter() {
 		return filter;

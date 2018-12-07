@@ -1,18 +1,18 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.context.support;
 
@@ -42,6 +42,7 @@ import org.springframework.context.ApplicationContextException;
  *
  * @author Rod Johnson
  * @author Juergen Hoeller
+ * @see org.springframework.web.context.support.WebApplicationObjectSupport
  */
 public abstract class ApplicationObjectSupport implements ApplicationContextAware {
 	
@@ -54,42 +55,49 @@ public abstract class ApplicationObjectSupport implements ApplicationContextAwar
 	/** MessageSourceAccessor for easy message access */
 	private MessageSourceAccessor messageSourceAccessor;
 
-	/**
-	 * Constructor for bean usage via subclassing.
-	 */
-	public ApplicationObjectSupport() {
-	}
-
-	/**
-	 * Constructor for usage as helper to delegate to.
-	 * @param context ApplicationContext object to be used by this object
-	 */
-	public ApplicationObjectSupport(ApplicationContext context) {
-		this.applicationContext = context;
-	}
 
 	public final void setApplicationContext(ApplicationContext context) throws BeansException {
-		if (this.applicationContext == null) {
+		if (context == null && !isContextRequired()) {
+			// Reset internal context state.
+			this.applicationContext = null;
+			this.messageSourceAccessor = null;
+		}
+		else if (this.applicationContext == null) {
+			// Initialize with passed-in context.
 			if (!requiredContextClass().isInstance(context)) {
-				throw new ApplicationContextException("Invalid application context: needs to be of type '" +
-				                                      requiredContextClass().getName() + "'");
+				throw new ApplicationContextException(
+						"Invalid application context: needs to be of type [" + requiredContextClass().getName() + "]");
 			}
 			this.applicationContext = context;
 			this.messageSourceAccessor = new MessageSourceAccessor(context);
 			initApplicationContext();
 		}
 		else {
-			// ignore reinitialization if same context passed in
+			// Ignore reinitialization if same context passed in.
 			if (this.applicationContext != context) {
-				throw new ApplicationContextException("Cannot reinitialize with different application context");
+				throw new ApplicationContextException(
+						"Cannot reinitialize with different application context: current one is [" +
+						this.applicationContext + "], passed-in one is [" + context + "]");
 			}
 		}
 	}
-	
+
+	/**
+	 * Determine whether this application object needs to run in an ApplicationContext.
+	 * <p>Default is "false". Can be overridden to enforce running in a context
+	 * (i.e. to throw IllegalStateException on accessors if outside a context).
+	 * @see #getApplicationContext
+	 * @see #getMessageSourceAccessor
+	 */
+	protected boolean isContextRequired() {
+		return false;
+	}
+
 	/**
 	 * Determine the context class that any context passed to
-	 * setApplicationContext must be an instance of.
+	 * <code>setApplicationContext</code> must be an instance of.
 	 * Can be overridden in subclasses.
+	 * @see #setApplicationContext
 	 */
 	protected Class requiredContextClass() {
 		return ApplicationContext.class;
@@ -97,26 +105,38 @@ public abstract class ApplicationObjectSupport implements ApplicationContextAwar
 
 	/**
 	 * Subclasses can override this for custom initialization behavior.
-	 * Gets called by setApplicationContext() after setting the context instance.
-	 * <p>Note: Does </i>not</i> get called on reinitialization of the context.
+	 * Gets called by <code>setApplicationContext</code> after setting the context instance.
+	 * <p>Note: Does </i>not</i> get called on reinitialization of the context
+	 * but rather just on first initialization of this object's context reference.
 	 * @throws ApplicationContextException in case of initialization errors
-	 * @throws BeansException if thrown by application context methods
+	 * @throws BeansException if thrown by ApplicationContext methods
+	 * @see #setApplicationContext
 	 */
 	protected void initApplicationContext() throws BeansException {
 	}
 
+
 	/**
 	 * Return the ApplicationContext instance used by this object.
 	 */
-	public final ApplicationContext getApplicationContext() {
+	public final ApplicationContext getApplicationContext() throws IllegalStateException {
+		if (this.applicationContext == null && isContextRequired()) {
+			throw new IllegalStateException(
+					"ApplicationObjectSupport instance [" + this + "] does not run in an ApplicationContext");
+		}
 		return applicationContext;
 	}
 
 	/**
 	 * Return a MessageSourceAccessor for the application context
 	 * used by this object, for easy message access.
+	 * @throws IllegalStateException if not running in an ApplicationContext
 	 */
-	protected final MessageSourceAccessor getMessageSourceAccessor() {
+	protected final MessageSourceAccessor getMessageSourceAccessor() throws IllegalStateException {
+		if (this.messageSourceAccessor == null && isContextRequired()) {
+			throw new IllegalStateException(
+					"ApplicationObjectSupport instance [" + this + "] does not run in an ApplicationContext");
+		}
 		return this.messageSourceAccessor;
 	}
 

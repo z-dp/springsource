@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.handler.metadata;
 
@@ -21,17 +21,14 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.ITestBean;
 import org.springframework.web.servlet.ModelAndView;
-import org.springframework.web.servlet.mvc.AbstractController;
-
+import org.springframework.web.servlet.mvc.Controller;
 
 /**
- * 
  * @author Rod Johnson
- * @version $Id: ConstructorController.java,v 1.2 2004/03/18 03:01:39 trisberg Exp $
  * 
  * @@PathMap("/constructor.cgi")
  */
-public class ConstructorController extends AbstractController {
+public class ConstructorController implements Controller {
 	
 	public ITestBean testBean;
 
@@ -39,10 +36,7 @@ public class ConstructorController extends AbstractController {
 		this.testBean = testBean;
 	}
 
-	/**
-	 * @see org.springframework.web.servlet.mvc.AbstractController#handleRequestInternal(javax.servlet.http.HttpServletRequest, javax.servlet.http.HttpServletResponse)
-	 */
-	protected ModelAndView handleRequestInternal(HttpServletRequest arg0, HttpServletResponse arg1) throws Exception {
+	public ModelAndView handleRequest(HttpServletRequest request, HttpServletResponse response) throws Exception {
 		return new ModelAndView("test");
 	}
 

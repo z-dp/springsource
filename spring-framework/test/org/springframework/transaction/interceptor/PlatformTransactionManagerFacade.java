@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.transaction.interceptor;
 
@@ -22,37 +22,29 @@ import org.springframework.transaction.TransactionStatus;
 
 /**
  * Used for testing only (for example, when we must replace the
- * behaviour of a PlatformTransactionManager bean we don't have access to).
- * Allows behaviour of an entire class to change with static delegate change.
- * Not multithreaded.
+ * behavior of a PlatformTransactionManager bean we don't have access to).
+ *
+ * <p>Allows behavior of an entire class to change with static delegate change.
+ * Not multi-threaded.
+ *
  * @author Rod Johnson
- * @since 26-Apr-2003
- * @version $Revision: 1.2 $
+ * @since 26.04.2003
  */
 public class PlatformTransactionManagerFacade implements PlatformTransactionManager {
 	
 	/**
-	 * This member can be changed to change behaviour class-wide.
+	 * This member can be changed to change behavior class-wide.
 	 */
 	public static PlatformTransactionManager delegate;
 
-	/**
-	 * @see org.springframework.transaction.PlatformTransactionManager#getTransaction(org.springframework.transaction.TransactionDefinition)
-	 */
 	public TransactionStatus getTransaction(TransactionDefinition definition) {
 		return delegate.getTransaction(definition);
 	}
 
-	/**
-	 * @see org.springframework.transaction.PlatformTransactionManager#commit(org.springframework.transaction.TransactionStatus)
-	 */
 	public void commit(TransactionStatus status) {
 		delegate.commit(status);
 	}
 
-	/**
-	 * @see org.springframework.transaction.PlatformTransactionManager#rollback(org.springframework.transaction.TransactionStatus)
-	 */
 	public void rollback(TransactionStatus status) {
 		delegate.rollback(status);
 	}

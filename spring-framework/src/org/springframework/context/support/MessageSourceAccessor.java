@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.context.support;
 
@@ -21,6 +21,7 @@ import java.util.Locale;
 import org.springframework.context.MessageSource;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.context.NoSuchMessageException;
+import org.springframework.context.i18n.LocaleContextHolder;
 
 /**
  * Helper class for easy access to messages from a MessageSource,
@@ -40,13 +41,14 @@ public class MessageSourceAccessor {
 	private final Locale defaultLocale;
 
 	/**
-	 * Create a new MessageSourceAccessor, using the system Locale
-	 * as default Locale.
+	 * Create a new MessageSourceAccessor, using LocaleContextHolder's locale
+	 * as default locale.
 	 * @param messageSource the MessageSource to wrap
+	 * @see org.springframework.context.i18n.LocaleContextHolder#getLocale()
 	 */
 	public MessageSourceAccessor(MessageSource messageSource) {
 		this.messageSource = messageSource;
-		this.defaultLocale = Locale.getDefault();
+		this.defaultLocale = null;
 	}
 
 	/**
@@ -60,13 +62,25 @@ public class MessageSourceAccessor {
 	}
 
 	/**
+	 * Return the default locale to use if no explicit locale has been given.
+	 * <p>The default implementation returns the default locale passed into the
+	 * corresponding constructor, or LocaleContextHolder's locale as fallback.
+	 * Can be overridden in subclasses.
+	 * @see #MessageSourceAccessor(org.springframework.context.MessageSource, java.util.Locale)
+	 * @see org.springframework.context.i18n.LocaleContextHolder#getLocale()
+	 */
+	protected Locale getDefaultLocale() {
+		return (this.defaultLocale != null ? this.defaultLocale : LocaleContextHolder.getLocale());
+	}
+
+	/**
 	 * Retrieve the message for the given code and the default Locale.
 	 * @param code code of the message
 	 * @param defaultMessage String to return if the lookup fails
 	 * @return the message
 	 */
 	public String getMessage(String code, String defaultMessage) {
-		return this.messageSource.getMessage(code, null, defaultMessage, this.defaultLocale);
+		return this.messageSource.getMessage(code, null, defaultMessage, getDefaultLocale());
 	}
 
 	/**
@@ -83,18 +97,18 @@ public class MessageSourceAccessor {
 	/**
 	 * Retrieve the message for the given code and the default Locale.
 	 * @param code code of the message
-	 * @param args arguments for the message, or null if none
+	 * @param args arguments for the message, or <code>null</code> if none
 	 * @param defaultMessage String to return if the lookup fails
 	 * @return the message
 	 */
 	public String getMessage(String code, Object[] args, String defaultMessage) {
-		return this.messageSource.getMessage(code, args, defaultMessage, this.defaultLocale);
+		return this.messageSource.getMessage(code, args, defaultMessage, getDefaultLocale());
 	}
 
 	/**
 	 * Retrieve the message for the given code and the given Locale.
 	 * @param code code of the message
-	 * @param args arguments for the message, or null if none
+	 * @param args arguments for the message, or <code>null</code> if none
 	 * @param defaultMessage String to return if the lookup fails
 	 * @param locale Locale in which to do lookup
 	 * @return the message
@@ -110,7 +124,7 @@ public class MessageSourceAccessor {
 	 * @throws org.springframework.context.NoSuchMessageException if not found
 	 */
 	public String getMessage(String code) throws NoSuchMessageException {
-		return this.messageSource.getMessage(code, null, this.defaultLocale);
+		return this.messageSource.getMessage(code, null, getDefaultLocale());
 	}
 
 	/**
@@ -127,18 +141,18 @@ public class MessageSourceAccessor {
 	/**
 	 * Retrieve the message for the given code and the default Locale.
 	 * @param code code of the message
-	 * @param args arguments for the message, or null if none
+	 * @param args arguments for the message, or <code>null</code> if none
 	 * @return the message
 	 * @throws org.springframework.context.NoSuchMessageException if not found
 	 */
 	public String getMessage(String code, Object[] args) throws NoSuchMessageException {
-		return this.messageSource.getMessage(code, args, this.defaultLocale);
+		return this.messageSource.getMessage(code, args, getDefaultLocale());
 	}
 
 	/**
 	 * Retrieve the message for the given code and the given Locale.
 	 * @param code code of the message
-	 * @param args arguments for the message, or null if none
+	 * @param args arguments for the message, or <code>null</code> if none
 	 * @param locale Locale in which to do lookup
 	 * @return the message
 	 * @throws org.springframework.context.NoSuchMessageException if not found
@@ -155,7 +169,7 @@ public class MessageSourceAccessor {
 	 * @throws org.springframework.context.NoSuchMessageException if not found
 	 */
 	public String getMessage(MessageSourceResolvable resolvable) throws NoSuchMessageException {
-		return this.messageSource.getMessage(resolvable, this.defaultLocale);
+		return this.messageSource.getMessage(resolvable, getDefaultLocale());
 	}
 
 	/**

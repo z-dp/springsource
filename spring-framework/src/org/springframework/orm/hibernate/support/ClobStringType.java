@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.hibernate.support;
 
@@ -21,14 +21,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 
-import net.sf.hibernate.UserType;
-import net.sf.hibernate.util.EqualsHelper;
+import javax.transaction.TransactionManager;
 
 import org.springframework.jdbc.support.lob.LobCreator;
 import org.springframework.jdbc.support.lob.LobHandler;
-import org.springframework.orm.hibernate.LocalSessionFactoryBean;
-import org.springframework.transaction.support.TransactionSynchronizationAdapter;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Hibernate UserType implementation for Strings that get mapped to CLOBs.
@@ -38,21 +34,32 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * Oracle database (only possible via CLOBs), in combination with OracleLobHandler.
  *
  * <p>Can also be defined in generic Hibernate mappings, as DefaultLobCreator will
- * work with most JDBC-compliant databases respectively drivers. In this case,
- * the field type does not have to be CLOB: For databases like MySQL and MS SQL
- * Server, any large enough text type will work.
+ * work with most JDBC-compliant database drivers. In this case, the field type
+ * does not have to be BLOB: For databases like MySQL and MS SQL Server, any
+ * large enough binary type will work.
  *
  * @author Juergen Hoeller
  * @since 12.01.2004
  * @see org.springframework.orm.hibernate.LocalSessionFactoryBean#setLobHandler
- * @see org.springframework.jdbc.support.lob.LobHandler
  */
-public class ClobStringType implements UserType {
+public class ClobStringType extends AbstractLobType {
 
-	protected final LobHandler lobHandler;
-
+	/**
+	 * Constructor used by Hibernate: fetches config-time LobHandler and
+	 * config-time JTA TransactionManager from LocalSessionFactoryBean.
+	 * @see org.springframework.orm.hibernate.LocalSessionFactoryBean#getConfigTimeLobHandler
+	 * @see org.springframework.orm.hibernate.LocalSessionFactoryBean#getConfigTimeTransactionManager
+	 */
 	public ClobStringType() {
-		this.lobHandler = LocalSessionFactoryBean.getConfigTimeLobHandler();
+		super();
+	}
+
+	/**
+	 * Constructor used for testing: takes an explicit LobHandler
+	 * and an explicit JTA TransactionManager (can be <code>null</code>).
+	 */
+	protected ClobStringType(LobHandler lobHandler, TransactionManager jtaTransactionManager) {
+		super(lobHandler, jtaTransactionManager);
 	}
 
 	public int[] sqlTypes() {
@@ -63,56 +70,14 @@ public class ClobStringType implements UserType {
 		return String.class;
 	}
 
-	public boolean equals(Object x, Object y) {
-		return EqualsHelper.equals(x, y);
+	protected Object nullSafeGetInternal(ResultSet rs, int index, LobHandler lobHandler)
+			throws SQLException {
+		return lobHandler.getClobAsString(rs, index);
 	}
 
-	public Object nullSafeGet(ResultSet rs, String[] names, Object owner) throws SQLException {
-		if (this.lobHandler == null) {
-			throw new IllegalStateException("No LobHandler found for configuration - " +
-																			"lobHandler property must be set on LocalSessionFactoryBean");
-		}
-		return this.lobHandler.getClobAsString(rs, rs.findColumn(names[0]));
-	}
-
-	public void nullSafeSet(PreparedStatement st, Object value, int index) throws SQLException {
-		if (this.lobHandler == null) {
-			throw new IllegalStateException("No LobHandler found for configuration - " +
-																			"lobHandler property must be set on LocalSessionFactoryBean");
-		}
-		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-			throw new IllegalStateException("ClobStringType requires active transaction synchronization");
-		}
-		LobCreator lobCreator = this.lobHandler.getLobCreator();
-		lobCreator.setClobAsString(st, index, (String) value);
-		TransactionSynchronizationManager.registerSynchronization(new LobCreatorSynchronization(lobCreator));
-	}
-
-	public Object deepCopy(Object value) {
-		return value;
-	}
-
-	public boolean isMutable() {
-		return false;
-	}
-
-
-	/**
-	 * Callback for resource cleanup at the end of a transaction.
-	 * Invokes LobCreator.close to clean up temporary LOBs that might have been created.
-	 * @see org.springframework.jdbc.support.lob.LobCreator#close
-	 */
-	private static class LobCreatorSynchronization extends TransactionSynchronizationAdapter {
-
-		private final LobCreator lobCreator;
-
-		private LobCreatorSynchronization(LobCreator lobCreator) {
-			this.lobCreator = lobCreator;
-		}
-
-		public void beforeCompletion() {
-			this.lobCreator.close();
-		}
+	protected void nullSafeSetInternal(PreparedStatement ps, int index, Object value, LobCreator lobCreator)
+			throws SQLException {
+		lobCreator.setClobAsString(ps, index, (String) value);
 	}
 
 }

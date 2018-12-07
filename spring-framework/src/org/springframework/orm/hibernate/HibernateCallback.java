@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.orm.hibernate;
 
@@ -43,9 +43,9 @@ import net.sf.hibernate.Session;
 public interface HibernateCallback {
 
 	/**
-	 * Gets called by HibernateTemplate.execute with an active Hibernate Session.
-	 * Does not need to care about activating or closing the Session,
-	 * or handling transactions.
+	 * Gets called by <code>HibernateTemplate.execute</code> with an active
+	 * Hibernate Session. Does not need to care about activating or closing
+	 * the Session, or handling transactions.
 	 *
 	 * <p>If called without a thread-bound Hibernate transaction (initiated
 	 * by HibernateTransactionManager), the code will simply get executed on the
@@ -60,7 +60,7 @@ public interface HibernateCallback {
 	 * propagated to the caller of the template.
 	 *
 	 * @param session active Hibernate session
-	 * @return a result object, or null if none
+	 * @return a result object, or <code>null</code> if none
 	 * @throws HibernateException in case of Hibernate errors
 	 * @throws SQLException in case of errors on direct JDBC access
 	 * @see HibernateTemplate#execute

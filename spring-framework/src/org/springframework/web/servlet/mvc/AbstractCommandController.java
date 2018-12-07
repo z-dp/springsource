@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet.mvc;
 
@@ -34,7 +34,7 @@ import org.springframework.web.servlet.ModelAndView;
  * AbstractFormController} and its corresponding implementations.</p>
  *
  * <p><b><a name="config">Exposed configuration properties</a>
- * (<a href="AbstractController.html#config">and those defined by superclass</a>):</b><br>
+ * (<a href="BaseCommandController.html#config">and those defined by superclass</a>):</b><br>
  * <i>none</i> (so only those available in superclass).</p>
  *
  * <p><b><a name="workflow">Workflow
@@ -71,9 +71,11 @@ public abstract class AbstractCommandController extends BaseCommandController {
 		setCommandClass(commandClass);
 		setCommandName(commandName);
 	}
-	
-	protected final ModelAndView handleRequestInternal(HttpServletRequest request, HttpServletResponse response)
+
+
+	protected ModelAndView handleRequestInternal(HttpServletRequest request, HttpServletResponse response)
 			throws Exception {
+
 		Object command = getCommand(request);
 		ServletRequestDataBinder binder = bindAndValidate(request, command);
 		return handle(request, response, command, binder.getErrors());
@@ -82,16 +84,19 @@ public abstract class AbstractCommandController extends BaseCommandController {
 	/**
 	 * Template method for request handling, providing a populated and validated instance
 	 * of the command class, and an Errors object containing binding and validation errors.
-	 * <p>Can invoke <code>errors.getModel()</code> to populate the ModelAndView model
-	 * with the command and the Errors instance, under the specified command name.
+	 * <p>Call <code>errors.getModel()</code> to populate the ModelAndView model
+	 * with the command and the Errors instance, under the specified command name,
+	 * as expected by the "spring:bind" tag.
 	 * @param request current HTTP request
 	 * @param response current HTTP response
 	 * @param command the populated command object
 	 * @param errors validation errors holder
-	 * @return a ModelAndView to render, or null if handled directly
+	 * @return a ModelAndView to render, or <code>null</code> if handled directly
 	 * @see org.springframework.validation.Errors
+	 * @see org.springframework.validation.BindException#getModel
 	 */
-	protected abstract ModelAndView handle(HttpServletRequest request, HttpServletResponse response,
-	                                       Object command, BindException errors) throws Exception;
+	protected abstract ModelAndView handle(
+			HttpServletRequest request, HttpServletResponse response, Object command, BindException errors)
+			throws Exception;
 
 }

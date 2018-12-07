@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.mail;
 
@@ -20,15 +20,24 @@ import org.springframework.core.NestedRuntimeException;
 
 /**
  * Base class for all mail exceptions.
+ *
  * @author Dmitriy Kopylenko
- * @version $Id: MailException.java,v 1.5 2004/03/18 02:46:05 trisberg Exp $
  */
 public abstract class MailException extends NestedRuntimeException {
 
+	/**
+	 * Constructor for MailException.
+	 * @param msg the detail message
+	 */
 	public MailException(String msg) {
 		super(msg);
 	}
 
+	/**
+	 * Constructor for MailException.
+	 * @param msg the detail message
+	 * @param ex root cause from remoting API in use
+	 */
 	public MailException(String msg, Throwable ex) {
 		super(msg, ex);
 	}

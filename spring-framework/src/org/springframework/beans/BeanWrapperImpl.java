@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2007 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,288 +20,337 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyDescriptor;
 import java.beans.PropertyEditor;
 import java.beans.PropertyEditorManager;
-import java.io.File;
 import java.lang.reflect.Array;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.net.URL;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import org.springframework.beans.propertyeditors.ClassEditor;
-import org.springframework.beans.propertyeditors.FileEditor;
-import org.springframework.beans.propertyeditors.LocaleEditor;
-import org.springframework.beans.propertyeditors.PropertiesEditor;
-import org.springframework.beans.propertyeditors.StringArrayPropertyEditor;
-import org.springframework.beans.propertyeditors.URLEditor;
+import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 /**
- * Default implementation of the BeanWrapper interface that should be sufficient
- * for all normal uses. Caches introspection results for efficiency.
+ * Default {@link BeanWrapper} implementation that should be sufficient
+ * for all typical use cases. Caches introspection results for efficiency.
  *
- * <p>Note: This class never tries to load a class by name, as this can pose
- * class loading problems in J2EE applications with multiple deployment modules.
- * The caller is responsible for loading a target class.
+ * <p>Note: Auto-registers default property editors from the
+ * <code>org.springframework.beans.propertyeditors</code> package, which apply
+ * in addition to the JDK's standard PropertyEditors. Applications can call
+ * the {@link #registerCustomEditor(Class, java.beans.PropertyEditor)} method
+ * to register an editor for a particular instance (i.e. they are not shared
+ * across the application). See the base class
+ * {@link PropertyEditorRegistrySupport} for details.
  *
- * <p>Note: Auto-registers all default property editors (not the custom ones)
- * in the org.springframework.beans.propertyeditors package.
- * Applications can either use a standard PropertyEditorManager to register a
- * custom editor before using a BeanWrapperImpl instance, or call the instance's
- * registerCustomEditor method to register an editor for the particular instance.
- *
- * <p>BeanWrapperImpl will convert List and array values to the corresponding
- * target arrays, if necessary. Custom property editors that deal with Lists or
- * arrays can be written against a comma delimited String as String arrays are
+ * <p><code>BeanWrapperImpl</code> will convert collection and array values
+ * to the corresponding target collections or arrays, if necessary. Custom
+ * property editors that deal with collections or arrays can either be
+ * written via PropertyEditor's <code>setValue</code>, or against a
+ * comma-delimited String via <code>setAsText</code>, as String arrays are
  * converted in such a format if the array itself is not assignable.
  *
  * @author Rod Johnson
  * @author Juergen Hoeller
- * @author Jean-Pierre Pawlak
+ * @author Rob Harrop
  * @since 15 April 2001
- * @version $Id: BeanWrapperImpl.java,v 1.33 2004/03/19 16:09:16 jhoeller Exp $
  * @see #registerCustomEditor
- * @see java.beans.PropertyEditorManager
- * @see org.springframework.beans.propertyeditors.ClassEditor
- * @see org.springframework.beans.propertyeditors.FileEditor
- * @see org.springframework.beans.propertyeditors.LocaleEditor
- * @see org.springframework.beans.propertyeditors.PropertiesEditor
- * @see org.springframework.beans.propertyeditors.StringArrayPropertyEditor
- * @see org.springframework.beans.propertyeditors.URLEditor
+ * @see #setPropertyValues
+ * @see #setPropertyValue
+ * @see #getPropertyValue
+ * @see #getPropertyType
+ * @see BeanWrapper
+ * @see PropertyEditorRegistrySupport
  */
-public class BeanWrapperImpl implements BeanWrapper {
+public class BeanWrapperImpl extends PropertyEditorRegistrySupport implements BeanWrapper {
 
-	/** We'll create a lot of these objects, so we don't want a new logger every time */
+	/**
+	 * We'll create a lot of these objects, so we don't want a new logger every time
+	 */
 	private static final Log logger = LogFactory.getLog(BeanWrapperImpl.class);
 
-	/** Registry for default PropertyEditors */
-	private static final Map defaultEditors = new HashMap();
-
-	static {
-		// Register default editors in this class, for restricted environments.
-		// We're not using the JRE's PropertyEditorManager to avoid potential
-		// SecurityExceptions when running in a SecurityManager.
-		defaultEditors.put(Class.class, ClassEditor.class);
-		defaultEditors.put(File.class, FileEditor.class);
-		defaultEditors.put(Locale.class, LocaleEditor.class);
-		defaultEditors.put(Properties.class, PropertiesEditor.class);
-		defaultEditors.put(String[].class, StringArrayPropertyEditor.class);
-		defaultEditors.put(URL.class, URLEditor.class);
-	}
-
-
-	//---------------------------------------------------------------------
-	// Instance data
-	//---------------------------------------------------------------------
 
 	/** The wrapped object */
 	private Object object;
 
-	/** The nested path of the object */
 	private String nestedPath = "";
 
-	/* Map with cached nested BeanWrappers */
-	private Map nestedBeanWrappers;
+	private Object rootObject;
 
-	/** Map with custom PropertyEditor instances */
-	private Map customEditors;
+	private boolean extractOldValueForEditor = false;
 
 	/**
-	 * Cached introspections results for this object, to prevent encountering the cost
-	 * of JavaBeans introspection every time.
+	 * Cached introspections results for this object, to prevent encountering
+	 * the cost of JavaBeans introspection every time.
 	 */
 	private CachedIntrospectionResults cachedIntrospectionResults;
 
+	/**
+	 * Map with cached nested BeanWrappers: nested path -> BeanWrapper instance.
+	 */
+	private Map nestedBeanWrappers;
 
-	//---------------------------------------------------------------------
-	// Constructors
-	//---------------------------------------------------------------------
 
 	/**
 	 * Create new empty BeanWrapperImpl. Wrapped instance needs to be set afterwards.
+	 * Registers default editors.
 	 * @see #setWrappedInstance
 	 */
 	public BeanWrapperImpl() {
+		this(true);
+	}
+
+	/**
+	 * Create new empty BeanWrapperImpl. Wrapped instance needs to be set afterwards.
+	 * @param registerDefaultEditors whether to register default editors
+	 * (can be suppressed if the BeanWrapper won't need any type conversion)
+	 * @see #setWrappedInstance
+	 */
+	public BeanWrapperImpl(boolean registerDefaultEditors) {
+		if (registerDefaultEditors) {
+			registerDefaultEditors();
+		}
 	}
 
 	/**
 	 * Create new BeanWrapperImpl for the given object.
-	 * @param object object wrapped by this BeanWrapper.
-	 * @throws BeansException if the object cannot be wrapped by a BeanWrapper
+	 * @param object object wrapped by this BeanWrapper
 	 */
-	public BeanWrapperImpl(Object object) throws BeansException {
+	public BeanWrapperImpl(Object object) {
+		this();
 		setWrappedInstance(object);
-	}
-
-	/**
-	 * Create new BeanWrapperImpl for the given object,
-	 * registering a nested path that the object is in.
-	 * @param object object wrapped by this BeanWrapper.
-	 * @param nestedPath the nested path of the object
-	 * @throws BeansException if the object cannot be wrapped by a BeanWrapper
-	 */
-	public BeanWrapperImpl(Object object, String nestedPath) throws BeansException {
-		setWrappedInstance(object);
-		this.nestedPath = nestedPath;
 	}
 
 	/**
 	 * Create new BeanWrapperImpl, wrapping a new instance of the specified class.
 	 * @param clazz class to instantiate and wrap
-	 * @throws BeansException if the class cannot be wrapped by a BeanWrapper
 	 */
-	public BeanWrapperImpl(Class clazz) throws BeansException {
+	public BeanWrapperImpl(Class clazz) {
+		this();
 		setWrappedInstance(BeanUtils.instantiateClass(clazz));
 	}
 
+	/**
+	 * Create new BeanWrapperImpl for the given object,
+	 * registering a nested path that the object is in.
+	 * @param object object wrapped by this BeanWrapper
+	 * @param nestedPath the nested path of the object
+	 * @param rootObject the root object at the top of the path
+	 */
+	public BeanWrapperImpl(Object object, String nestedPath, Object rootObject) {
+		this();
+		setWrappedInstance(object, nestedPath, rootObject);
+	}
+
+	/**
+	 * Create new BeanWrapperImpl for the given object,
+	 * registering a nested path that the object is in.
+	 * @param object object wrapped by this BeanWrapper
+	 * @param nestedPath the nested path of the object
+	 * @param superBw the containing BeanWrapper (must not be <code>null</code>)
+	 */
+	private BeanWrapperImpl(Object object, String nestedPath, BeanWrapper superBw) {
+		setWrappedInstance(object, nestedPath, superBw.getWrappedInstance());
+		setExtractOldValueForEditor(superBw.isExtractOldValueForEditor());
+	}
+
 
 	//---------------------------------------------------------------------
-	// Implementation of BeanWrapper
+	// Implementation of BeanWrapper interface
 	//---------------------------------------------------------------------
 
 	/**
-	 * Switches the target object, replacing the cached introspection results only
+	 * Switch the target object, replacing the cached introspection results only
 	 * if the class of the new object is different to that of the replaced object.
-	 * @param object new target
-	 * @throws BeansException if the object cannot be changed
+	 * @param object the new target object
 	 */
-	public void setWrappedInstance(Object object) throws BeansException {
-		if (object == null) {
-			throw new FatalBeanException("Cannot set BeanWrapperImpl target to a null object");
-		}
-		this.object = object;
-		this.nestedBeanWrappers = null;
-		if (this.cachedIntrospectionResults == null ||
-		    !this.cachedIntrospectionResults.getBeanClass().equals(object.getClass())) {
-			this.cachedIntrospectionResults = CachedIntrospectionResults.forClass(object.getClass());
-		}
+	public void setWrappedInstance(Object object) {
+		setWrappedInstance(object, "", null);
 	}
 
-	public Class getWrappedClass() {
-		return object.getClass();
+	/**
+	 * Switch the target object, replacing the cached introspection results only
+	 * if the class of the new object is different to that of the replaced object.
+	 * @param object the new target object
+	 * @param nestedPath the nested path of the object
+	 * @param rootObject the root object at the top of the path
+	 */
+	public void setWrappedInstance(Object object, String nestedPath, Object rootObject) {
+		Assert.notNull(object, "Bean object must not be null");
+		this.object = object;
+		this.nestedPath = (nestedPath != null ? nestedPath : "");
+		this.rootObject = (!"".equals(this.nestedPath) ? rootObject : object);
+		this.nestedBeanWrappers = null;
+		setIntrospectionClass(object.getClass());
 	}
 
 	public Object getWrappedInstance() {
-		return object;
+		return this.object;
 	}
 
-
-	public void registerCustomEditor(Class requiredType, PropertyEditor propertyEditor) {
-		registerCustomEditor(requiredType, null, propertyEditor);
+	public Class getWrappedClass() {
+		return (this.object != null ? this.object.getClass() : null);
 	}
-
-	public void registerCustomEditor(Class requiredType, String propertyPath, PropertyEditor propertyEditor) {
-		if (propertyPath != null) {
-			List bws = getBeanWrappersForPropertyPath(propertyPath);
-			for (Iterator it = bws.iterator(); it.hasNext();) {
-				BeanWrapperImpl bw = (BeanWrapperImpl) it.next();
-				bw.doRegisterCustomEditor(requiredType, getFinalPath(propertyPath), propertyEditor);
-			}
-		}
-		else {
-			doRegisterCustomEditor(requiredType, propertyPath, propertyEditor);
-		}
-	}
-
-	private void doRegisterCustomEditor(Class requiredType, String propertyName, PropertyEditor propertyEditor) {
-		if (this.customEditors == null) {
-			this.customEditors = new HashMap();
-		}
-		if (propertyName != null) {
-			// consistency check
-			PropertyDescriptor descriptor = getPropertyDescriptor(propertyName);
-			if (requiredType != null && !descriptor.getPropertyType().isAssignableFrom(requiredType)) {
-				throw new IllegalArgumentException("Types do not match: required [" + requiredType.getName() +
-																					 "], found [" + descriptor.getPropertyType().getName() + "]");
-			}
-			this.customEditors.put(propertyName, propertyEditor);
-		}
-		else {
-			if (requiredType == null) {
-				throw new IllegalArgumentException("No propertyName and no requiredType specified");
-			}
-			this.customEditors.put(requiredType, propertyEditor);
-		}
-	}
-
-	public PropertyEditor findCustomEditor(Class requiredType, String propertyPath) {
-		if (propertyPath != null) {
-			BeanWrapperImpl bw = getBeanWrapperForPropertyPath(propertyPath);
-			return bw.doFindCustomEditor(requiredType, getFinalPath(propertyPath));
-		}
-		else {
-			return doFindCustomEditor(requiredType, propertyPath);
-		}
-	}
-
-	private PropertyEditor doFindCustomEditor(Class requiredType, String propertyName) {
-		if (this.customEditors == null) {
-			return null;
-		}
-		if (propertyName != null) {
-			// check property-specific editor first
-			PropertyDescriptor descriptor = null;
-			try {
-				descriptor = getPropertyDescriptor(propertyName);
-				PropertyEditor editor = (PropertyEditor) this.customEditors.get(propertyName);
-				if (editor != null) {
-					// consistency check
-					if (requiredType != null) {
-						if (!descriptor.getPropertyType().isAssignableFrom(requiredType)) {
-							throw new IllegalArgumentException("Types do not match: required=" + requiredType.getName() +
-																								 ", found=" + descriptor.getPropertyType());
-						}
-					}
-					return editor;
-				}
-				else {
-					if (requiredType == null) {
-						// try property type
-						requiredType = descriptor.getPropertyType();
-					}
-				}
-			}
-			catch (BeansException ex) {
-				// probably an indexed or mapped property
-				// we need to retrieve the value to determine the type
-				requiredType = getPropertyValue(propertyName).getClass();
-			}
-		}
-		// no property-specific editor -> check type-specific editor
-		return (PropertyEditor) this.customEditors.get(requiredType);
-	}
-
 
 	/**
-	 * Is the property nested? That is, does it contain the nested
-	 * property separator (usually ".").
-	 * @param path property path
-	 * @return boolean is the property nested
+	 * Return the nested path of the object wrapped by this BeanWrapper.
 	 */
-	private boolean isNestedProperty(String path) {
-		return path.indexOf(NESTED_PROPERTY_SEPARATOR) != -1;
+	public String getNestedPath() {
+		return this.nestedPath;
 	}
+
+	/**
+	 * Return the root object at the top of the path of this BeanWrapper.
+	 * @see #getNestedPath
+	 */
+	public Object getRootInstance() {
+		return this.rootObject;
+	}
+
+	/**
+	 * Return the class of the root object at the top of the path of this BeanWrapper.
+	 * @see #getNestedPath
+	 */
+	public Class getRootClass() {
+		return (this.rootObject != null ? this.rootObject.getClass() : null);
+	}
+
+	/**
+	 * Set the class to introspect.
+	 * Needs to be called when the target object changes.
+	 * @param clazz the class to introspect
+	 */
+	protected void setIntrospectionClass(Class clazz) {
+		if (this.cachedIntrospectionResults == null ||
+				!this.cachedIntrospectionResults.getBeanClass().equals(clazz)) {
+			this.cachedIntrospectionResults = CachedIntrospectionResults.forClass(clazz);
+		}
+	}
+
+	public void setExtractOldValueForEditor(boolean extractOldValueForEditor) {
+		this.extractOldValueForEditor = extractOldValueForEditor;
+	}
+
+	public boolean isExtractOldValueForEditor() {
+		return this.extractOldValueForEditor;
+	}
+
+
+	public PropertyDescriptor[] getPropertyDescriptors() {
+		Assert.state(this.cachedIntrospectionResults != null, "BeanWrapper does not hold a bean instance");
+		return this.cachedIntrospectionResults.getBeanInfo().getPropertyDescriptors();
+	}
+
+	public PropertyDescriptor getPropertyDescriptor(String propertyName) throws BeansException {
+		PropertyDescriptor pd = getPropertyDescriptorInternal(propertyName);
+		if (pd == null) {
+			throw new InvalidPropertyException(getRootClass(), this.nestedPath + propertyName,
+					"No property '" + propertyName + "' found");
+		}
+		return pd;
+	}
+
+	/**
+	 * Internal version of {@link #getPropertyDescriptor}:
+	 * Returns <code>null</code> if not found rather than throwing an exception.
+	 * @param propertyName the property to obtain the descriptor for
+	 * @return the property descriptor for the specified property,
+	 * or <code>null</code> if not found
+	 * @throws BeansException in case of introspection failure
+	 */
+	protected PropertyDescriptor getPropertyDescriptorInternal(String propertyName) throws BeansException {
+		Assert.state(this.cachedIntrospectionResults != null, "BeanWrapper does not hold a bean instance");
+		Assert.notNull(propertyName, "Property name must not be null");
+		BeanWrapperImpl nestedBw = getBeanWrapperForPropertyPath(propertyName);
+		return nestedBw.cachedIntrospectionResults.getPropertyDescriptor(getFinalPath(nestedBw, propertyName));
+	}
+
+	public Class getPropertyType(String propertyName) throws BeansException {
+		try {
+			PropertyDescriptor pd = getPropertyDescriptorInternal(propertyName);
+			if (pd != null) {
+				return pd.getPropertyType();
+			}
+			else {
+				// Maybe an indexed/mapped property...
+				Object value = getPropertyValue(propertyName);
+				if (value != null) {
+					return value.getClass();
+				}
+				// Check to see if there is a custom editor,
+				// which might give an indication on the desired target type.
+				Class editorType = guessPropertyTypeFromEditors(propertyName);
+				if (editorType != null) {
+					return editorType;
+				}
+			}
+		}
+		catch (InvalidPropertyException ex) {
+			// Consider as not determinable.
+		}
+		return null;
+	}
+
+	public boolean isReadableProperty(String propertyName) {
+		try {
+			PropertyDescriptor pd = getPropertyDescriptorInternal(propertyName);
+			if (pd != null) {
+				if (pd.getReadMethod() != null) {
+					return true;
+				}
+			}
+			else {
+				// Maybe an indexed/mapped property...
+				getPropertyValue(propertyName);
+				return true;
+			}
+		}
+		catch (InvalidPropertyException ex) {
+			// Cannot be evaluated, so can't be readable.
+		}
+		return false;
+	}
+
+	public boolean isWritableProperty(String propertyName) {
+		try {
+			PropertyDescriptor pd = getPropertyDescriptorInternal(propertyName);
+			if (pd != null) {
+				if (pd.getWriteMethod() != null) {
+					return true;
+				}
+			}
+			else {
+				// Maybe an indexed/mapped property...
+				getPropertyValue(propertyName);
+				return true;
+			}
+		}
+		catch (InvalidPropertyException ex) {
+			// Cannot be evaluated, so can't be writable.
+		}
+		return false;
+	}
+
 
 	/**
 	 * Get the last component of the path. Also works if not nested.
+	 * @param bw BeanWrapper to work on
 	 * @param nestedPath property path we know is nested
 	 * @return last component of the path (the property on the target bean)
 	 */
-	private String getFinalPath(String nestedPath) {
-		String finalPath = nestedPath.substring(nestedPath.lastIndexOf(NESTED_PROPERTY_SEPARATOR) + 1);
-		if (logger.isDebugEnabled() && !nestedPath.equals(finalPath)) {
-			logger.debug("Final path in nested property value '" + nestedPath + "' is '" + finalPath + "'");
+	private String getFinalPath(BeanWrapper bw, String nestedPath) {
+		if (bw == this) {
+			return nestedPath;
 		}
-		return finalPath;
+		return nestedPath.substring(PropertyAccessorUtils.getLastNestedPropertySeparatorIndex(nestedPath) + 1);
 	}
 
 	/**
@@ -309,75 +358,18 @@ public class BeanWrapperImpl implements BeanWrapper {
 	 * @param propertyPath property property path, which may be nested
 	 * @return a BeanWrapper for the target bean
 	 */
-	private BeanWrapperImpl getBeanWrapperForPropertyPath(String propertyPath) {
-		int pos = propertyPath.indexOf(NESTED_PROPERTY_SEPARATOR);
-		// Handle nested properties recursively
+	protected BeanWrapperImpl getBeanWrapperForPropertyPath(String propertyPath) {
+		int pos = PropertyAccessorUtils.getFirstNestedPropertySeparatorIndex(propertyPath);
+		// Handle nested properties recursively.
 		if (pos > -1) {
 			String nestedProperty = propertyPath.substring(0, pos);
 			String nestedPath = propertyPath.substring(pos + 1);
-			logger.debug("Navigating to nested property '" + nestedProperty + "' of property path '" + propertyPath + "'");
 			BeanWrapperImpl nestedBw = getNestedBeanWrapper(nestedProperty);
 			return nestedBw.getBeanWrapperForPropertyPath(nestedPath);
 		}
 		else {
 			return this;
 		}
-	}
-
-	/**
-	 * Recursively navigate to return a BeanWrapper for the nested property path.
-	 * In case of an indexed or mapped property, all BeanWrappers that apply will
-	 * be returned.
-	 * @param propertyPath property property path, which may be nested
-	 * @return a BeanWrapper for the target bean
-	 */
-	private List getBeanWrappersForPropertyPath(String propertyPath) {
-		List beanWrappers = new ArrayList();
-		int pos = propertyPath.indexOf(NESTED_PROPERTY_SEPARATOR);
-		// handle nested properties recursively
-		if (pos > -1) {
-			String nestedProperty = propertyPath.substring(0, pos);
-			String nestedPath = propertyPath.substring(pos + 1);
-			if (nestedProperty.indexOf('[') == -1) {
-				Class propertyType = getPropertyDescriptor(nestedProperty).getPropertyType();
-				if (propertyType.isArray()) {
-					Object[] array = (Object[]) getPropertyValue(nestedProperty);
-					for (int i = 0; i < array.length; i++) {
-						beanWrappers.addAll(
-								getBeanWrappersForNestedProperty(propertyPath, nestedProperty + "[" + i + "]", nestedPath));
-					}
-					return beanWrappers;
-				}
-				else if (List.class.isAssignableFrom(propertyType)) {
-					List list = (List) getPropertyValue(nestedProperty);
-					for (int i = 0; i < list.size(); i++) {
-						beanWrappers.addAll(
-								getBeanWrappersForNestedProperty(propertyPath, nestedProperty + "[" + i + "]", nestedPath));
-					}
-					return beanWrappers;
-				}
-				else if (Map.class.isAssignableFrom(propertyType)) {
-					Map map = (Map) getPropertyValue(nestedProperty);
-					for (Iterator it = map.keySet().iterator(); it.hasNext();) {
-						beanWrappers.addAll(
-								getBeanWrappersForNestedProperty(propertyPath, nestedProperty + "[" + it.next() + "]", nestedPath));
-					}
-					return beanWrappers;
-				}
-			}
-			beanWrappers.addAll(getBeanWrappersForNestedProperty(propertyPath, nestedProperty, nestedPath));
-			return beanWrappers;
-		}
-		else {
-			beanWrappers.add(this);
-			return beanWrappers;
-		}
-	}
-
-	private List getBeanWrappersForNestedProperty(String propertyPath, String nestedProperty, String nestedPath) {
-		logger.debug("Navigating to nested property '" + nestedProperty + "' of property path '" + propertyPath + "'");
-		BeanWrapperImpl nestedBw = getNestedBeanWrapper(nestedProperty);
-		return nestedBw.getBeanWrappersForPropertyPath(nestedPath);
 	}
 
 	/**
@@ -392,171 +384,251 @@ public class BeanWrapperImpl implements BeanWrapper {
 		if (this.nestedBeanWrappers == null) {
 			this.nestedBeanWrappers = new HashMap();
 		}
-		// get value of bean property
-		String[] tokens = getPropertyNameTokens(nestedProperty);
-		Object propertyValue = getPropertyValue(tokens[0], tokens[1], tokens[2]);
-		String canonicalName = tokens[0];
+		// Get value of bean property.
+		PropertyTokenHolder tokens = getPropertyNameTokens(nestedProperty);
+		String canonicalName = tokens.canonicalName;
+		Object propertyValue = getPropertyValue(tokens);
 		if (propertyValue == null) {
-			throw new NullValueInNestedPathException(getWrappedClass(), canonicalName);
+			throw new NullValueInNestedPathException(getRootClass(), this.nestedPath + canonicalName);
 		}
 
-		// lookup cached sub-BeanWrapper, create new one if not found
+		// Lookup cached sub-BeanWrapper, create new one if not found.
 		BeanWrapperImpl nestedBw = (BeanWrapperImpl) this.nestedBeanWrappers.get(canonicalName);
-		if (nestedBw == null) {
-			logger.debug("Creating new nested BeanWrapper for property '" + canonicalName + "'");
-			nestedBw = new BeanWrapperImpl(propertyValue, this.nestedPath + canonicalName + NESTED_PROPERTY_SEPARATOR);
-			// inherit all type-specific PropertyEditors
-			if (this.customEditors != null) {
-				for (Iterator it = this.customEditors.keySet().iterator(); it.hasNext();) {
-					Object key = it.next();
-					if (key instanceof Class) {
-						Class requiredType = (Class) key;
-						PropertyEditor propertyEditor = (PropertyEditor) this.customEditors.get(key);
-						nestedBw.registerCustomEditor(requiredType, null, propertyEditor);
-					}
-				}
+		if (nestedBw == null || nestedBw.getWrappedInstance() != propertyValue) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Creating new nested BeanWrapper for property '" + canonicalName + "'");
 			}
+			nestedBw = newNestedBeanWrapper(propertyValue, this.nestedPath + canonicalName + NESTED_PROPERTY_SEPARATOR);
+			// Inherit all type-specific PropertyEditors.
+			copyDefaultEditorsTo(nestedBw);
+			copyCustomEditorsTo(nestedBw, canonicalName);
 			this.nestedBeanWrappers.put(canonicalName, nestedBw);
 		}
 		else {
-			logger.debug("Using cached nested BeanWrapper for property '" + canonicalName + "'");
+			if (logger.isDebugEnabled()) {
+				logger.debug("Using cached nested BeanWrapper for property '" + canonicalName + "'");
+			}
 		}
 		return nestedBw;
 	}
 
-	private String[] getPropertyNameTokens(String propertyName) {
-		String actualName = propertyName;
-		String key = null;
-		int keyStart = propertyName.indexOf('[');
-		if (keyStart != -1 && propertyName.endsWith("]")) {
-			actualName = propertyName.substring(0, keyStart);
-			key = propertyName.substring(keyStart + 1, propertyName.length() - 1);
-			if (key.startsWith("'") && key.endsWith("'")) {
-				key = key.substring(1, key.length() - 1);
-			}
-			else if (key.startsWith("\"") && key.endsWith("\"")) {
-				key = key.substring(1, key.length() - 1);
-			}
-		}
-		String canonicalName = actualName;
-		if (key != null) {
-			canonicalName += "[" + key + "]";
-		}
-		return new String[] {canonicalName, actualName, key};
+	/**
+	 * Create a new nested BeanWrapper instance.
+	 * <p>Default implementation creates a BeanWrapperImpl instance.
+	 * Can be overridden in subclasses to create a BeanWrapperImpl subclass.
+	 * @param object object wrapped by this BeanWrapper
+	 * @param nestedPath the nested path of the object
+	 * @return the nested BeanWrapper instance
+	 */
+	protected BeanWrapperImpl newNestedBeanWrapper(Object object, String nestedPath) {
+		return new BeanWrapperImpl(object, nestedPath, this);
 	}
 
+	/**
+	 * Parse the given property name into the corresponding property name tokens.
+	 * @param propertyName the property name to parse
+	 * @return representation of the parsed property tokens
+	 */
+	private PropertyTokenHolder getPropertyNameTokens(String propertyName) {
+		PropertyTokenHolder tokens = new PropertyTokenHolder();
+		String actualName = null;
+		List keys = new ArrayList(2);
+		int searchIndex = 0;
+		while (searchIndex != -1) {
+			int keyStart = propertyName.indexOf(PROPERTY_KEY_PREFIX, searchIndex);
+			searchIndex = -1;
+			if (keyStart != -1) {
+				int keyEnd = propertyName.indexOf(PROPERTY_KEY_SUFFIX, keyStart + PROPERTY_KEY_PREFIX.length());
+				if (keyEnd != -1) {
+					if (actualName == null) {
+						actualName = propertyName.substring(0, keyStart);
+					}
+					String key = propertyName.substring(keyStart + PROPERTY_KEY_PREFIX.length(), keyEnd);
+					if ((key.startsWith("'") && key.endsWith("'")) || (key.startsWith("\"") && key.endsWith("\""))) {
+						key = key.substring(1, key.length() - 1);
+					}
+					keys.add(key);
+					searchIndex = keyEnd + PROPERTY_KEY_SUFFIX.length();
+				}
+			}
+		}
+		tokens.actualName = (actualName != null ? actualName : propertyName);
+		tokens.canonicalName = tokens.actualName;
+		if (!keys.isEmpty()) {
+			tokens.canonicalName +=
+					PROPERTY_KEY_PREFIX +
+					StringUtils.collectionToDelimitedString(keys, PROPERTY_KEY_SUFFIX + PROPERTY_KEY_PREFIX) +
+					PROPERTY_KEY_SUFFIX;
+			tokens.keys = StringUtils.toStringArray(keys);
+		}
+		return tokens;
+	}
+
+
+	//---------------------------------------------------------------------
+	// Implementation of PropertyAccessor interface
+	//---------------------------------------------------------------------
 
 	public Object getPropertyValue(String propertyName) throws BeansException {
-		if (isNestedProperty(propertyName)) {
-			BeanWrapper nestedBw = getBeanWrapperForPropertyPath(propertyName);
-			return nestedBw.getPropertyValue(getFinalPath(propertyName));
-		}
-		String[] tokens = getPropertyNameTokens(propertyName);
-		return getPropertyValue(tokens[0], tokens[1], tokens[2]);
+		BeanWrapperImpl nestedBw = getBeanWrapperForPropertyPath(propertyName);
+		PropertyTokenHolder tokens = getPropertyNameTokens(getFinalPath(nestedBw, propertyName));
+		return nestedBw.getPropertyValue(tokens);
 	}
 
-	private Object getPropertyValue(String propertyName, String actualName, String key) {
-		PropertyDescriptor pd = getPropertyDescriptor(actualName);
-		Method readMethod = pd.getReadMethod();
-		if (readMethod == null) {
-			throw new FatalBeanException("Cannot get property '" + actualName + "': not readable", null);
+	private Object getPropertyValue(PropertyTokenHolder tokens) throws BeansException {
+		String propertyName = tokens.canonicalName;
+		String actualName = tokens.actualName;
+		PropertyDescriptor pd = getPropertyDescriptorInternal(tokens.actualName);
+		if (pd == null || pd.getReadMethod() == null) {
+			throw new NotReadablePropertyException(getRootClass(), this.nestedPath + propertyName);
 		}
-		if (logger.isDebugEnabled())
-			logger.debug("About to invoke read method [" + readMethod +
-			             "] on object of class [" + this.object.getClass().getName() + "]");
+		Method readMethod = pd.getReadMethod();
+		if (logger.isDebugEnabled()) {
+			logger.debug("About to invoke read method [" + readMethod + "] on object of class [" +
+					this.object.getClass().getName() + "]");
+		}
 		try {
-			Object value = readMethod.invoke(this.object, null);
-			if (key != null) {
-				if (value == null) {
-					throw new FatalBeanException("Cannot access indexed value in property referenced in indexed property path '" +
-					                             propertyName + "': returned null");
-				}
-				else if (value.getClass().isArray()) {
-					Object[] array = (Object[]) value;
-					return array[Integer.parseInt(key)];
-				}
-				else if (value instanceof List) {
-					List list = (List) value;
-					return list.get(Integer.parseInt(key));
-				}
-				else if (value instanceof Set) {
-					// apply index to Iterator in case of a Set
-					Set set = (Set) value;
-					int index = Integer.parseInt(key);
-					Iterator it = set.iterator();
-					for (int i = 0; it.hasNext(); i++) {
-						Object elem = it.next();
-						if (i == index) {
-							return elem;
+			if (!Modifier.isPublic(readMethod.getDeclaringClass().getModifiers())) {
+				readMethod.setAccessible(true);
+			}
+			Object value = readMethod.invoke(this.object, (Object[]) null);
+			if (tokens.keys != null) {
+				// apply indexes and map keys
+				for (int i = 0; i < tokens.keys.length; i++) {
+					String key = tokens.keys[i];
+					if (value == null) {
+						throw new NullValueInNestedPathException(getRootClass(), this.nestedPath + propertyName,
+								"Cannot access indexed value of property referenced in indexed " +
+								"property path '" + propertyName + "': returned null");
+					}
+					else if (value.getClass().isArray()) {
+						value = Array.get(value, Integer.parseInt(key));
+					}
+					else if (value instanceof List) {
+						List list = (List) value;
+						value = list.get(Integer.parseInt(key));
+					}
+					else if (value instanceof Set) {
+						// Apply index to Iterator in case of a Set.
+						Set set = (Set) value;
+						int index = Integer.parseInt(key);
+						if (index < 0 || index >= set.size()) {
+							throw new InvalidPropertyException(getRootClass(), this.nestedPath + propertyName,
+									"Cannot get element with index " + index + " from Set of size " +
+									set.size() + ", accessed using property path '" + propertyName + "'");
+						}
+						Iterator it = set.iterator();
+						for (int j = 0; it.hasNext(); j++) {
+							Object elem = it.next();
+							if (j == index) {
+								value = elem;
+								break;
+							}
 						}
 					}
-					throw new FatalBeanException("Cannot get element with index " + index + " from Set of size " +
-																			 set.size() + ", accessed using property path '" + propertyName + "'");
-				}
-				else if (value instanceof Map) {
-					Map map = (Map) value;
-					return map.get(key);
-				}
-				else {
-					throw new FatalBeanException("Property referenced in indexed property path '" + propertyName +
-					                             "' is neither an array nor a List nor a Map; returned value was [" + value + "]");
+					else if (value instanceof Map) {
+						Map map = (Map) value;
+						value = map.get(key);
+					}
+					else {
+						throw new InvalidPropertyException(getRootClass(), this.nestedPath + propertyName,
+								"Property referenced in indexed property path '" + propertyName +
+								"' is neither an array nor a List nor a Set nor a Map; returned value was [" + value + "]");
+					}
 				}
 			}
-			else {
-				return value;
-			}
+			return value;
 		}
 		catch (InvocationTargetException ex) {
-			throw new FatalBeanException("Getter for property '" + actualName + "' threw exception", ex);
+			throw new InvalidPropertyException(getRootClass(), this.nestedPath + propertyName,
+					"Getter for property '" + actualName + "' threw exception", ex);
 		}
 		catch (IllegalAccessException ex) {
-			throw new FatalBeanException("Illegal attempt to get property '" + actualName + "' threw exception", ex);
+			throw new InvalidPropertyException(getRootClass(), this.nestedPath + propertyName,
+					"Illegal attempt to get property '" + actualName + "' threw exception", ex);
 		}
 		catch (IndexOutOfBoundsException ex) {
-			throw new FatalBeanException("Index of out of bounds in property path '" + propertyName + "'", ex);
+			throw new InvalidPropertyException(getRootClass(), this.nestedPath + propertyName,
+					"Index of out of bounds in property path '" + propertyName + "'", ex);
 		}
 		catch (NumberFormatException ex) {
-			throw new FatalBeanException("Invalid index in property path '" + propertyName + "'");
+			throw new InvalidPropertyException(getRootClass(), this.nestedPath + propertyName,
+					"Invalid index in property path '" + propertyName + "'", ex);
 		}
 	}
 
 	public void setPropertyValue(String propertyName, Object value) throws BeansException {
-		if (isNestedProperty(propertyName)) {
-			try {
-				BeanWrapper nestedBw = getBeanWrapperForPropertyPath(propertyName);
-				nestedBw.setPropertyValue(new PropertyValue(getFinalPath(propertyName), value));
-				return;
-			}
-			catch (NullValueInNestedPathException ex) {
-				// let this through
-				throw ex;
-			}
-			catch (FatalBeanException ex) {
-				// error in the nested path
-				throw new NotWritablePropertyException(propertyName, getWrappedClass(), ex);
-			}
+		BeanWrapperImpl nestedBw = null;
+		try {
+			nestedBw = getBeanWrapperForPropertyPath(propertyName);
 		}
-		String[] tokens = getPropertyNameTokens(propertyName);
-		setPropertyValue(tokens[0], tokens[1], tokens[2], value);
+		catch (NotReadablePropertyException ex) {
+			throw new NotWritablePropertyException(getRootClass(), this.nestedPath + propertyName,
+					"Nested property in path '" + propertyName + "' does not exist", ex);
+		}
+		PropertyTokenHolder tokens = getPropertyNameTokens(getFinalPath(nestedBw, propertyName));
+		nestedBw.setPropertyValue(tokens, value);
 	}
 
-	private void setPropertyValue(String propertyName, String actualName, String key, Object value)
-			throws BeansException {
-		if (key != null) {
-			Object propValue = getPropertyValue(actualName);
+	private void setPropertyValue(PropertyTokenHolder tokens, Object newValue) throws BeansException {
+		String propertyName = tokens.canonicalName;
+
+		if (tokens.keys != null) {
+			// Apply indexes and map keys: fetch value for all keys but the last one.
+			PropertyTokenHolder getterTokens = new PropertyTokenHolder();
+			getterTokens.canonicalName = tokens.canonicalName;
+			getterTokens.actualName = tokens.actualName;
+			getterTokens.keys = new String[tokens.keys.length - 1];
+			System.arraycopy(tokens.keys, 0, getterTokens.keys, 0, tokens.keys.length - 1);
+			Object propValue = null;
+			try {
+				propValue = getPropertyValue(getterTokens);
+			}
+			catch (NotReadablePropertyException ex) {
+				throw new NotWritablePropertyException(getRootClass(), this.nestedPath + propertyName,
+						"Cannot access indexed value in property referenced " +
+						"in indexed property path '" + propertyName + "'", ex);
+			}
+			// Set value for last key.
+			String key = tokens.keys[tokens.keys.length - 1];
 			if (propValue == null) {
-				throw new FatalBeanException("Cannot access indexed value in property referenced in indexed property path '" +
-																		 propertyName + "': returned null");
+				throw new NullValueInNestedPathException(getRootClass(), this.nestedPath + propertyName,
+						"Cannot access indexed value in property referenced " +
+						"in indexed property path '" + propertyName + "': returned null");
 			}
 			else if (propValue.getClass().isArray()) {
-				Object[] array = (Object[]) propValue;
-				array[Integer.parseInt(key)] = value;
+				Class requiredType = propValue.getClass().getComponentType();
+				int arrayIndex = Integer.parseInt(key);
+				Object oldValue = null;
+				try {
+					if (isExtractOldValueForEditor()) {
+						oldValue = Array.get(propValue, arrayIndex);
+					}
+					Object convertedValue =
+							doTypeConversionIfNecessary(propertyName, propertyName, oldValue, newValue, requiredType);
+					Array.set(propValue, Integer.parseInt(key), convertedValue);
+				}
+				catch (IllegalArgumentException ex) {
+					PropertyChangeEvent pce =
+							new PropertyChangeEvent(this.rootObject, this.nestedPath + propertyName, oldValue, newValue);
+					throw new TypeMismatchException(pce, requiredType, ex);
+				}
+				catch (IndexOutOfBoundsException ex) {
+					throw new InvalidPropertyException(getRootClass(), this.nestedPath + propertyName,
+							"Invalid array index in property path '" + propertyName + "'", ex);
+				}
 			}
 			else if (propValue instanceof List) {
 				List list = (List) propValue;
 				int index = Integer.parseInt(key);
+				Object oldValue = null;
+				if (isExtractOldValueForEditor() && index < list.size()) {
+					oldValue = list.get(index);
+				}
+				Object convertedValue =
+						doTypeConversionIfNecessary(propertyName, propertyName, oldValue, newValue, null);
 				if (index < list.size()) {
-					list.set(index, value);
+					list.set(index, convertedValue);
 				}
 				else if (index >= list.size()) {
 					for (int i = list.size(); i < index; i++) {
@@ -564,76 +636,97 @@ public class BeanWrapperImpl implements BeanWrapper {
 							list.add(null);
 						}
 						catch (NullPointerException ex) {
-							throw new FatalBeanException("Cannot set element with index " + index + " in List of size " +
-																					 list.size() + ", accessed using property path '" + propertyName +
-																					 "': List does not support filling up gaps with null elements");
+							throw new InvalidPropertyException(getRootClass(), this.nestedPath + propertyName,
+									"Cannot set element with index " + index + " in List of size " +
+									list.size() + ", accessed using property path '" + propertyName +
+									"': List does not support filling up gaps with null elements");
 						}
 					}
-					list.add(value);
+					list.add(convertedValue);
 				}
 			}
 			else if (propValue instanceof Map) {
 				Map map = (Map) propValue;
-				map.put(key, value);
+				Object oldValue = null;
+				if (isExtractOldValueForEditor()) {
+					oldValue = map.get(key);
+				}
+				Object convertedValue =
+						doTypeConversionIfNecessary(propertyName, propertyName, oldValue, newValue, null);
+				map.put(key, convertedValue);
 			}
 			else {
-				throw new FatalBeanException("Property referenced in indexed property path '" + propertyName +
-																		 "' is neither an array nor a List nor a Map; returned value was [" + value + "]");
+				throw new InvalidPropertyException(getRootClass(), this.nestedPath + propertyName,
+						"Property referenced in indexed property path '" + propertyName +
+						"' is neither an array nor a List nor a Map; returned value was [" + newValue + "]");
 			}
 		}
+
 		else {
-			if (!isWritableProperty(propertyName)) {
-				throw new NotWritablePropertyException(propertyName, getWrappedClass());
+			PropertyDescriptor pd = getPropertyDescriptorInternal(propertyName);
+			if (pd == null || pd.getWriteMethod() == null) {
+				throw new NotWritablePropertyException(getRootClass(), this.nestedPath + propertyName);
 			}
-			PropertyDescriptor pd = getPropertyDescriptor(propertyName);
+
+			Method readMethod = pd.getReadMethod();
 			Method writeMethod = pd.getWriteMethod();
-			Object newValue = null;
+			Object oldValue = null;
+
+			if (isExtractOldValueForEditor() && readMethod != null) {
+				if (!Modifier.isPublic(readMethod.getDeclaringClass().getModifiers())) {
+					readMethod.setAccessible(true);
+				}
+				try {
+					oldValue = readMethod.invoke(this.object, new Object[0]);
+				}
+				catch (Exception ex) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("Could not read previous value of property '" + this.nestedPath + propertyName + "'", ex);
+					}
+				}
+			}
+
 			try {
-				// old value may still be null
-				newValue = doTypeConversionIfNecessary(propertyName, propertyName, null, value, pd.getPropertyType());
+				Object convertedValue =
+						doTypeConversionIfNecessary(propertyName, propertyName, oldValue, newValue, pd.getPropertyType());
 
-				if (pd.getPropertyType().isPrimitive() &&
-						(newValue == null || "".equals(newValue))) {
-					throw new IllegalArgumentException("Invalid value [" + value + "] for property '" +
-								pd.getName() + "' of primitive type [" + pd.getPropertyType() + "]");
+				if (pd.getPropertyType().isPrimitive() && (convertedValue == null || "".equals(convertedValue))) {
+					throw new IllegalArgumentException("Invalid value [" + newValue + "] for property '" +
+							pd.getName() + "' of primitive type [" + pd.getPropertyType() + "]");
 				}
 
 				if (logger.isDebugEnabled()) {
-					logger.debug("About to invoke write method [" + writeMethod +
-											 "] on object of class [" + object.getClass().getName() + "]");
+					logger.debug("About to invoke write method [" + writeMethod + "] on object of class [" +
+							this.object.getClass().getName() + "]");
 				}
-				writeMethod.invoke(this.object, new Object[] { newValue });
+				if (!Modifier.isPublic(writeMethod.getDeclaringClass().getModifiers())) {
+					writeMethod.setAccessible(true);
+				}
+				writeMethod.invoke(this.object, new Object[] {convertedValue});
 				if (logger.isDebugEnabled()) {
-					String msg = "Invoked write method [" + writeMethod + "] with value ";
-					// only cause toString invocation of new value in case of simple property
-					if (newValue == null || BeanUtils.isSimpleProperty(pd.getPropertyType())) {
-						logger.debug(msg + "[" + newValue + "]");
-					}
-					else {
-						logger.debug(msg + "of type [" + pd.getPropertyType().getName() + "]");
-					}
+					logger.debug("Invoked write method [" + writeMethod + "] with value of type [" +
+							pd.getPropertyType().getName() + "]");
 				}
 			}
 			catch (InvocationTargetException ex) {
-				// TODO could consider getting rid of PropertyChangeEvents as exception parameters
-				// as they can never contain anything but null for the old value as we no longer
-				// support event propagation.
-				PropertyChangeEvent propertyChangeEvent = new PropertyChangeEvent(this.object, this.nestedPath + propertyName,
-																																					null, newValue);
+				PropertyChangeEvent propertyChangeEvent =
+						new PropertyChangeEvent(this.rootObject, this.nestedPath + propertyName, oldValue, newValue);
 				if (ex.getTargetException() instanceof ClassCastException) {
 					throw new TypeMismatchException(propertyChangeEvent, pd.getPropertyType(), ex.getTargetException());
 				}
 				else {
-					throw new MethodInvocationException(ex.getTargetException(), propertyChangeEvent);
+					throw new MethodInvocationException(propertyChangeEvent, ex.getTargetException());
 				}
 			}
-			catch (IllegalAccessException ex) {
-				throw new FatalBeanException("Illegal attempt to set property [" + value + "] threw exception", ex);
-			}
 			catch (IllegalArgumentException ex) {
-				PropertyChangeEvent propertyChangeEvent = new PropertyChangeEvent(this.object, this.nestedPath + propertyName,
-																																					null, newValue);
-				throw new TypeMismatchException(propertyChangeEvent, pd.getPropertyType(), ex);
+				PropertyChangeEvent pce =
+						new PropertyChangeEvent(this.rootObject, this.nestedPath + propertyName, oldValue, newValue);
+				throw new TypeMismatchException(pce, pd.getPropertyType(), ex);
+			}
+			catch (IllegalAccessException ex) {
+				PropertyChangeEvent pce =
+						new PropertyChangeEvent(this.rootObject, this.nestedPath + propertyName, oldValue, newValue);
+				throw new MethodInvocationException(pce, ex);
 			}
 		}
 	}
@@ -663,52 +756,50 @@ public class BeanWrapperImpl implements BeanWrapper {
 		PropertyValue[] pvs = propertyValues.getPropertyValues();
 		for (int i = 0; i < pvs.length; i++) {
 			try {
-				// This method may throw ReflectionException, which won't be caught
+				// This method may throw any BeansException, which won't be caught
 				// here, if there is a critical failure such as no matching field.
 				// We can attempt to deal only with less serious exceptions.
 				setPropertyValue(pvs[i]);
 			}
-			// fatal ReflectionExceptions will just be rethrown
 			catch (NotWritablePropertyException ex) {
 				if (!ignoreUnknown) {
 					throw ex;
 				}
-				// otherwise, just ignore it and continue...
+				// Otherwise, just ignore it and continue...
 			}
-			catch (TypeMismatchException ex) {
-				propertyAccessExceptions.add(ex);
-			}
-			catch (MethodInvocationException ex) {
+			catch (PropertyAccessException ex) {
 				propertyAccessExceptions.add(ex);
 			}
 		}
 
-		// if we encountered individual exceptions, throw the composite exception
+		// If we encountered individual exceptions, throw the composite exception.
 		if (!propertyAccessExceptions.isEmpty()) {
-			Object[] paeArray = propertyAccessExceptions.toArray(new PropertyAccessException[propertyAccessExceptions.size()]);
+			Object[] paeArray =
+					propertyAccessExceptions.toArray(new PropertyAccessException[propertyAccessExceptions.size()]);
 			throw new PropertyAccessExceptionsException(this, (PropertyAccessException[]) paeArray);
 		}
 	}
 
-	private PropertyChangeEvent createPropertyChangeEvent(String propertyName, Object oldValue, Object newValue)
-			throws BeansException {
-		return new PropertyChangeEvent((this.object != null ? this.object : "constructor"),
-		                               (propertyName != null ? this.nestedPath + propertyName : null),
-																	 oldValue, newValue);
+	private PropertyChangeEvent createPropertyChangeEvent(String propertyName, Object oldValue, Object newValue) {
+		return new PropertyChangeEvent((this.rootObject != null ? this.rootObject : "constructor"),
+				(propertyName != null ? this.nestedPath + propertyName : null),
+				oldValue, newValue);
 	}
 
 	/**
 	 * Convert the value to the required type (if necessary from a String).
-	 * Conversions from String to any type use the setAsText() method of
-	 * the PropertyEditor class. Note that a PropertyEditor must be registered
-	 * for this class for this to work. This is a standard Java Beans API.
-	 * A number of property editors are automatically registered by this class.
-	 * @param newValue proposed change value.
-	 * @param requiredType type we must convert to
-	 * @throws BeansException if there is an internal error
-	 * @return new value, possibly the result of type convertion
+	 * <p>Conversions from String to any type use the <code>setAsText</code> method
+	 * of the PropertyEditor class. Note that a PropertyEditor must be registered
+	 * for the given class for this to work; this is a standard JavaBeans API.
+	 * A number of PropertyEditors are automatically registered by BeanWrapperImpl.
+	 * @param newValue proposed change value
+	 * @param requiredType the type we must convert to
+	 * @return the new value, possibly the result of type conversion
+	 * @throws TypeMismatchException if type conversion failed
+	 * @see java.beans.PropertyEditor#setAsText(String)
+	 * @see java.beans.PropertyEditor#getValue()
 	 */
-	public Object doTypeConversionIfNecessary(Object newValue, Class requiredType) throws BeansException {
+	public Object doTypeConversionIfNecessary(Object newValue, Class requiredType) throws TypeMismatchException {
 		return doTypeConversionIfNecessary(null, null, null, newValue, requiredType);
 	}
 
@@ -716,197 +807,178 @@ public class BeanWrapperImpl implements BeanWrapper {
 	 * Convert the value to the required type (if necessary from a String),
 	 * for the specified property.
 	 * @param propertyName name of the property
-	 * @param oldValue previous value, if available (may be null)
-	 * @param newValue proposed change value.
-	 * @param requiredType type we must convert to
-	 * @throws BeansException if there is an internal error
-	 * @return new value, possibly the result of type convertion
+	 * @param oldValue previous value, if available (may be <code>null</code>)
+	 * @param newValue proposed change value
+	 * @param requiredType the type we must convert to
+	 * (or <code>null</code> if not known, for example in case of a collection element)
+	 * @return the new value, possibly the result of type conversion
+	 * @throws TypeMismatchException if type conversion failed
 	 */
-	protected Object doTypeConversionIfNecessary(String propertyName, String propertyDescriptor,
-																							 Object oldValue, Object newValue,
-																							 Class requiredType) throws BeansException {
-		if (newValue != null) {
+	protected Object doTypeConversionIfNecessary(String propertyName, String fullPropertyName,
+			Object oldValue, Object newValue, Class requiredType) throws TypeMismatchException {
 
-			if (requiredType.isArray()) {
-				// convert individual elements to array elements
-				Class componentType = requiredType.getComponentType();
-				if (newValue instanceof List) {
-					List list = (List) newValue;
-					Object result = Array.newInstance(componentType, list.size());
-					for (int i = 0; i < list.size(); i++) {
-						Object value = doTypeConversionIfNecessary(propertyName, propertyName + "[" + i + "]",
-																											 null, list.get(i), componentType);
-						Array.set(result, i, value);
-					}
-					return result;
-				}
-				else if (newValue instanceof Object[]) {
-					Object[] array = (Object[]) newValue;
-					Object result = Array.newInstance(componentType, array.length);
-					for (int i = 0; i < array.length; i++) {
-						Object value = doTypeConversionIfNecessary(propertyName, propertyName + "[" + i + "]",
-																											 null, array[i], componentType);
-						Array.set(result, i, value);
-					}
-					return result;
-				}
-			}
+		Object convertedValue = newValue;
 
-			// custom editor for this type?
-			PropertyEditor pe = findCustomEditor(requiredType, propertyName);
+		// Custom editor for this type?
+		PropertyEditor pe = findCustomEditor(requiredType, fullPropertyName);
 
-			// value not of required type?
-			if (pe != null || !requiredType.isAssignableFrom(newValue.getClass())) {
+		// Value not of required type?
+		if (pe != null ||
+				(requiredType != null &&
+				(requiredType.isArray() || !requiredType.isInstance(convertedValue)))) {
 
-				if (newValue instanceof String[]) {
-					if (logger.isDebugEnabled()) {
-						logger.debug("Converting String array to comma-delimited String [" + newValue + "]");
-					}
-					newValue = StringUtils.arrayToCommaDelimitedString((String[]) newValue);
-				}
-
-				if (newValue instanceof String) {
+			if (requiredType != null) {
+				if (pe == null) {
+					// No custom editor -> check BeanWrapperImpl's default editors.
+					pe = (PropertyEditor) getDefaultEditor(requiredType);
 					if (pe == null) {
-						// no custom editor -> check BeanWrapper's default editors
-						pe = findDefaultEditor(requiredType);
-						if (pe == null) {
-							// no BeanWrapper default editor -> check standard JavaBean editors
-							pe = PropertyEditorManager.findEditor(requiredType);
-						}
-					}
-					if (pe != null) {
-						// use PropertyEditor's setAsText in case of a String value
-						if (logger.isDebugEnabled()) {
-							logger.debug("Converting String to [" + requiredType + "] using property editor [" + pe + "]");
-						}
-						try {
-							pe.setAsText((String) newValue);
-							newValue = pe.getValue();
-						}
-						catch (IllegalArgumentException ex) {
-							throw new TypeMismatchException(createPropertyChangeEvent(propertyDescriptor, oldValue, newValue),
-																							requiredType, ex);
-						}
-					}
-					else {
-						throw new TypeMismatchException(createPropertyChangeEvent(propertyDescriptor, oldValue, newValue),
-																						requiredType);
-					}
-				}
-
-				else if (pe != null) {
-					// Not a String -> use PropertyEditor's setValue.
-					// With standard PropertyEditors, this will return the very same object;
-					// we just want to allow special PropertyEditors to override setValue
-					// for type conversion from non-String values to the required type.
-					try {
-						pe.setValue(newValue);
-						newValue = pe.getValue();
-					}
-					catch (IllegalArgumentException ex) {
-						throw new TypeMismatchException(createPropertyChangeEvent(propertyDescriptor, oldValue, newValue),
-																						requiredType, ex);
+						// No BeanWrapper default editor -> check standard JavaBean editors.
+						pe = PropertyEditorManager.findEditor(requiredType);
 					}
 				}
 			}
 
-			if (requiredType.isArray() && !newValue.getClass().isArray()) {
-				Class componentType = requiredType.getComponentType();
-				Object result = Array.newInstance(componentType, 1) ;
-				Object val = doTypeConversionIfNecessary(propertyName, propertyName + "[" + 0 + "]",
-																								 null, newValue, componentType);
-				Array.set(result, 0, val) ;
-				return result;
+			if (pe != null && !(convertedValue instanceof String)) {
+				// Not a String -> use PropertyEditor's setValue.
+				// With standard PropertyEditors, this will return the very same object;
+				// we just want to allow special PropertyEditors to override setValue
+				// for type conversion from non-String values to the required type.
+				try {
+					pe.setValue(convertedValue);
+					Object newConvertedValue = pe.getValue();
+					if (newConvertedValue != convertedValue) {
+						convertedValue = newConvertedValue;
+						// Reset PropertyEditor: It already did a proper conversion.
+						// Don't use it again for a setAsText call.
+						pe = null;
+					}
+				}
+				catch (IllegalArgumentException ex) {
+					throw new TypeMismatchException(
+							createPropertyChangeEvent(fullPropertyName, oldValue, newValue), requiredType, ex);
+				}
+			}
+
+			if (requiredType != null && !requiredType.isArray() && convertedValue instanceof String[]) {
+				// Convert String array to a comma-separated String.
+				// Only applies if no PropertyEditor converted the String array before.
+				// The CSV String will be passed into a PropertyEditor's setAsText method, if any.
+				if (logger.isDebugEnabled()) {
+					logger.debug("Converting String array to comma-delimited String [" + convertedValue + "]");
+				}
+				convertedValue = StringUtils.arrayToCommaDelimitedString((String[]) convertedValue);
+			}
+
+			if (pe != null && convertedValue instanceof String) {
+				// Use PropertyEditor's setAsText in case of a String value.
+				if (logger.isDebugEnabled()) {
+					logger.debug("Converting String to [" + requiredType + "] using property editor [" + pe + "]");
+				}
+				try {
+					pe.setValue(oldValue);
+					pe.setAsText((String) convertedValue);
+					convertedValue = pe.getValue();
+				}
+				catch (IllegalArgumentException ex) {
+					throw new TypeMismatchException(
+							createPropertyChangeEvent(fullPropertyName, oldValue, newValue), requiredType, ex);
+				}
+			}
+
+			if (requiredType != null) {
+				// Array required -> apply appropriate conversion of elements.
+				if (requiredType.isArray()) {
+					Class componentType = requiredType.getComponentType();
+					if (convertedValue instanceof Collection) {
+						// Convert Collection elements to array elements.
+						Collection coll = (Collection) convertedValue;
+						Object result = Array.newInstance(componentType, coll.size());
+						int i = 0;
+						for (Iterator it = coll.iterator(); it.hasNext(); i++) {
+							Object value = doTypeConversionIfNecessary(
+									propertyName, propertyName + PROPERTY_KEY_PREFIX + i + PROPERTY_KEY_SUFFIX,
+									null, it.next(), componentType);
+							Array.set(result, i, value);
+						}
+						return result;
+					}
+					else if (convertedValue != null && convertedValue.getClass().isArray()) {
+						// Convert Collection elements to array elements.
+						int arrayLength = Array.getLength(convertedValue);
+						Object result = Array.newInstance(componentType, arrayLength);
+						for (int i = 0; i < arrayLength; i++) {
+							Object value = doTypeConversionIfNecessary(
+									propertyName, propertyName + PROPERTY_KEY_PREFIX + i + PROPERTY_KEY_SUFFIX,
+									null, Array.get(convertedValue, i), componentType);
+							Array.set(result, i, value);
+						}
+						return result;
+					}
+					else if (convertedValue != null) {
+						// A plain value: convert it to an array with a single component.
+						Object result = Array.newInstance(componentType, 1);
+						Object value = doTypeConversionIfNecessary(
+								propertyName, propertyName + PROPERTY_KEY_PREFIX + 0 + PROPERTY_KEY_SUFFIX,
+								null, convertedValue, componentType);
+						Array.set(result, 0, value);
+						return result;
+					}
+				}
+
+				// If the resulting value definitely doesn't match the required type,
+				// try field lookup as fallback. If no matching field found,
+				// throw explicit TypeMismatchException with full context information.
+				if (convertedValue != null && !requiredType.isPrimitive() &&
+						!requiredType.isInstance(convertedValue)) {
+
+					// In case of String value, try to find matching field (for JDK 1.5
+					// enum or custom enum with values defined as static fields).
+					if (convertedValue instanceof String) {
+						try {
+							Field enumField = requiredType.getField((String) convertedValue);
+							return enumField.get(null);
+						}
+						catch (Exception ex) {
+							if (logger.isDebugEnabled()) {
+								logger.debug("Field [" + convertedValue + "] isn't an enum value", ex);
+							}
+						}
+					}
+
+					// Definitely doesn't match: throw TypeMismatchException.
+					throw new TypeMismatchException(
+							createPropertyChangeEvent(fullPropertyName, oldValue, newValue), requiredType);
+				}
 			}
 		}
 
-		return newValue;
+		return convertedValue;
 	}
 
-	private PropertyEditor findDefaultEditor(Class type) {
-		Class editorClass = (Class) defaultEditors.get(type);
-		if (editorClass != null) {
-			return (PropertyEditor) BeanUtils.instantiateClass(editorClass);
+
+	public String toString() {
+		StringBuffer sb = new StringBuffer(getClass().getName());
+		if (this.object != null) {
+			sb.append(": wrapping object of type [").append(this.object.getClass().getName()).append("]");
 		}
 		else {
-			return null;
-		}
-	}
-
-
-	public PropertyDescriptor[] getPropertyDescriptors() {
-		return this.cachedIntrospectionResults.getBeanInfo().getPropertyDescriptors();
-	}
-
-	public PropertyDescriptor getPropertyDescriptor(String propertyName) throws BeansException {
-		if (propertyName == null) {
-			throw new FatalBeanException("Can't find property descriptor for null property");
-		}
-		if (isNestedProperty(propertyName)) {
-			BeanWrapper nestedBw = getBeanWrapperForPropertyPath(propertyName);
-			return nestedBw.getPropertyDescriptor(getFinalPath(propertyName));
-		}
-		return this.cachedIntrospectionResults.getPropertyDescriptor(propertyName);
-	}
-
-	public boolean isReadableProperty(String propertyName) {
-		// This is a programming error, although asking for a property
-		// that doesn't exist is not
-		if (propertyName == null) {
-			throw new FatalBeanException("Can't find readability status for null property");
-		}
-		try {
-			return getPropertyDescriptor(propertyName).getReadMethod() != null;
-		}
-		catch (BeansException ex) {
-			// doesn't exist, so can't be readable
-			return false;
-		}
-	}
-
-	public boolean isWritableProperty(String propertyName) {
-		// This is a programming error, although asking for a property
-		// that doesn't exist is not.
-		if (propertyName == null) {
-			throw new FatalBeanException("Can't find writability status for null property");
-		}
-		try {
-			return getPropertyDescriptor(propertyName).getWriteMethod() != null;
-		}
-		catch (BeansException ex) {
-			// doesn't exist, so can't be writable
-			return false;
-		}
-	}
-
-
-	//---------------------------------------------------------------------
-	// Diagnostics
-	//---------------------------------------------------------------------
-
-	/**
-	 * This method is expensive! Only call for diagnostics and debugging reasons,
-	 * not in production.
-	 * @return a string describing the state of this object
-	 */
-	public String toString() {
-		StringBuffer sb = new StringBuffer();
-		try {
-			sb.append("BeanWrapperImpl:"
-								+ " wrapping class [" + getWrappedInstance().getClass().getName() + "]; ");
-			PropertyDescriptor pds[] = getPropertyDescriptors();
-			if (pds != null) {
-				for (int i = 0; i < pds.length; i++) {
-					Object val = getPropertyValue(pds[i].getName());
-					String valStr = (val != null) ? val.toString() : "null";
-					sb.append(pds[i].getName() + "={" + valStr + "}");
-				}
-			}
-		}
-		catch (Exception ex) {
-			sb.append("exception encountered: " + ex);
+			sb.append(": no wrapped object set");
 		}
 		return sb.toString();
+	}
+
+
+	//---------------------------------------------------------------------
+	// Inner class for internal use
+	//---------------------------------------------------------------------
+
+	private static class PropertyTokenHolder {
+
+		public String canonicalName;
+
+		public String actualName;
+
+		public String[] keys;
 	}
 
 }

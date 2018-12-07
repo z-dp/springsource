@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.ui.velocity;
 
@@ -31,13 +31,21 @@ import org.springframework.context.ResourceLoaderAware;
  * application code, e.g. for generating email content. For web views,
  * VelocityConfigurer is used to set up a VelocityEngine for views.
  *
- * <p>See base class VelocityEngineFactory for configuration details.
+ * <p>The simplest way to use this class is to specify a "resourceLoaderPath";
+ * you do not need any further configuration then. For example, in a web
+ * application context:
+ *
+ * <pre>
+ * &lt;bean id="velocityEngine" class="org.springframework.ui.velocity.VelocityEngineFactoryBean"&gt;
+ *   &lt;property name="resourceLoaderPath"&gt;&lt;value&gt;/WEB-INF/velocity/&lt;/value&gt;lt;/property&gt;
+ * &lt;/bean&gt;</pre>
+ *
+ * See the base class VelocityEngineFactory for configuration details.
  *
  * @author Juergen Hoeller
  * @see #setConfigLocation
  * @see #setVelocityProperties
  * @see #setResourceLoaderPath
- * @see CommonsLoggingLogSystem
  * @see org.springframework.web.servlet.view.velocity.VelocityConfigurer
  */
 public class VelocityEngineFactoryBean extends VelocityEngineFactory

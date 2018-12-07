@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.aop.support;
 
@@ -25,8 +25,8 @@ import org.springframework.core.Ordered;
 /**
  * Convenient class for name-match method pointcuts that hold an Interceptor,
  * making them an Advisor.
+ *
  * @author Juergen Hoeller
- * @version $Id: NameMatchMethodPointcutAdvisor.java,v 1.5 2004/03/23 14:29:45 jhoeller Exp $
  */
 public class NameMatchMethodPointcutAdvisor extends NameMatchMethodPointcut
 		implements PointcutAdvisor, Ordered {
@@ -35,12 +35,14 @@ public class NameMatchMethodPointcutAdvisor extends NameMatchMethodPointcut
 
 	private Advice advice;
 
+
 	public NameMatchMethodPointcutAdvisor() {
 	}
 
 	public NameMatchMethodPointcutAdvisor(Advice advice) {
 		this.advice = advice;
 	}
+
 
 	public void setOrder(int order) {
 		this.order = order;
@@ -57,6 +59,7 @@ public class NameMatchMethodPointcutAdvisor extends NameMatchMethodPointcut
 	public Advice getAdvice() {
 		return advice;
 	}
+
 
 	public Pointcut getPointcut() {
 		return this;

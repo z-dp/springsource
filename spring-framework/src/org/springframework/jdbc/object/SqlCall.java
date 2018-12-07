@@ -1,23 +1,25 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.jdbc.object;
 
 import java.util.List;
 import java.util.Map;
+
+import javax.sql.DataSource;
 
 import org.springframework.jdbc.core.CallableStatementCreator;
 import org.springframework.jdbc.core.CallableStatementCreatorFactory;
@@ -34,7 +36,7 @@ import org.springframework.jdbc.core.SqlReturnResultSet;
  *
  * @author Rod Johnson
  * @author Thomas Risberg
- * @version $Id: SqlCall.java,v 1.6 2004/03/18 02:46:13 trisberg Exp $
+ * @see CallableStatementCreatorFactory
  */
 public abstract class SqlCall extends RdbmsOperation {
 
@@ -51,6 +53,12 @@ public abstract class SqlCall extends RdbmsOperation {
 	private boolean function = false;
 
 	/**
+	 * Flag used to indicate that the sql for this call should be used exactly as it is
+	 * defined.  No need to add the escape syntax and parameter place holders.
+	 */
+	private boolean sqlReadyForUse = false;
+
+	/**
 	 * Call string as defined in java.sql.CallableStatement.
 	 * String of form {call add_invoice(?, ?, ?)}
 	 * or {? = call get_invoice_count(?)} if isFunction is set to true
@@ -58,47 +66,58 @@ public abstract class SqlCall extends RdbmsOperation {
 	 */
 	private String callString;
 
+
 	/**
-	 * Set the flag used to indicate that this call is for a function
-	 * @param function true or false
+	 * Constructor to allow use as a JavaBean.
+	 * A DataSource, SQL and any parameters must be supplied before
+	 * invoking the <code>compile</code> method and using this object.
+	 * @see #setDataSource
+	 * @see #setSql
+	 * @see #compile
+	 */
+	public SqlCall() {
+	}
+
+	/**
+	 * Create a new SqlCall object with SQL, but without parameters.
+	 * Must add parameters or settle with none.
+	 * @param ds DataSource to obtain connections from
+	 * @param sql SQL to execute
+	 */
+	public SqlCall(DataSource ds, String sql) {
+		setDataSource(ds);
+		setSql(sql);
+	}
+
+
+	/**
+	 * Set whether this call is for a function.
 	 */
 	public void setFunction(boolean function) {
 		this.function = function;
 	}
 
 	/**
-	 * Get the flag used to indicate that this call is for a function.
-	 * @return boolean
+	 * Return whether this call is for a function.
 	 */
 	public boolean isFunction() {
 		return function;
 	}
 
 	/**
-	 * Get the flag used to indicate that this call is for a function.
-	 * @return boolean
+	 * Set whether the SQL can be used as is.
 	 */
-	public String getCallString() {
-		return this.callString;
+	public void setSqlReadyForUse(boolean sqlReadyForUse) {
+		this.sqlReadyForUse = sqlReadyForUse;
 	}
 
 	/**
-	 * Return a CallableStatementCreator to perform an operation
-	 * with this parameters.
-	 * @param inParams parameters. May be null.
+	 * Return whether the SQL can be used as is.
 	 */
-	protected CallableStatementCreator newCallableStatementCreator(Map inParams) {
-		return this.callableStatementFactory.newCallableStatementCreator(inParams);
+	public boolean isSqlReadyForUse() {
+		return sqlReadyForUse;
 	}
 
-	/**
-	 * Return a CallableStatementCreator to perform an operation
-	 * with the parameters returned from this ParameterMapper.
-	 * @param inParamMapper parametermapper. May not be null.
-	 */
-	protected CallableStatementCreator newCallableStatementCreator(ParameterMapper inParamMapper) {
-		return this.callableStatementFactory.newCallableStatementCreator(inParamMapper);
-	}
 
 	/**
 	 * Overridden method to configure the CallableStatementCreatorFactory
@@ -106,32 +125,41 @@ public abstract class SqlCall extends RdbmsOperation {
 	 * @see RdbmsOperation#compileInternal()
 	 */
 	protected final void compileInternal() {
-		List parameters = getDeclaredParameters();
-		int firstParameter = 0;
-		if (isFunction()) {
-			this.callString = "{? = call " + getSql() + "(";
-			firstParameter = 1;
+		if (isSqlReadyForUse()) {
+			this.callString = getSql();
 		}
 		else {
-			this.callString = "{call " + getSql() + "(";
-		}
-		for (int i = firstParameter; i < parameters.size(); i++) {
-			SqlParameter p = (SqlParameter) parameters.get(i);
-			if ((p instanceof SqlReturnResultSet)) {
-				firstParameter++;
+			List parameters = getDeclaredParameters();
+			int parameterCount = 0;
+			if (isFunction()) {
+				this.callString = "{? = call " + getSql() + "(";
+				parameterCount = -1;
 			}
 			else {
-				if (i > firstParameter) {
-					this.callString += ", ";
-				}
-				this.callString += "?";
+				this.callString = "{call " + getSql() + "(";
 			}
+			for (int i = 0; i < parameters.size(); i++) {
+				SqlParameter parameter = (SqlParameter) parameters.get(i);
+				if (!(parameter instanceof SqlReturnResultSet)) {
+					if (parameterCount > 0) {
+						this.callString += ", ";
+					}
+					if (parameterCount >= 0) {
+						this.callString += "?";
+					}
+					parameterCount++;
+				}
+			}
+			this.callString += ")}";
 		}
-		this.callString += ")}";
-
-		logger.info("Compiled stored procedure. Call string is [" + getCallString() + "]");
+		if (logger.isDebugEnabled()) {
+			logger.debug("Compiled stored procedure. Call string is [" + getCallString() + "]");
+		}
 
 		this.callableStatementFactory = new CallableStatementCreatorFactory(getCallString(), getDeclaredParameters());
+		this.callableStatementFactory.setResultSetType(getResultSetType());
+		this.callableStatementFactory.setUpdatableResults(isUpdatableResults());
+		this.callableStatementFactory.setNativeJdbcExtractor(getJdbcTemplate().getNativeJdbcExtractor());
 
 		onCompileInternal();
 	}
@@ -141,6 +169,31 @@ public abstract class SqlCall extends RdbmsOperation {
 	 * This implementation does nothing.
 	 */
 	protected void onCompileInternal() {
+	}
+
+	/**
+	 * Get the call string.
+	 */
+	public String getCallString() {
+		return this.callString;
+	}
+
+	/**
+	 * Return a CallableStatementCreator to perform an operation
+	 * with this parameters.
+	 * @param inParams parameters. May be <code>null</code>.
+	 */
+	protected CallableStatementCreator newCallableStatementCreator(Map inParams) {
+		return this.callableStatementFactory.newCallableStatementCreator(inParams);
+	}
+
+	/**
+	 * Return a CallableStatementCreator to perform an operation
+	 * with the parameters returned from this ParameterMapper.
+	 * @param inParamMapper parametermapper. May not be <code>null</code>.
+	 */
+	protected CallableStatementCreator newCallableStatementCreator(ParameterMapper inParamMapper) {
+		return this.callableStatementFactory.newCallableStatementCreator(inParamMapper);
 	}
 
 }

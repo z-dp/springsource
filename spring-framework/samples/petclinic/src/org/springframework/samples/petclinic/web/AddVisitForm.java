@@ -17,6 +17,7 @@ import org.springframework.web.servlet.ModelAndView;
 public class AddVisitForm extends AbstractClinicForm {
 
 	public AddVisitForm() {
+		setCommandName("visit");
 		// need a session to hold the formBackingObject
 		setSessionForm(true);
 	}
@@ -34,7 +35,7 @@ public class AddVisitForm extends AbstractClinicForm {
 		Visit visit = (Visit) command;
 		// delegate the insert to the Business layer
 		getClinic().storeVisit(visit);
-		return new ModelAndView(getSuccessView(), "ownerId", Long.toString(visit.getPet().getOwner().getId()));
+		return new ModelAndView(getSuccessView(), "ownerId", visit.getPet().getOwner().getId());
 	}
 
 	protected ModelAndView handleInvalidSubmit(HttpServletRequest request, HttpServletResponse response)

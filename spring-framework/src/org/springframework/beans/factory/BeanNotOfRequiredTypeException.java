@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory;
 
@@ -20,50 +20,54 @@ import org.springframework.beans.BeansException;
 
 /**
  * Thrown when a bean doesn't match the required type.
+ *
  * @author Rod Johnson
  */
 public class BeanNotOfRequiredTypeException extends BeansException {
 
 	/** The name of the instance that was of the wrong type */
-	private String name;
+	private final String beanName;
 
 	/** The required type */
-	private Class requiredType;
+	private final Class requiredType;
 
-	/** The offending instance */
-	private Object actualInstance;
+	/** The offending type */
+	private final Class actualType;
 
 	/**
-	 * Creates new <code>BeanNotOfRequiredTypeException</code>.
-	 * @param name name of the bean requested
-	 * @param requiredType required type
-	 * @param actualInstance the instance actually returned, whose
-	 * class did not match the expected type.
+	 * Create a new BeanNotOfRequiredTypeException.
+	 * @param beanName the name of the bean requested
+	 * @param requiredType the required type
+	 * @param actualType the actual type returned, which did not match
+	 * the expected type
 	 */
-	public BeanNotOfRequiredTypeException(String name, Class requiredType, Object actualInstance) {
-		super("Bean named '" + name + "' must be of type [" + requiredType.getName() +
-					"], but was actually of type [" + actualInstance.getClass().getName() + "]", null);
-		this.name = name;
+	public BeanNotOfRequiredTypeException(String beanName, Class requiredType, Class actualType) {
+		super("Bean named '" + beanName + "' must be of type [" + requiredType.getName() +
+				"], but was actually of type [" + actualType.getName() + "]");
+		this.beanName = beanName;
 		this.requiredType = requiredType;
-		this.actualInstance = actualInstance;
+		this.actualType = actualType;
 	}
 
+	/**
+	 * Return the name of the instance that was of the wrong type.
+	 */
 	public String getBeanName() {
-		return name;
+		return beanName;
 	}
 
+	/**
+	 * Return the required type for the bean.
+	 */
 	public Class getRequiredType() {
 		return requiredType;
 	}
 
+	/**
+	 * Return the actual type of the instance found.
+	 */
 	public Class getActualType() {
-		return actualInstance.getClass();
-	}
-
-	public Object getActualInstance() {
-		return actualInstance;
+		return actualType;
 	}
 
 }
-
-

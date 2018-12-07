@@ -1,24 +1,24 @@
 /*
- * Copyright 2002-2004 the original author or authors.
- * 
+ * Copyright 2002-2006 the original author or authors.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.web.servlet;
 
 import java.io.IOException;
+import java.security.Principal;
 
-import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -33,6 +33,8 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.RequestHandledEvent;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 import org.springframework.web.context.support.XmlWebApplicationContext;
+import org.springframework.web.util.NestedServletException;
+import org.springframework.web.util.WebUtils;
 
 /**
  * Base servlet for servlets within the web framework. Allows integration
@@ -72,7 +74,7 @@ import org.springframework.web.context.support.XmlWebApplicationContext;
  * the "namespace" servlet init-param.
  *
  * @author Rod Johnson
- * @version $Revision: 1.14 $
+ * @author Juergen Hoeller
  * @see #doService
  * @see #initFrameworkServlet
  * @see #setContextClass
@@ -82,9 +84,9 @@ import org.springframework.web.context.support.XmlWebApplicationContext;
 public abstract class FrameworkServlet extends HttpServletBean {
 
 	/**
-	 * Suffix for namespace bean factory names. If a servlet of this class is
-	 * given the name 'test' in a context, the namespace used by the servlet will
-	 * resolve to 'test-servlet'.
+	 * Suffix for WebApplicationContext namespaces. If a servlet of this class is
+	 * given the name "test" in a context, the namespace used by the servlet will
+	 * resolve to "test-servlet".
 	 */
 	public static final String DEFAULT_NAMESPACE_SUFFIX = "-servlet";
 
@@ -95,13 +97,13 @@ public abstract class FrameworkServlet extends HttpServletBean {
 	public static final Class DEFAULT_CONTEXT_CLASS = XmlWebApplicationContext.class;
 
 	/**
-	 * Prefix for the ServletContext attribute for the web application context.
+	 * Prefix for the ServletContext attribute for the WebApplicationContext.
 	 * The completion is the servlet name.
 	 */
 	public static final String SERVLET_CONTEXT_PREFIX = FrameworkServlet.class.getName() + ".CONTEXT.";
 
 
-	/** Custom context class */
+	/** WebApplicationContext implementation class to use */
 	private Class contextClass = DEFAULT_CONTEXT_CLASS;
 
 	/** Namespace for this servlet */
@@ -113,16 +115,20 @@ public abstract class FrameworkServlet extends HttpServletBean {
 	/** Should we publish the context as a ServletContext attribute? */
 	private boolean publishContext = true;
 
+	/** Should we publish a RequestHandledEvent at the end of each request? */
+	private boolean publishEvents = true;
+
 	/** WebApplicationContext for this servlet */
 	private WebApplicationContext webApplicationContext;
 
 
 	/**
-	 * Set a custom context class. This class must be of type WebApplicationContext,
-	 * with the default FrameworkServlet implementing ConfigurableWebApplicationContext.
+	 * Set a custom context class. This class must be of type WebApplicationContext;
+	 * when using the default FrameworkServlet implementation, the context class
+	 * must also implement ConfigurableWebApplicationContext.
 	 * @see #createWebApplicationContext
 	 */
-	public final void setContextClass(Class contextClass) {
+	public void setContextClass(Class contextClass) {
 		this.contextClass = contextClass;
 	}
 
@@ -146,7 +152,7 @@ public abstract class FrameworkServlet extends HttpServletBean {
 	 * no custom namespace was set: e.g. "test-servlet" for a servlet named "test".
 	 */
 	public String getNamespace() {
-		return (namespace != null) ? namespace : getServletName() + FrameworkServlet.DEFAULT_NAMESPACE_SUFFIX;
+		return (this.namespace != null) ? this.namespace : getServletName() + DEFAULT_NAMESPACE_SUFFIX;
 	}
 
 	/**
@@ -166,15 +172,12 @@ public abstract class FrameworkServlet extends HttpServletBean {
 	}
 
 	/**
-	 * Set whether to publish this servlet's context as a ServletContext attribute.
-	 * Default is true.
-	 * @param publishContext whether we should publish this servlet's
-	 * WebApplicationContext as a ServletContext attribute, available to
-	 * all objects in this web container. Default is true. This is especially
-	 * handy during testing, although it is debatable whether it's good practice
-	 * to let other application objects access the context this way.
+	 * Set whether to publish this servlet's context as a ServletContext attribute,
+	 * available to all objects in the web container. Default is "true".
+	 * <p>This is especially handy during testing, although it is debatable whether
+	 * it's good practice to let other application objects access the context this way.
 	 */
-	public final void setPublishContext(boolean publishContext) {
+	public void setPublishContext(boolean publishContext) {
 		this.publishContext = publishContext;
 	}
 
@@ -186,18 +189,20 @@ public abstract class FrameworkServlet extends HttpServletBean {
 	}
 
 	/**
-	 * Return this servlet's WebApplicationContext.
+	 * Set whether this servlet should publish a RequestHandlerEvent at the end
+	 * of each request. Default is "true"; can be turned off for a slight performance
+	 * improvement, provided that no ApplicationListeners rely on such events.
 	 */
-	public final WebApplicationContext getWebApplicationContext() {
-		return webApplicationContext;
+	public void setPublishEvents(boolean publishEvents) {
+		this.publishEvents = publishEvents;
 	}
 
 	/**
-	 * Return the ServletContext attribute name for this servlet's
-	 * WebApplicationContext.
+	 * Return whether this servlet should publish a RequestHandlerEvent at the end
+	 * of each request.
 	 */
-	public final String getServletContextAttributeName() {
-		return SERVLET_CONTEXT_PREFIX + getServletName();
+	public boolean isPublishEvents() {
+		return publishEvents;
 	}
 
 
@@ -208,7 +213,7 @@ public abstract class FrameworkServlet extends HttpServletBean {
 	protected final void initServletBean() throws ServletException, BeansException {
 		long startTime = System.currentTimeMillis();
 		if (logger.isInfoEnabled()) {
-			logger.info("Framework servlet '" + getServletName() + "' init");
+			logger.info("FrameworkServlet '" + getServletName() + "': initialization started");
 		}
 
 		try {
@@ -226,7 +231,8 @@ public abstract class FrameworkServlet extends HttpServletBean {
 
 		if (logger.isInfoEnabled()) {
 			long elapsedTime = System.currentTimeMillis() - startTime;
-			logger.info("Framework servlet '" + getServletName() + "' init completed in " + elapsedTime + " ms");
+			logger.info("FrameworkServlet '" + getServletName() + "': initialization completed in " +
+					elapsedTime + " ms");
 		}
 	}
 
@@ -238,24 +244,26 @@ public abstract class FrameworkServlet extends HttpServletBean {
 	 * @see #createWebApplicationContext
 	 */
 	protected WebApplicationContext initWebApplicationContext() throws BeansException {
-		getServletContext().log("Initializing WebApplicationContext for servlet '" + getServletName() + "'");
-		ServletContext servletContext = getServletConfig().getServletContext();
-		WebApplicationContext parent = WebApplicationContextUtils.getWebApplicationContext(servletContext);
+		getServletContext().log(
+				"Loading WebApplicationContext for Spring FrameworkServlet '" + getServletName() + "'");
 
+		WebApplicationContext parent = WebApplicationContextUtils.getWebApplicationContext(getServletContext());
 		WebApplicationContext wac = createWebApplicationContext(parent);
 		if (logger.isInfoEnabled()) {
-			logger.info("Using context class '" + wac.getClass().getName() + "' for servlet '" + getServletName() + "'");
+			logger.info("Using context class [" + wac.getClass().getName() + "] for servlet '" +
+					getServletName() + "'");
 		}
 
-		if (this.publishContext) {
-			// Publish the context as a servlet context attribute
-			String attName = getServletContextAttributeName();
-			servletContext.setAttribute(attName, wac);
-			if (logger.isInfoEnabled()) {
-				logger.info("Published WebApplicationContext of servlet '" + getServletName() +
-										"' as ServletContext attribute with name [" + attName + "]");
+		if (isPublishContext()) {
+			// Publish the context as a servlet context attribute.
+			String attrName = getServletContextAttributeName();
+			getServletContext().setAttribute(attrName, wac);
+			if (logger.isDebugEnabled()) {
+				logger.debug("Published WebApplicationContext of servlet '" + getServletName() +
+						"' as ServletContext attribute with name [" + attrName + "]");
 			}
 		}
+
 		return wac;
 	}
 
@@ -264,6 +272,8 @@ public abstract class FrameworkServlet extends HttpServletBean {
 	 * XmlWebApplicationContext or a custom context class if set. This implementation
 	 * expects custom contexts to implement ConfigurableWebApplicationContext.
 	 * Can be overridden in subclasses.
+	 * @param parent the parent ApplicationContext to use, or <code>null</code> if none
+	 * @return the WebApplicationContext for this servlet
 	 * @throws BeansException if the context couldn't be initialized
 	 * @see #setContextClass
 	 * @see org.springframework.web.context.support.XmlWebApplicationContext
@@ -271,16 +281,16 @@ public abstract class FrameworkServlet extends HttpServletBean {
 	protected WebApplicationContext createWebApplicationContext(WebApplicationContext parent)
 			throws BeansException {
 
-		if (logger.isInfoEnabled()) {
-			logger.info("Servlet with name '" + getServletName() +
-									"' will try to create custom WebApplicationContext context of class '" +
-									getContextClass().getName() + "'" + " using parent context [" + parent + "]");
+		if (logger.isDebugEnabled()) {
+			logger.debug("Servlet with name '" + getServletName() +
+					"' will try to create custom WebApplicationContext context of class '" +
+					getContextClass().getName() + "'" + ", using parent context [" + parent + "]");
 		}
 		if (!ConfigurableWebApplicationContext.class.isAssignableFrom(getContextClass())) {
-			throw new ApplicationContextException("Fatal initialization error in servlet with name '" +
-																						getServletName() + "': custom WebApplicationContext class [" +
-																						getContextClass().getName() +
-																						"] is not of type ConfigurableWebApplicationContext");
+			throw new ApplicationContextException(
+					"Fatal initialization error in servlet with name '" + getServletName() +
+					"': custom WebApplicationContext class [" + getContextClass().getName() +
+					"] is not of type ConfigurableWebApplicationContext");
 		}
 
 		ConfigurableWebApplicationContext wac =
@@ -288,90 +298,31 @@ public abstract class FrameworkServlet extends HttpServletBean {
 		wac.setParent(parent);
 		wac.setServletContext(getServletContext());
 		wac.setNamespace(getNamespace());
-		if (this.contextConfigLocation != null) {
+		if (getContextConfigLocation() != null) {
 			wac.setConfigLocations(
-			    StringUtils.tokenizeToStringArray(this.contextConfigLocation,
-			                                      ConfigurableWebApplicationContext.CONFIG_LOCATION_DELIMITERS,
-			                                      true, true));
+			    StringUtils.tokenizeToStringArray(
+							getContextConfigLocation(), ConfigurableWebApplicationContext.CONFIG_LOCATION_DELIMITERS));
 		}
 		wac.refresh();
 		return wac;
 	}
 
-	public void destroy() {
-		getServletContext().log("Closing WebApplicationContext for servlet '" + getServletName() + "'");
-		if (getWebApplicationContext() instanceof ConfigurableApplicationContext) {
-			((ConfigurableApplicationContext) getWebApplicationContext()).close();
-		}
+	/**
+	 * Return the ServletContext attribute name for this servlet's WebApplicationContext.
+	 * Default implementation returns SERVLET_CONTEXT_PREFIX + servlet name.
+	 * @see #SERVLET_CONTEXT_PREFIX
+	 * @see #getServletName
+	 */
+	public String getServletContextAttributeName() {
+		return SERVLET_CONTEXT_PREFIX + getServletName();
 	}
 
 	/**
-	 * It's up to each subclass to decide whether or not it supports a request method.
-	 * It should throw a Servlet exception if it doesn't support a particular request type.
-	 * This might commonly be done with GET for forms, for example
+	 * Return this servlet's WebApplicationContext.
 	 */
-	protected final void doGet(HttpServletRequest request, HttpServletResponse response)
-	    throws ServletException, IOException {
-		serviceWrapper(request, response);
+	public final WebApplicationContext getWebApplicationContext() {
+		return webApplicationContext;
 	}
-
-	/**
-	 * It's up to each subclass to decide whether or not it supports a request method.
-	 * It should throw a Servlet exception if it doesn't support a particular request type.
-	 * This might commonly be done with GET for forms, for example
-	 */
-	protected final void doPost(HttpServletRequest request, HttpServletResponse response)
-	    throws ServletException, IOException {
-		serviceWrapper(request, response);
-	}
-
-	/**
-	 * Handle this request, publishing an event regardless of the outcome.
-	 * The actually event handling is performed by the abstract doService() method.
-	 * Both doGet() and doPost() are handled by this method.
-	 */
-	private void serviceWrapper(HttpServletRequest request, HttpServletResponse response)
-	    throws ServletException, IOException {
-
-		long startTime = System.currentTimeMillis();
-		Exception failureCause = null;
-		try {
-			doService(request, response);
-		}
-		catch (ServletException ex) {
-			failureCause = ex;
-			throw ex;
-		}
-		catch (IOException ex) {
-			failureCause = ex;
-			throw ex;
-		}
-		catch (RuntimeException ex) {
-			failureCause = ex;
-			throw ex;
-		}
-		catch (Exception ex) {
-			failureCause = ex;
-			throw new ServletException(ex.getMessage(), ex);
-		}
-		finally {
-			long processingTime = System.currentTimeMillis() - startTime;
-			// whether or not we succeeded, publish an event
-			if (failureCause != null) {
-				logger.error("Could not complete request", failureCause);
-				this.webApplicationContext.publishEvent(
-				    new RequestHandledEvent(this, request.getRequestURI(), processingTime, request.getRemoteAddr(),
-				                            request.getMethod(), getServletConfig().getServletName(), failureCause));
-			}
-			else {
-				logger.debug("Successfully completed request");
-				this.webApplicationContext.publishEvent(
-				    new RequestHandledEvent(this, request.getRequestURI(), processingTime, request.getRemoteAddr(),
-				                            request.getMethod(), getServletConfig().getServletName()));
-			}
-		}
-	}
-
 
 	/**
 	 * This method will be invoked after any bean properties have been set and
@@ -383,15 +334,136 @@ public abstract class FrameworkServlet extends HttpServletBean {
 	protected void initFrameworkServlet() throws ServletException, BeansException {
 	}
 
+
 	/**
-	 * Subclasses must implement this method to do the work of request handling.
-	 * The contract is the same as that for the doGet or doPost methods of HttpServlet.
-	 * This class intercepts calls to ensure that event publication takes place.
+	 * Delegate GET requests to processRequest/doService.
+	 * <p>Will also be invoked by HttpServlet's default implementation of doHead,
+	 * with a NoBodyResponse that just captures the content length.
+	 * @see #doService
+	 * @see #doHead
+	 */
+	protected final void doGet(HttpServletRequest request, HttpServletResponse response)
+	    throws ServletException, IOException {
+
+		processRequest(request, response);
+	}
+
+	/**
+	 * Delegate POST requests to processRequest/doService.
+	 * @see #doService
+	 */
+	protected final void doPost(HttpServletRequest request, HttpServletResponse response)
+	    throws ServletException, IOException {
+
+		processRequest(request, response);
+	}
+
+	/**
+	 * Delegate PUT requests to processRequest/doService.
+	 * @see #doService
+	 */
+	protected final void doPut(HttpServletRequest request, HttpServletResponse response)
+	    throws ServletException, IOException {
+
+		processRequest(request, response);
+	}
+
+	/**
+	 * Delegate DELETE requests to processRequest/doService.
+	 * @see #doService
+	 */
+	protected final void doDelete(HttpServletRequest request, HttpServletResponse response)
+	    throws ServletException, IOException {
+
+		processRequest(request, response);
+	}
+
+	/**
+	 * Process this request, publishing an event regardless of the outcome.
+	 * The actually event handling is performed by the abstract
+	 * <code>doService()</code> template method.
+	 * @see #doService
+	 */
+	protected final void processRequest(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+
+		long startTime = System.currentTimeMillis();
+		Throwable failureCause = null;
+
+		try {
+			doService(request, response);
+		}
+		catch (ServletException ex) {
+			failureCause = ex;
+			throw ex;
+		}
+		catch (IOException ex) {
+			failureCause = ex;
+			throw ex;
+		}
+		catch (Throwable ex) {
+			failureCause = ex;
+			throw new NestedServletException("Request processing failed", ex);
+		}
+
+		finally {
+			if (failureCause != null) {
+				logger.debug("Could not complete request", failureCause);
+			}
+			else {
+				logger.debug("Successfully completed request");
+			}
+			if (isPublishEvents()) {
+				// Whether or not we succeeded, publish an event.
+				long processingTime = System.currentTimeMillis() - startTime;
+				this.webApplicationContext.publishEvent(
+						new RequestHandledEvent(this, request.getRequestURI(), processingTime, request.getRemoteAddr(),
+								request.getMethod(), getServletConfig().getServletName(), WebUtils.getSessionId(request),
+								getUsernameForRequest(request), failureCause));
+			}
+		}
+	}
+
+	/**
+	 * Determine the username for the given request.
+	 * Default implementation takes the name of the UserPrincipal, if any.
+	 * Can be overridden in subclasses.
+	 * @param request current HTTP request
+	 * @return the username, or <code>null</code> if none
+	 * @see javax.servlet.http.HttpServletRequest#getUserPrincipal
+	 */
+	protected String getUsernameForRequest(HttpServletRequest request) {
+		Principal userPrincipal = request.getUserPrincipal();
+		return (userPrincipal != null ? userPrincipal.getName() : null);
+	}
+
+	/**
+	 * Subclasses must implement this method to do the work of request handling,
+	 * receiving a centralized callback for GET, POST, PUT and DELETE.
+	 * <p>The contract is essentially the same as that for the commonly overridden
+	 * <code>doGet</code> or <code>doPost</code> methods of HttpServlet.
+	 * <p>This class intercepts calls to ensure that exception handling and
+	 * event publication takes place.
+	 * @param request current HTTP request
+	 * @param response current HTTP response
+	 * @throws Exception in case of any kind of processing failure
 	 * @see javax.servlet.http.HttpServlet#doGet
 	 * @see javax.servlet.http.HttpServlet#doPost
-	 * @throws Exception in case of any kind of processing failure
 	 */
 	protected abstract void doService(HttpServletRequest request, HttpServletResponse response)
 	    throws Exception;
+
+
+	/**
+	 * Close the WebApplicationContext of this servlet.
+	 * @see org.springframework.context.ConfigurableApplicationContext#close
+	 */
+	public void destroy() {
+		getServletContext().log(
+				"Closing WebApplicationContext of Spring FrameworkServlet '" + getServletName() + "'");
+		if (this.webApplicationContext instanceof ConfigurableApplicationContext) {
+			((ConfigurableApplicationContext) this.webApplicationContext).close();
+		}
+	}
 
 }

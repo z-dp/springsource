@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2004 the original author or authors.
+ * Copyright 2002-2005 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,39 +12,47 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */ 
+ */
 
 package org.springframework.beans.factory;
 
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 
-
 /**
- * Simple test of BeanFactory initialization
- * and lifecycle callbacks.
+ * Simple test of BeanFactory initialization and lifecycle callbacks.
+ * 
  * @author Rod Johnson
- * @since 12-Mar-2003
- * @version $Revision: 1.4 $
+ * @author Colin Sampaleanu
+ * @since 12.03.2003
  */
-public class LifecycleBean implements BeanNameAware, InitializingBean, BeanFactoryAware, DisposableBean {
+public class LifecycleBean implements BeanNameAware, BeanFactoryAware, InitializingBean, DisposableBean {
 
-	private String beanName;
+	protected String beanName;
+	
+	protected boolean initMethodDeclared = false;
 
-	private BeanFactory owningFactory;
+	protected BeanFactory owningFactory;
 
-	private boolean postProcessedBeforeInit;
+	protected boolean postProcessedBeforeInit;
 
-	private boolean inited;
+	protected boolean inited;
+	protected boolean initedViaDeclaredInitMethod;
 
-	private boolean postProcessedAfterInit;
+	protected boolean postProcessedAfterInit;
 
-	private boolean destroyed;
+	protected boolean destroyed;
+	
+	public boolean isInitMethodDeclared() {
+		return initMethodDeclared;
+	}
+	public void setInitMethodDeclared(boolean initMethodDeclared) {
+		this.initMethodDeclared = initMethodDeclared;
+	}
 
 	public void setBeanName(String name) {
 		this.beanName = name;
 	}
-
 	public String getBeanName() {
 		return beanName;
 	}
@@ -54,7 +62,7 @@ public class LifecycleBean implements BeanNameAware, InitializingBean, BeanFacto
 	}
 
 	public void postProcessBeforeInit() {
-		if (this.inited) {
+		if (this.inited || this.initedViaDeclaredInitMethod) {
 			throw new RuntimeException("Factory called postProcessBeforeInit after afterPropertiesSet");
 		}
 		if (this.postProcessedBeforeInit) {
@@ -70,15 +78,33 @@ public class LifecycleBean implements BeanNameAware, InitializingBean, BeanFacto
 		if (!this.postProcessedBeforeInit) {
 			throw new RuntimeException("Factory didn't call postProcessBeforeInit before afterPropertiesSet on lifecycle bean");
 		}
+		if (this.initedViaDeclaredInitMethod) {
+			throw new RuntimeException("Factory initialized via declared init method before initializing via afterPropertiesSet");
+		}
 		if (this.inited) {
 			throw new RuntimeException("Factory called afterPropertiesSet twice");
 		}
 		this.inited = true;
 	}
+	
+	public void declaredInitMethod() {
+		
+		if (!this.inited) {
+			throw new RuntimeException("Factory didn't call afterPropertiesSet before declared init method");
+		}		
+		
+		if (this.initedViaDeclaredInitMethod) {
+			throw new RuntimeException("Factory called declared init method twice");
+		}
+		this.initedViaDeclaredInitMethod = true;
+	}
 
 	public void postProcessAfterInit() {
 		if (!this.inited) {
 			throw new RuntimeException("Factory called postProcessAfterInit before afterPropertiesSet");
+		}
+		if (this.initMethodDeclared && !this.initedViaDeclaredInitMethod) {
+			throw new RuntimeException("Factory called postProcessAfterInit before calling declared init method");
 		}
 		if (this.postProcessedAfterInit) {
 			throw new RuntimeException("Factory called postProcessAfterInit twice");
@@ -91,7 +117,8 @@ public class LifecycleBean implements BeanNameAware, InitializingBean, BeanFacto
 	 * managed the bean's lifecycle correctly
 	 */
 	public void businessMethod() {
-		if (!this.inited || !this.postProcessedAfterInit) {
+		if (!this.inited || (this.initMethodDeclared && !this.initedViaDeclaredInitMethod)
+				|| !this.postProcessedAfterInit) {
 			throw new RuntimeException("Factory didn't initialize lifecycle object correctly");
 		}
 	}
@@ -124,5 +151,4 @@ public class LifecycleBean implements BeanNameAware, InitializingBean, BeanFacto
 			return bean;
 		}
 	}
-
 }
